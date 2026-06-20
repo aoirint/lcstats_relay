@@ -581,3 +581,18 @@ def test_app_composition_builds_standard_outputs(tmp_path: Path) -> None:
             assert isinstance(gas_output, GasOutput)
 
     asyncio.run(scenario())
+
+
+def test_app_composition_omits_gas_output_when_url_is_empty(tmp_path: Path) -> None:
+    """Keep archive-only connections available without Google Sheets settings."""
+    manager = create_connection_manager(
+        "http://localhost:2145/",
+        "",
+        "",
+        tmp_path,
+        lambda _state: None,
+        lambda _payload: None,
+    )
+
+    assert isinstance(manager, ConnectionManager)
+    assert list(manager.state.outputs) == ["archive"]

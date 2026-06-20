@@ -9,7 +9,7 @@ from typing import Any, cast
 import flet as ft
 import pytest
 
-from lcstats_relay.core.config import DEFAULT_TRACKER_URL, SettingsStore
+from lcstats_relay.core.config import DEFAULT_TRACKER_URL, RelaySettings, SettingsStore
 from lcstats_relay.core.payload import JSONValue
 from lcstats_relay.core.state import ConnectionState, OutputState, OutputStatus, RelayStatus
 from lcstats_relay.ui.monitor import (
@@ -118,14 +118,44 @@ def test_gas_url_validation_rejects_unexpected_endpoint(value: str, message: str
         validate_gas_url(value)
 
 
-def test_start_validates_inputs_before_creating_manager(tmp_path: Path) -> None:
-    """Keep controls editable and show an error when settings are incomplete."""
+def test_start_allows_connection_without_gas_destination(tmp_path: Path) -> None:
+    """Allow local archive-only connections when GAS is not configured."""
 
     async def scenario() -> None:
         page = _FakePage()
+        manager = _FakeManager()
         view = MonitorView(
             page,
             settings_store=_settings_store(tmp_path),
+            manager_factory=_factory_for(manager),
+        )
+
+        await view.start()
+
+        assert view.error.value == ""
+        assert view.start_button.disabled is True
+        assert manager.start_count == 1
+        assert page.update_count == 1
+
+    asyncio.run(scenario())
+
+
+def test_start_rejects_invalid_configured_gas_destination(tmp_path: Path) -> None:
+    """Validate a configured GAS destination before creating the manager."""
+
+    async def scenario() -> None:
+        page = _FakePage()
+        store = _settings_store(tmp_path)
+        store.save(
+            RelaySettings(
+                tracker_url=DEFAULT_TRACKER_URL,
+                gas_url="https://example.com/macros/s/id/exec",
+                data_dir=tmp_path,
+            ),
+        )
+        view = MonitorView(
+            page,
+            settings_store=store,
             manager_factory=_factory_for(_FakeManager()),
         )
 
@@ -277,7 +307,7 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
     assert view.error.value == ""
     assert view.health.value == "停止中"
     assert view.health_icon.icon == ft.Icons.ERROR_OUTLINE
-    assert len(view.output_destinations.controls) == 1
+    assert len(view.output_destinations.controls) == _OUTPUT_DESTINATION_COUNT
 
 
 def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> None:
@@ -295,7 +325,7 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
     assert view.health.value == "異常なし"
     assert view.health_detail.value == "監視中"
     assert view.health_icon.icon == ft.Icons.CHECK_CIRCLE
-    assert len(view.output_destinations.controls) == 1
+    assert len(view.output_destinations.controls) == _OUTPUT_DESTINATION_COUNT
 
     view.update_state(
         ConnectionState(
@@ -435,6 +465,12 @@ def test_full_window_view_save_errors_keep_active_view(tmp_path: Path) -> None:
     assert view.error.value == "ローカル保存先ディレクトリを指定してください"
 
     view.open_gas_auth()
+    view._save_gas_auth_from_view()
+    assert _active_heading(view) == "設定"
+    assert view.error.value == ""
+
+    view.open_gas_auth()
+    view.gas_url_field.value = "https://example.com/macros/s/id/exec"
     view._save_gas_auth_from_view()
     assert _active_heading(view) == "GAS認証"
     assert view.error.value == "GAS URLにはscript.google.comのHTTPS URLを指定してください"

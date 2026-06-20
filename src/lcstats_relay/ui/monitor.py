@@ -41,6 +41,7 @@ _OUTPUT_STATUS_COLORS = {
 }
 
 _UNHEALTHY_OUTPUT_STATUSES = frozenset({OutputStatus.ERROR, OutputStatus.RETRY_QUEUED})
+_DEFAULT_OUTPUT_ORDER = ("archive", "gas")
 
 
 class PagePort(Protocol):
@@ -212,12 +213,13 @@ class MonitorView:
 
     def save_gas_auth(self, gas_url: str, gas_token: str) -> None:
         """Validate and persist the GAS destination while keeping the token in memory."""
+        normalized_gas_url = validate_gas_url(gas_url) if gas_url.strip() else ""
         self._settings = RelaySettings(
             tracker_url=self._settings.tracker_url,
-            gas_url=validate_gas_url(gas_url),
+            gas_url=normalized_gas_url,
             data_dir=self._settings.data_dir,
         )
-        self._gas_token = gas_token.strip()
+        self._gas_token = gas_token.strip() if normalized_gas_url else ""
         self._settings_store.save(self._settings)
         self.error.value = ""
         self._refresh_settings_summary()
@@ -227,7 +229,9 @@ class MonitorView:
         """Validate settings and start a new connection manager."""
         try:
             tracker_url = validate_sse_url(self._settings.tracker_url)
-            gas_url = validate_gas_url(self._settings.gas_url)
+            gas_url = (
+                validate_gas_url(self._settings.gas_url) if self._settings.gas_url.strip() else ""
+            )
             data_dir = validate_data_dir(str(self._settings.data_dir))
         except ValueError as exc:
             self.error.value = str(exc)
@@ -319,9 +323,9 @@ class MonitorView:
         self.root_view.controls = [
             self._full_view_title("設定"),
             self.tracker_url_field,
-            self.data_dir_field,
             ft.Divider(),
             ft.Text("出力先設定", size=14, weight=ft.FontWeight.BOLD),
+            self.data_dir_field,
             ft.Row(
                 [
                     ft.Text("Google Apps Script", expand=True),
@@ -415,9 +419,10 @@ class MonitorView:
         self.gas_summary.value = f"GAS: {gas_state} / Token: {token_state}"
 
     def _refresh_health(self, state: ConnectionState) -> None:
+        display_outputs = self._display_outputs(state)
         unhealthy_outputs = [
             output
-            for output in state.outputs.values()
+            for output in display_outputs
             if output.status in _UNHEALTHY_OUTPUT_STATUSES or output.pending_count > 0
         ]
         if state.last_error:
@@ -446,8 +451,21 @@ class MonitorView:
             self.health_detail.value = "未接続"
 
         self.output_destinations.controls = [
-            self._output_destination(output) for output in state.outputs.values()
-        ] or [ft.Text("出力先は接続開始後に表示されます", color=ft.Colors.GREY_700)]
+            self._output_destination(output) for output in display_outputs
+        ]
+
+    def _display_outputs(self, state: ConnectionState) -> list[OutputState]:
+        if state.outputs and not any(key in state.outputs for key in _DEFAULT_OUTPUT_ORDER):
+            return list(state.outputs.values())
+        outputs = self._default_output_states() | state.outputs
+        return [outputs[key] for key in _DEFAULT_OUTPUT_ORDER]
+
+    def _default_output_states(self) -> dict[str, OutputState]:
+        gas_label = "Google Sheets" if self._settings.gas_url else "Google Sheets (未設定)"
+        return {
+            "archive": OutputState(key="archive", label="ローカル保存"),
+            "gas": OutputState(key="gas", label=gas_label),
+        }
 
     def _global_alert_panel(self) -> ft.Container:
         return ft.Container(

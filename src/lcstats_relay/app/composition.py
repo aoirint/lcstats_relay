@@ -36,13 +36,16 @@ def create_connection_manager(  # noqa: PLR0913 - UI boundary passes user settin
             required=True,
             queue_failures=False,
         ),
-        OutputRegistration(
-            key="gas",
-            label="Google Sheets",
-            build=lambda client: _build_gas_output(gas_url, client, authenticator),
-            queue_failures=True,
-        ),
     ]
+    if gas_url:
+        outputs.append(
+            OutputRegistration(
+                key="gas",
+                label="Google Sheets",
+                build=lambda client: _build_gas_output(gas_url, client, authenticator),
+                queue_failures=True,
+            ),
+        )
     return ConnectionManager(
         sse_url=sse_url,
         outputs=outputs,
