@@ -154,10 +154,10 @@ class MonitorView:
         )
         self.status = ft.Text(_STATUS_LABELS[RelayStatus.STOPPED], weight=ft.FontWeight.BOLD)
         self.health = ft.Text(
-            "停止中", size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_700
+            "停止中", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_700
         )
         self.health_detail = ft.Text("未接続", selectable=True)
-        self.health_icon = ft.Icon(ft.Icons.ERROR_OUTLINE, size=36, color=ft.Colors.RED_700)
+        self.health_icon = ft.Icon(ft.Icons.ERROR_OUTLINE, size=30, color=ft.Colors.RED_700)
         self.receive_count = ft.Text("0")
         self.last_received = ft.Text("-")
         self.error = ft.Text("", color=ft.Colors.RED_700, selectable=True)
@@ -170,13 +170,13 @@ class MonitorView:
             can_reveal_password=True,
             expand=True,
         )
-        self.output_destinations = ft.Column([], spacing=8)
-        self.root_view = ft.Column([], spacing=12, expand=True)
+        self.output_destinations = ft.Column([], spacing=4)
+        self.root_view = ft.Column([], spacing=8, expand=True)
         self.root_container = ft.Container(
             content=self.root_view,
             expand=True,
-            padding=16,
-            border_radius=8,
+            padding=8,
+            border_radius=6,
         )
         self._refresh_settings_summary()
         self._refresh_health(ConnectionState())
@@ -288,7 +288,7 @@ class MonitorView:
             ft.Row(
                 [
                     ft.Text(
-                        "LCStats Relay Monitor", size=26, weight=ft.FontWeight.BOLD, expand=True
+                        "LCStats Relay Monitor", size=20, weight=ft.FontWeight.BOLD, expand=True
                     ),
                     self.settings_button,
                 ],
@@ -308,7 +308,7 @@ class MonitorView:
                     self._global_alert_panel(),
                     self._output_destinations_panel(),
                 ],
-                spacing=12,
+                spacing=8,
                 vertical_alignment=ft.CrossAxisAlignment.START,
             ),
         ]
@@ -321,7 +321,7 @@ class MonitorView:
             self.tracker_url_field,
             self.data_dir_field,
             ft.Divider(),
-            ft.Text("出力先設定", size=16, weight=ft.FontWeight.BOLD),
+            ft.Text("出力先設定", size=14, weight=ft.FontWeight.BOLD),
             ft.Row(
                 [
                     ft.Text("Google Apps Script", expand=True),
@@ -369,7 +369,7 @@ class MonitorView:
     def _full_view_title(self, title: str) -> ft.Row:
         return ft.Row(
             [
-                ft.Text(title, size=26, weight=ft.FontWeight.BOLD, expand=True),
+                ft.Text(title, size=20, weight=ft.FontWeight.BOLD, expand=True),
                 ft.IconButton(
                     icon=ft.Icons.CLOSE,
                     tooltip="閉じる",
@@ -453,14 +453,14 @@ class MonitorView:
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Row([self.health_icon, self.health], spacing=12),
+                    ft.Row([self.health_icon, self.health], spacing=8),
                     self.health_detail,
                 ],
-                spacing=8,
+                spacing=4,
             ),
             border=ft.Border.all(1, ft.Colors.GREY_300),
-            border_radius=8,
-            padding=12,
+            border_radius=6,
+            padding=8,
             expand=1,
         )
 
@@ -470,11 +470,11 @@ class MonitorView:
                 [
                     self.output_destinations,
                 ],
-                spacing=6,
+                spacing=4,
             ),
             border=ft.Border.all(1, ft.Colors.GREY_300),
-            border_radius=8,
-            padding=12,
+            border_radius=6,
+            padding=8,
             expand=1,
         )
 
@@ -499,10 +499,10 @@ class MonitorView:
         if output.status in _UNHEALTHY_OUTPUT_STATUSES or output.pending_count > 0:
             controls.append(ft.Text(output.message, selectable=True))
         return ft.Container(
-            content=ft.Column(controls, spacing=4),
+            content=ft.Column(controls, spacing=2),
             border=ft.Border.all(1, ft.Colors.GREY_300),
-            border_radius=8,
-            padding=12,
+            border_radius=6,
+            padding=8,
         )
 
     @staticmethod

@@ -11,9 +11,9 @@ from lcstats_relay.app import run
 from lcstats_relay.app.main import main
 from lcstats_relay.ui.monitor import MonitorView
 
-_WINDOW_MIN_WIDTH = 760
-_WINDOW_MIN_HEIGHT = 640
-_PAGE_PADDING = 20
+_WINDOW_MIN_WIDTH = 560
+_WINDOW_MIN_HEIGHT = 380
+_PAGE_PADDING = 10
 
 
 class _FakeWindow:
