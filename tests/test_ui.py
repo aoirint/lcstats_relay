@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import flet as ft
 import pytest
@@ -25,9 +25,21 @@ _PAYLOAD_CALLS = 101
 class _FakePage:
     def __init__(self) -> None:
         self.update_count = 0
+        self.dialogs: list[ft.AlertDialog] = []
 
     def update(self) -> None:
         self.update_count += 1
+
+    def show_dialog(self, dialog: ft.AlertDialog) -> None:
+        dialog.open = True
+        self.dialogs.append(dialog)
+
+    def pop_dialog(self) -> ft.AlertDialog | None:
+        if not self.dialogs:
+            return None
+        dialog = self.dialogs.pop()
+        dialog.open = False
+        return dialog
 
 
 class _FakeManager:
@@ -73,7 +85,8 @@ def _settings_store(tmp_path: Path) -> SettingsStore:
 
 
 def _active_heading(view: MonitorView) -> str | None:
-    heading = cast("ft.Text", view.root_view.controls[0])
+    header = cast("ft.Row", view.root_view.controls[0])
+    heading = cast("ft.Text", header.controls[0])
     return heading.value
 
 
@@ -257,13 +270,14 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
     )
     view.update_state(state)
 
-    assert isinstance(control, ft.Column)
+    assert isinstance(control, ft.Container)
     assert view.status.value == "出力処理中"
     assert view.receive_count.value == "4"
     assert view.last_received.value == "2026-06-20 09:15:33"
     assert view.error.value == "受信エラー: HTTP 503"
     assert view.health.value == "要確認"
     assert view.health_detail.value == "受信エラー: HTTP 503"
+    assert view.root_container.bgcolor == ft.Colors.RED_50
     assert len(view.output_alerts.controls) == 1
 
     first = view.output_alerts.controls[0]
@@ -273,6 +287,7 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
     assert view.last_received.value == "-"
     assert view.error.value == ""
     assert view.health.value == "停止中"
+    assert view.root_container.bgcolor == ft.Colors.RED_50
     assert len(view.output_alerts.controls) == 1
 
 
@@ -290,6 +305,7 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
 
     assert view.health.value == "異常なし"
     assert view.health_detail.value == "受信と出力を監視中です"
+    assert view.root_container.bgcolor == ft.Colors.GREEN_50
     assert len(view.output_alerts.controls) == 1
 
     view.update_state(
@@ -317,6 +333,7 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
 
     assert view.health.value == "要確認"
     assert view.health_detail.value == "出力に失敗または再送待ちがあります"
+    assert view.root_container.bgcolor == ft.Colors.RED_50
     assert len(view.output_alerts.controls) == 1
 
 
@@ -335,25 +352,38 @@ def test_payload_callback_does_not_render_raw_payloads(tmp_path: Path) -> None:
     assert page.update_count == 0
 
 
-def test_settings_and_gas_auth_are_saved_from_separate_views(tmp_path: Path) -> None:
-    """Keep connection settings and GAS auth on separate in-page views."""
+def test_settings_modal_links_to_gas_auth_modal(tmp_path: Path) -> None:
+    """Open GAS auth as an output setting from the settings modal."""
     page = _FakePage()
     store = _settings_store(tmp_path)
     view = MonitorView(page, settings_store=store, manager_factory=_factory_for(_FakeManager()))
     view.build()
 
     view.open_settings()
-    assert _active_heading(view) == "設定"
+    assert page.dialogs[-1].open is True
+    settings_dialog = page.dialogs[-1]
+    settings_title = cast("ft.Row", settings_dialog.title)
+    assert cast("ft.Text", settings_title.controls[0]).value == "設定"
     view.tracker_url_field.value = "http://localhost:2145/"
     view.data_dir_field.value = str(tmp_path / "archive-root")
-    view._save_settings_from_view()
-    assert _active_heading(view) == "LCStats Relay Monitor"
 
-    view.open_gas_auth()
-    assert _active_heading(view) == "GAS認証"
+    settings_content = cast("ft.Column", settings_dialog.content)
+    output_row = cast("ft.Row", settings_content.controls[4])
+    gas_button = cast("Any", output_row.controls[1])
+    gas_button.on_click(None)
+
+    assert settings_dialog.open is False
+    gas_dialog = page.dialogs[-1]
+    gas_title = cast("ft.Row", gas_dialog.title)
+    assert cast("ft.Text", gas_title.controls[0]).value == "GAS認証"
     view.gas_url_field.value = "https://script.google.com/macros/s/id/exec"
     view.gas_token_field.value = "secret"
-    view._save_gas_auth_from_view()
+    view._save_gas_auth_from_modal()
+
+    view.open_settings()
+    view.tracker_url_field.value = "http://localhost:2145/"
+    view.data_dir_field.value = str(tmp_path / "archive-root")
+    view._save_settings_from_modal()
 
     settings = store.load()
     assert settings.tracker_url == "http://localhost:2145/"
@@ -363,8 +393,8 @@ def test_settings_and_gas_auth_are_saved_from_separate_views(tmp_path: Path) -> 
     assert "secret" not in store.path.read_text(encoding="utf-8")
 
 
-def test_view_save_errors_keep_active_view(tmp_path: Path) -> None:
-    """Report validation errors without leaving the active settings view."""
+def test_modal_save_errors_keep_modal_open(tmp_path: Path) -> None:
+    """Report validation errors without closing the active modal."""
     page = _FakePage()
     view = MonitorView(
         page,
@@ -375,11 +405,13 @@ def test_view_save_errors_keep_active_view(tmp_path: Path) -> None:
 
     view.open_settings()
     view.data_dir_field.value = ""
-    view._save_settings_from_view()
-    assert _active_heading(view) == "設定"
+    settings_dialog = page.dialogs[-1]
+    view._save_settings_from_modal()
+    assert settings_dialog.open is True
     assert view.error.value == "ローカル保存先ディレクトリを指定してください"
 
     view.open_gas_auth()
-    view._save_gas_auth_from_view()
-    assert _active_heading(view) == "GAS認証"
+    gas_dialog = page.dialogs[-1]
+    view._save_gas_auth_from_modal()
+    assert gas_dialog.open is True
     assert view.error.value == "GAS URLにはscript.google.comのHTTPS URLを指定してください"

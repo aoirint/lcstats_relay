@@ -49,6 +49,12 @@ class PagePort(Protocol):
     def update(self) -> None:
         """Push changed controls to the client."""
 
+    def show_dialog(self, dialog: ft.AlertDialog) -> None:
+        """Display a modal dialog."""
+
+    def pop_dialog(self) -> object | None:
+        """Close the active modal dialog."""
+
 
 class ManagerPort(Protocol):
     """Connection manager operations used by the view."""
@@ -171,25 +177,31 @@ class MonitorView:
         )
         self.output_alerts = ft.Column([], spacing=8)
         self.root_view = ft.Column([], spacing=12, expand=True)
+        self.root_container = ft.Container(
+            content=self.root_view,
+            expand=True,
+            padding=16,
+            border_radius=8,
+        )
         self._refresh_settings_summary()
         self._refresh_health(ConnectionState())
 
-    def build(self) -> ft.Column:
+    def build(self) -> ft.Container:
         """Build the complete monitor control tree."""
         self._show_monitor_view(update=False)
-        return self.root_view
+        return self.root_container
 
     def open_settings(self, _event: object | None = None) -> None:
-        """Switch to the tracker and local storage settings view."""
+        """Open tracker, local storage, and output settings in a modal."""
         self.tracker_url_field.value = self._settings.tracker_url
         self.data_dir_field.value = str(self._settings.data_dir)
-        self._show_settings_view(update=True)
+        self._page.show_dialog(self._settings_dialog())
 
     def open_gas_auth(self, _event: object | None = None) -> None:
-        """Switch to the Google Apps Script destination and token view."""
+        """Open Google Apps Script destination and token settings in a modal."""
         self.gas_url_field.value = self._settings.gas_url
         self.gas_token_field.value = self._gas_token
-        self._show_gas_auth_view(update=True)
+        self._page.show_dialog(self._gas_auth_dialog())
 
     def save_settings(self, tracker_url: str, data_dir: str) -> None:
         """Validate and persist tracker plus local storage settings."""
@@ -278,11 +290,17 @@ class MonitorView:
 
     def _show_monitor_view(self, *, update: bool) -> None:
         self.root_view.controls = [
-            ft.Text("LCStats Relay Monitor", size=26, weight=ft.FontWeight.BOLD),
             ft.Row(
                 [
+                    ft.Text(
+                        "LCStats Relay Monitor", size=26, weight=ft.FontWeight.BOLD, expand=True
+                    ),
                     self.settings_button,
-                    self.gas_auth_button,
+                ],
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            ft.Row(
+                [
                     self.start_button,
                     self.stop_button,
                 ],
@@ -310,57 +328,68 @@ class MonitorView:
         if update:
             self._page.update()
 
-    def _show_settings_view(self, *, update: bool) -> None:
-        self.root_view.controls = [
-            ft.Text("設定", size=26, weight=ft.FontWeight.BOLD),
-            self.tracker_url_field,
-            self.data_dir_field,
-            self.error,
-            ft.Row(
+    def _settings_dialog(self) -> ft.AlertDialog:
+        return ft.AlertDialog(
+            modal=True,
+            title=self._modal_title("設定"),
+            content=ft.Column(
                 [
-                    ft.OutlinedButton(
-                        "戻る",
-                        icon=ft.Icons.ARROW_BACK,
-                        on_click=lambda _event: self._show_monitor_view(update=True),
-                    ),
-                    ft.FilledButton(
-                        "保存",
-                        icon=ft.Icons.SAVE,
-                        on_click=self._save_settings_from_view,
+                    self.tracker_url_field,
+                    self.data_dir_field,
+                    ft.Divider(),
+                    ft.Text("出力先設定", size=16, weight=ft.FontWeight.BOLD),
+                    ft.Row(
+                        [
+                            ft.Text("Google Apps Script", expand=True),
+                            ft.OutlinedButton(
+                                "設定",
+                                icon=ft.Icons.KEY,
+                                on_click=self._open_gas_auth_from_settings,
+                            ),
+                        ],
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
                 ],
-                wrap=True,
+                tight=True,
+                spacing=12,
             ),
-        ]
-        if update:
-            self._page.update()
+            actions=[
+                ft.FilledButton(
+                    "保存", icon=ft.Icons.SAVE, on_click=self._save_settings_from_modal
+                ),
+            ],
+        )
 
-    def _show_gas_auth_view(self, *, update: bool) -> None:
-        self.root_view.controls = [
-            ft.Text("GAS認証", size=26, weight=ft.FontWeight.BOLD),
-            self.gas_url_field,
-            self.gas_token_field,
-            self.error,
-            ft.Row(
-                [
-                    ft.OutlinedButton(
-                        "戻る",
-                        icon=ft.Icons.ARROW_BACK,
-                        on_click=lambda _event: self._show_monitor_view(update=True),
-                    ),
-                    ft.FilledButton(
-                        "保存",
-                        icon=ft.Icons.SAVE,
-                        on_click=self._save_gas_auth_from_view,
-                    ),
-                ],
-                wrap=True,
-            ),
-        ]
-        if update:
-            self._page.update()
+    def _gas_auth_dialog(self) -> ft.AlertDialog:
+        return ft.AlertDialog(
+            modal=True,
+            title=self._modal_title("GAS認証"),
+            content=ft.Column([self.gas_url_field, self.gas_token_field], tight=True, spacing=12),
+            actions=[
+                ft.FilledButton(
+                    "保存", icon=ft.Icons.SAVE, on_click=self._save_gas_auth_from_modal
+                ),
+            ],
+        )
 
-    def _save_settings_from_view(self, _event: object | None = None) -> None:
+    def _modal_title(self, title: str) -> ft.Row:
+        return ft.Row(
+            [
+                ft.Text(title, size=20, weight=ft.FontWeight.BOLD, expand=True),
+                ft.IconButton(
+                    icon=ft.Icons.CLOSE,
+                    tooltip="閉じる",
+                    on_click=lambda _event: self._page.pop_dialog(),
+                ),
+            ],
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
+    def _open_gas_auth_from_settings(self, _event: object | None = None) -> None:
+        self._page.pop_dialog()
+        self.open_gas_auth()
+
+    def _save_settings_from_modal(self, _event: object | None = None) -> None:
         try:
             self.save_settings(
                 self.tracker_url_field.value or "",
@@ -370,9 +399,10 @@ class MonitorView:
             self.error.value = str(exc)
             self._page.update()
             return
+        self._page.pop_dialog()
         self._show_monitor_view(update=True)
 
-    def _save_gas_auth_from_view(self, _event: object | None = None) -> None:
+    def _save_gas_auth_from_modal(self, _event: object | None = None) -> None:
         try:
             self.save_gas_auth(
                 self.gas_url_field.value or "",
@@ -382,6 +412,7 @@ class MonitorView:
             self.error.value = str(exc)
             self._page.update()
             return
+        self._page.pop_dialog()
         self._show_monitor_view(update=True)
 
     def _refresh_settings_summary(self) -> None:
@@ -402,18 +433,22 @@ class MonitorView:
             self.health.value = "要確認"
             self.health.color = ft.Colors.RED_700
             self.health_detail.value = state.last_error
+            self.root_container.bgcolor = ft.Colors.RED_50
         elif unhealthy_outputs:
             self.health.value = "要確認"
             self.health.color = ft.Colors.RED_700
             self.health_detail.value = "出力に失敗または再送待ちがあります"
+            self.root_container.bgcolor = ft.Colors.RED_50
         elif state.running:
             self.health.value = "異常なし"
             self.health.color = ft.Colors.GREEN_700
             self.health_detail.value = "受信と出力を監視中です"
+            self.root_container.bgcolor = ft.Colors.GREEN_50
         else:
             self.health.value = "停止中"
             self.health.color = ft.Colors.GREY_700
             self.health_detail.value = "接続は開始されていません"
+            self.root_container.bgcolor = ft.Colors.RED_50
 
         self.output_alerts.controls = (
             [self._output_alert(output) for output in unhealthy_outputs]
