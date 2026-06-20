@@ -20,7 +20,7 @@ The local archive is the required durability boundary. If archiving fails, later
 outputs are not attempted for that payload.
 
 For the LCStatsTracker source contract, see
-[LCStatsTracker input contract](docs/lcstats-tracker-io.md).
+[LCStatsTracker contract](docs/lcstats-tracker-contract.md).
 
 For the Relay output design, see
 [Relay output architecture](docs/relay-output-architecture.md).

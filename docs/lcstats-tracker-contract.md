@@ -1,4 +1,4 @@
-# LCStatsTracker input contract
+# LCStatsTracker contract
 
 This document describes only the external source contract that LCStats Relay
 expects from LCStatsTracker.
