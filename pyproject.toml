@@ -71,9 +71,9 @@ ignore = [
 ]
 
 [tool.mypy]
-files = ["main.py", "tests"]
+files = ["src", "tests"]
 strict = true
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = ["src"]
 testpaths = ["tests"]

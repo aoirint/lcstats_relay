@@ -2,7 +2,7 @@
 
 import pytest
 
-from main import main
+from lcstats_relay.__main__ import main
 
 
 def test_main(capsys: pytest.CaptureFixture[str]) -> None:
