@@ -15,3 +15,65 @@ dev = [
     "pytest>=9.0.3,<10.0.0",
     "ruff>=0.15.17,<0.16.0",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle errors: catch syntax-adjacent style issues and common readability problems.
+    "E",
+    # Pyflakes: catch undefined names, unused imports, and suspicious bindings.
+    "F",
+    # isort: keep imports deterministic and review-friendly.
+    "I",
+    # flake8-annotations: require explicit public signatures before mypy has to infer them.
+    "ANN",
+    # flake8-bugbear: catch likely bugs and sharp Python edge cases.
+    "B",
+    # flake8-comprehensions: prefer clearer and faster comprehension forms.
+    "C4",
+    # flake8-commas: keep multi-line literals stable under future edits.
+    "COM",
+    # pydocstyle: keep public API documentation visible as the project grows.
+    "D",
+    # eradicate: reject commented-out code before it becomes misleading history.
+    "ERA",
+    # flynt: prefer f-strings over older interpolation styles.
+    "FLY",
+    # pep8-naming: keep names conventional for Python readers and tools.
+    "N",
+    # Perflint: flag avoidable performance footguns in ordinary code.
+    "PERF",
+    # Pylint-derived rules: add broad maintainability checks without running Pylint separately.
+    "PL",
+    # flake8-pytest-style: keep tests idiomatic and easy to scan.
+    "PT",
+    # flake8-use-pathlib: prefer pathlib for filesystem paths.
+    "PTH",
+    # Ruff-specific rules: enable extra fixes and checks unique to Ruff.
+    "RUF",
+    # flake8-simplify: reduce unnecessary branching and boolean noise.
+    "SIM",
+    # tryceratops: keep exception handling specific and maintainable.
+    "TRY",
+    # pyupgrade: keep syntax modern for the configured Python target.
+    "UP",
+]
+ignore = [
+    # pydocstyle: prefer no blank line before a class docstring; conflicts with D211.
+    "D203",
+    # pydocstyle: prefer multi-line docstring summaries on the first line; conflicts with D212.
+    "D213",
+    # flake8-commas: let Ruff format own trailing comma decisions.
+    "COM812",
+]
+
+[tool.mypy]
+files = ["main.py", "tests"]
+strict = true
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
