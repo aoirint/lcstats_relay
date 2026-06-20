@@ -1,12 +1,32 @@
 # LCStatsTracker contract
 
-This document describes only the external source contract that an LCStatsTracker
-client should expect.
+This document describes only behavior that can be explained from the
+`MakuAureo/LCStatsTracker` repository.
 
-It does not describe client-side outputs such as local archive storage,
-Google Apps Script delivery, retry queues, or UI state. Those are implementation
-concerns of a specific client and are documented separately in the
-[output architecture](relay-output-architecture.md).
+## Source snapshot
+
+- Repository: <https://github.com/MakuAureo/LCStatsTracker>
+- Branch: `main`
+- Commit: `3cca19b38e54ccb1610d0cd3a838922dbf696560`
+- Commit date: `2026-06-02T10:08:07-03:00`
+- Reviewed on: `2026-06-20`
+- LCStatsTracker version: `1.2.4`
+- License: MIT
+- Files checked:
+  - `LICENSE`
+  - `README.md`
+  - `StatsTracker.csproj`
+  - `Util/HttpSSE.cs`
+  - `Patches/ServerEvents.cs`
+
+When updating this document, first refresh the repository snapshot and re-check:
+
+- the plugin version in `StatsTracker.csproj`;
+- the local server description in `README.md`;
+- the listener prefix, status code, content type, and reset behavior in
+  `Util/HttpSSE.cs`;
+- the point where day stats are published in `Patches/ServerEvents.cs`.
+- the repository license if this document starts to quote or copy upstream text.
 
 ## Input source
 
@@ -19,10 +39,6 @@ implementation registers this endpoint:
 ```text
 http://localhost:2145/
 ```
-
-A client may choose a concrete loopback address if that works in its target
-environment, but that is a client-side connection policy rather than an
-LCStatsTracker protocol feature.
 
 ## Response model
 
@@ -54,9 +70,9 @@ LCStatsTracker has an important timing constraint around Lethal Company days.
 After one in-game day ends, the resulting statistics can be queried only once
 before the next in-game day ends.
 
-That means a successful query is also a consumption event. If the client, the
-network stack, or any other consumer fails after the data is consumed, the same
-payload may no longer be recoverable from LCStatsTracker.
+That means a successful query is also a consumption event. In the current
+implementation, the server resets its pending data after writing the response,
+so the same payload is not available again after that response completes.
 
 Expected behavior:
 
@@ -78,11 +94,3 @@ A client extracts the raw JSON payload from the first `data:` line in the
 response. JSON parsing happens after extraction and is not part of the
 LCStatsTracker transport contract beyond the requirement that the `data:` value
 be JSON.
-
-## Source basis
-
-This contract summarizes the public `MakuAureo/LCStatsTracker` repository
-without copying implementation code.
-
-The repository is MIT licensed. The behavior above is based on the upstream
-README and the current `Util/HttpSSE.cs` implementation.
