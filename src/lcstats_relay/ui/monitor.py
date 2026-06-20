@@ -6,7 +6,7 @@ import json
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol
 from urllib.parse import parse_qsl, urlparse
 
 import flet as ft
@@ -49,9 +49,11 @@ class PagePort(Protocol):
     def update(self) -> None:
         """Push changed controls to the client."""
 
+    def show_dialog(self, dialog: ft.AlertDialog) -> None:
+        """Display a modal dialog."""
 
-class _DialogPagePort(Protocol):
-    dialog: ft.AlertDialog | None
+    def pop_dialog(self) -> object | None:
+        """Close the active modal dialog."""
 
 
 class ManagerPort(Protocol):
@@ -367,16 +369,10 @@ class MonitorView:
         self._page.update()
 
     def _open_dialog(self, dialog: ft.AlertDialog) -> None:
-        dialog_page = cast("_DialogPagePort", self._page)
-        dialog_page.dialog = dialog
-        dialog.open = True
-        self._page.update()
+        self._page.show_dialog(dialog)
 
     def _close_dialog(self) -> None:
-        dialog = getattr(cast("_DialogPagePort", self._page), "dialog", None)
-        if dialog is not None:
-            dialog.open = False
-        self._page.update()
+        self._page.pop_dialog()
 
     def _refresh_settings_summary(self) -> None:
         self.settings_summary.value = (

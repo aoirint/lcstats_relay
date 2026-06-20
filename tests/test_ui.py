@@ -32,6 +32,20 @@ class _FakePage:
     def update(self) -> None:
         self.update_count += 1
 
+    def show_dialog(self, dialog: ft.AlertDialog) -> None:
+        if dialog.open:
+            msg = "Dialog is already opened"
+            raise RuntimeError(msg)
+        self.dialog = dialog
+        dialog.open = True
+
+    def pop_dialog(self) -> ft.AlertDialog | None:
+        if self.dialog is None or not self.dialog.open:
+            return None
+        dialog = self.dialog
+        dialog.open = False
+        return dialog
+
 
 class _FakeManager:
     def __init__(self) -> None:
