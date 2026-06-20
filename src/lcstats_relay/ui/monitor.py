@@ -428,28 +428,24 @@ class MonitorView:
             self.health_icon.icon = ft.Icons.ERROR_OUTLINE
             self.health_icon.color = ft.Colors.RED_700
             self.health_detail.value = state.last_error
-            self.root_container.bgcolor = ft.Colors.RED_50
         elif unhealthy_outputs:
             self.health.value = "要確認"
             self.health.color = ft.Colors.RED_700
             self.health_icon.icon = ft.Icons.WARNING_AMBER
             self.health_icon.color = ft.Colors.RED_700
             self.health_detail.value = "出力に失敗または再送待ちがあります"
-            self.root_container.bgcolor = ft.Colors.RED_50
         elif state.running:
             self.health.value = "異常なし"
             self.health.color = ft.Colors.GREEN_700
             self.health_icon.icon = ft.Icons.CHECK_CIRCLE
             self.health_icon.color = ft.Colors.GREEN_700
             self.health_detail.value = "受信と出力を監視中です"
-            self.root_container.bgcolor = ft.Colors.GREEN_50
         else:
             self.health.value = "停止中"
             self.health.color = ft.Colors.GREY_700
             self.health_icon.icon = ft.Icons.ERROR_OUTLINE
             self.health_icon.color = ft.Colors.RED_700
             self.health_detail.value = "接続は開始されていません"
-            self.root_container.bgcolor = ft.Colors.RED_50
 
         self.output_destinations.controls = [
             self._output_destination(output) for output in state.outputs.values()

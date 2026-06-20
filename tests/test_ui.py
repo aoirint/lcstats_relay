@@ -278,7 +278,6 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
     assert view.error.value == "受信エラー: HTTP 503"
     assert view.health.value == "要確認"
     assert view.health_detail.value == "受信エラー: HTTP 503"
-    assert view.root_container.bgcolor == ft.Colors.RED_50
     assert view.health_icon.icon == ft.Icons.ERROR_OUTLINE
     assert len(view.output_destinations.controls) == _OUTPUT_DESTINATION_COUNT
 
@@ -289,7 +288,6 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
     assert view.last_received.value == "-"
     assert view.error.value == ""
     assert view.health.value == "停止中"
-    assert view.root_container.bgcolor == ft.Colors.RED_50
     assert view.health_icon.icon == ft.Icons.ERROR_OUTLINE
     assert len(view.output_destinations.controls) == 1
 
@@ -308,7 +306,6 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
 
     assert view.health.value == "異常なし"
     assert view.health_detail.value == "受信と出力を監視中です"
-    assert view.root_container.bgcolor == ft.Colors.GREEN_50
     assert view.health_icon.icon == ft.Icons.CHECK_CIRCLE
     assert len(view.output_destinations.controls) == 1
 
@@ -337,7 +334,6 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
 
     assert view.health.value == "要確認"
     assert view.health_detail.value == "出力に失敗または再送待ちがあります"
-    assert view.root_container.bgcolor == ft.Colors.RED_50
     assert view.health_icon.icon == ft.Icons.WARNING_AMBER
     assert len(view.output_destinations.controls) == _OUTPUT_DESTINATION_COUNT
 
