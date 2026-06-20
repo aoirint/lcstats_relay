@@ -2,6 +2,8 @@
 
 This document describes only behavior that can be explained from the
 `MakuAureo/LCStatsTracker` repository.
+The upstream project is MIT licensed; this document summarizes behavior and does
+not copy source code.
 
 ## Reference
 
