@@ -40,7 +40,8 @@ uv run python -m lcstats_relay
 
 既定のSSE URLは `localhost` ではなく `127.0.0.1` です。
 これは `localhost` の名前解決でIPv6/IPv4の接続試行が発生し、環境によって接続開始が遅くなることを避けるためです。
-互換性のため `http://localhost:2145/` も入力できますが、受信時は `Host` ヘッダーを維持したままIPv4ループバックへ接続します。
+互換性のため `http://localhost:2145/` や `http://[::1]:2145/` も入力できます。
+明示的に指定したURLは書き換えず、そのまま接続します。
 
 GAS Token はURLに含めず、Token欄に入力してください。
 GAS Token は画面上でマスクされ、設定ファイルには保存されません。
