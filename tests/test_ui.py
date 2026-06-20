@@ -332,12 +332,24 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
 
     view.update_state(ConnectionState(status=RelayStatus.WAITING, running=True))
 
-    assert view.health.value == "接続中"
+    assert view.health.value == "接続試行中"
     assert view.health.color == ft.Colors.ORANGE_800
-    assert view.health_detail.value == "接続試行中"
+    assert view.health_detail.value == "待機中"
     assert view.health_icon.icon == ft.Icons.SYNC
     assert view.health_icon.color == ft.Colors.ORANGE_800
     assert len(view.output_destinations.controls) == 1
+
+    view.update_state(
+        ConnectionState(
+            status=RelayStatus.ERROR,
+            running=True,
+            last_error="受信エラー: ConnectError",
+        ),
+    )
+
+    assert view.health.value == "接続試行中"
+    assert view.health_detail.value == "再試行中"
+    assert view.health_icon.icon == ft.Icons.SYNC
 
     view.update_state(
         ConnectionState(status=RelayStatus.WAITING, running=True, receive_count=1),

@@ -456,7 +456,13 @@ class MonitorView:
             for output in display_outputs
             if output.status in _UNHEALTHY_OUTPUT_STATUSES or output.pending_count > 0
         ]
-        if state.last_error:
+        if state.running and state.receive_count == 0 and not unhealthy_outputs:
+            self.health.value = "接続試行中"
+            self.health.color = ft.Colors.ORANGE_800
+            self.health_icon.icon = ft.Icons.SYNC
+            self.health_icon.color = ft.Colors.ORANGE_800
+            self.health_detail.value = "再試行中" if state.last_error else "待機中"
+        elif state.last_error:
             self.health.value = "要確認"
             self.health.color = ft.Colors.RED_700
             self.health_icon.icon = ft.Icons.ERROR_OUTLINE
@@ -468,12 +474,6 @@ class MonitorView:
             self.health_icon.icon = ft.Icons.WARNING_AMBER
             self.health_icon.color = ft.Colors.RED_700
             self.health_detail.value = "出力先を確認"
-        elif state.running and state.receive_count == 0:
-            self.health.value = "接続中"
-            self.health.color = ft.Colors.ORANGE_800
-            self.health_icon.icon = ft.Icons.SYNC
-            self.health_icon.color = ft.Colors.ORANGE_800
-            self.health_detail.value = "接続試行中"
         elif state.running:
             self.health.value = "異常なし"
             self.health.color = ft.Colors.GREEN_700
