@@ -14,7 +14,7 @@ exclude-newer-span = "P7D"
 msgpack = false
 
 [manifest]
-constraints = [{ name = "msgpack", specifier = ">=1.2.1,<1.3.0" }]
+constraints = [{ name = "msgpack", specifier = "==1.2.1" }]
 
 [[package]]
 name = "annotated-doc"

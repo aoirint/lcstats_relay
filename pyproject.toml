@@ -9,9 +9,9 @@ dependencies = [
 ]
 
 [tool.uv]
-# msgpack 1.2.1 fixes GHSA-6v7p-g79w-8964. Remove this narrow cooldown exemption
-# after 2026-06-25, once the patched release is covered by exclude-newer.
-constraint-dependencies = ["msgpack>=1.2.1,<1.3.0"]
+# msgpack 1.2.1 fixes GHSA-6v7p-g79w-8964, so keep the patched artifact exact.
+# Remove only the cooldown exemption after 2026-06-25; reassess the pin separately.
+constraint-dependencies = ["msgpack==1.2.1"]
 exclude-newer = "P7D"
 exclude-newer-package = { msgpack = false }
 
