@@ -457,9 +457,9 @@ class MonitorView:
             if output.status in _UNHEALTHY_OUTPUT_STATUSES or output.pending_count > 0
         ]
         if state.running and state.receive_count == 0 and not unhealthy_outputs:
-            self.health.value = "接続試行中"
+            self.health.value = "接続失敗" if state.last_error else "接続試行中"
             self.health.color = ft.Colors.ORANGE_800
-            self.health_icon.icon = ft.Icons.SYNC
+            self.health_icon.icon = ft.Icons.WARNING_AMBER if state.last_error else ft.Icons.SYNC
             self.health_icon.color = ft.Colors.ORANGE_800
             self.health_detail.value = self._connection_attempt_detail(state)
         elif state.last_error:

@@ -430,13 +430,19 @@ def test_manager_reconnects_after_receive_error(tmp_path: Path) -> None:
 
     async def scenario() -> None:
         states: list[ConnectionState] = []
+        sleeps: list[float] = []
+
+        async def sleep(delay: float) -> None:
+            sleeps.append(delay)
+
         manager = ConnectionManager(
             sse_url="http://localhost:2145/",
             outputs=[],
             data_dir=tmp_path,
             on_state=states.append,
             on_payload=lambda _payload: None,
-            reconnect_delay=0,
+            reconnect_delay=3,
+            reconnect_sleep=sleep,
             client_factory=lambda _timeout: httpx.AsyncClient(
                 transport=httpx.MockTransport(handler),
             ),
@@ -446,9 +452,10 @@ def test_manager_reconnects_after_receive_error(tmp_path: Path) -> None:
         await _wait_for(lambda: manager.state.receive_count == 1)
         await manager.stop()
 
-        error_state = next(state for state in states if state.status is RelayStatus.ERROR)
-        assert error_state.last_error == "受信エラー: HTTP 503"
-        assert error_state.retry_after_seconds == 0
+        error_states = [state for state in states if state.status is RelayStatus.ERROR]
+        assert [state.retry_after_seconds for state in error_states] == [3, 2, 1]
+        assert {state.last_error for state in error_states} == {"受信エラー: HTTP 503"}
+        assert sleeps == [1.0, 1.0, 1.0]
         assert request_count >= _EXPECTED_RETRY_REQUESTS
 
     asyncio.run(scenario())

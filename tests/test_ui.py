@@ -348,9 +348,9 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
         ),
     )
 
-    assert view.health.value == "接続試行中"
+    assert view.health.value == "接続失敗"
     assert view.health_detail.value == "3秒後に再試行"
-    assert view.health_icon.icon == ft.Icons.SYNC
+    assert view.health_icon.icon == ft.Icons.WARNING_AMBER
 
     view.update_state(
         ConnectionState(status=RelayStatus.WAITING, running=True, receive_count=1),

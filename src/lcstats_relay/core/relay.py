@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from contextlib import suppress
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +21,7 @@ from lcstats_relay.core.storage import RetryQueue
 type PayloadCallback = Callable[[JSONValue], None]
 type Clock = Callable[[], datetime]
 type ClientFactory = Callable[[httpx.Timeout], httpx.AsyncClient]
+type Sleep = Callable[[float], Awaitable[None]]
 
 _PREVIEW_LENGTH = 300
 
@@ -44,6 +45,7 @@ class ConnectionManager:
         retry_interval: float = 30.0,
         clock: Clock = datetime.now,
         client_factory: ClientFactory = _make_client,
+        reconnect_sleep: Sleep = asyncio.sleep,
     ) -> None:
         """Configure input, output registrations, state, persistence, and timing."""
         self._sse_url = sse_url
@@ -54,6 +56,7 @@ class ConnectionManager:
         self._retry_interval = retry_interval
         self._clock = clock
         self._client_factory = client_factory
+        self._reconnect_sleep = reconnect_sleep
         self._task: asyncio.Task[None] | None = None
         pending = {output.key: self._queue.count(output.key) for output in self._outputs}
         self._state = RelayStateStore(
@@ -112,11 +115,9 @@ class ConnectionManager:
             except asyncio.CancelledError:
                 raise
             except (httpx.HTTPError, ValueError) as exc:
-                self._state.receiver_error(
-                    self._safe_error("受信", exc),
-                    retry_after_seconds=self._reconnect_delay,
-                )
-                await asyncio.sleep(self._reconnect_delay)
+                message = self._safe_error("受信", exc)
+                self._state.receiver_error(message, retry_after_seconds=self._reconnect_delay)
+                await self._wait_before_reconnect(message)
                 continue
 
             now = self._clock()
@@ -135,6 +136,15 @@ class ConnectionManager:
                 raise
             except (OSError, TypeError, ValueError) as exc:
                 self._state.receiver_error(self._safe_error("再送キュー読込", exc))
+
+    async def _wait_before_reconnect(self, message: str) -> None:
+        remaining = self._reconnect_delay
+        while remaining > 0:
+            step = min(1.0, remaining)
+            await self._reconnect_sleep(step)
+            remaining = max(0.0, remaining - step)
+            if remaining > 0:
+                self._state.receiver_error(message, retry_after_seconds=remaining)
 
     @staticmethod
     def _build_payload(raw_json: str, *, received_at: datetime) -> RelayPayload:
