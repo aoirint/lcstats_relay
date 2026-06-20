@@ -25,7 +25,7 @@ _PREVIEW_LENGTH = 300
 
 
 def _make_client(timeout: httpx.Timeout) -> httpx.AsyncClient:
-    return httpx.AsyncClient(timeout=timeout)
+    return httpx.AsyncClient(timeout=timeout, follow_redirects=True)
 
 
 class RelayStatus(StrEnum):

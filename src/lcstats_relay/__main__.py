@@ -1,9 +1,11 @@
-"""Command-line entry point for lcstats-relay."""
+"""Module entry point for lcstats-relay."""
+
+from lcstats_relay.app.main import run
 
 
 def main() -> None:
-    """Print the default startup message."""
-    print("Hello from lcstats-relay!")
+    """Start the desktop application."""
+    run()
 
 
 if __name__ == "__main__":

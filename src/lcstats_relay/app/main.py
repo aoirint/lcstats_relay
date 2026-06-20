@@ -1,0 +1,24 @@
+"""Flet desktop application entry point."""
+
+from __future__ import annotations
+
+import flet as ft
+
+from lcstats_relay.ui.monitor import MonitorView
+
+
+async def main(page: ft.Page) -> None:
+    """Configure the desktop page and mount the async monitor view."""
+    page.title = "LCStats Relay"
+    page.window.min_width = 760
+    page.window.min_height = 640
+    page.padding = 20
+
+    view = MonitorView(page)
+    page.on_close = view.close
+    page.add(view.build())
+
+
+def run() -> None:
+    """Start the Flet desktop runtime."""
+    ft.run(main)

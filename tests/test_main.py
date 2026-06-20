@@ -1,13 +1,15 @@
-"""Tests for the default command-line entry point."""
+"""Tests for the module entry point."""
 
 import pytest
 
-from lcstats_relay.__main__ import main
+from lcstats_relay import __main__
 
 
-def test_main(capsys: pytest.CaptureFixture[str]) -> None:
-    """Print the startup message."""
-    main()
+def test_main_starts_flet(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Delegate module execution to the Flet application runner."""
+    calls: list[bool] = []
+    monkeypatch.setattr(__main__, "run", lambda: calls.append(True))
 
-    captured = capsys.readouterr()
-    assert captured.out == "Hello from lcstats-relay!\n"
+    __main__.main()
+
+    assert calls == [True]

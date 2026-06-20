@@ -16,6 +16,10 @@ constraint-dependencies = ["msgpack==1.2.1"]
 exclude-newer = "P7D"
 exclude-newer-package = { msgpack = false }
 
+[tool.flet.app]
+path = "src"
+module = "main"
+
 [dependency-groups]
 dev = [
     "mypy>=2.1.0,<3.0.0",
