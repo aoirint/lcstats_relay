@@ -4,10 +4,16 @@ version = "0.0.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "flet[all]>=0.85.3,<0.86.0",
+]
 
 [tool.uv]
+# msgpack 1.2.1 fixes GHSA-6v7p-g79w-8964. Remove this narrow cooldown exemption
+# after 2026-06-25, once the patched release is covered by exclude-newer.
+constraint-dependencies = ["msgpack>=1.2.1,<1.3.0"]
 exclude-newer = "P7D"
+exclude-newer-package = { msgpack = false }
 
 [dependency-groups]
 dev = [
