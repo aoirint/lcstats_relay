@@ -78,7 +78,8 @@ description: >-
      maintainer channel is unavailable.
    - In public repository work, use only a minimal non-sensitive note when a
      security issue exists, is blocked, or has been reported privately.
-5. For supply-chain-sensitive work, apply the supply-chain baseline below.
+5. For supply-chain-sensitive work, apply the supply-chain baseline and the trusted-source
+   fallback and cooldown-exception rules below.
 6. If the safe path cannot be verified, do not normalize the risky action:
    - Report a blocker when release age, provenance, runtime behavior, or
      cooldown compliance cannot be verified.
@@ -145,6 +146,41 @@ description: >-
   be verified, report a blocker instead of trying an unverified fetch-and-run
   command.
 
+## Trusted-Source Fallbacks and Cooldown Exceptions
+
+Use this decision order when the preferred metadata source, artifact, or cooled-down version is
+unavailable:
+
+1. Change the interface, not the authority, when a lookup path fails:
+   - Prefer installed CLI help or schemas, official documentation, official registry APIs,
+     upstream release or tag APIs, and maintained advisory databases such as OSV or GHSA.
+   - Use an authenticated first-party API client, such as `gh`, when an anonymous or browser path
+     is unavailable.
+   - Do not substitute search snippets, mirrors, blogs, or package aggregators for available
+     first-party metadata.
+   - Record which fallback source was used and any verification limitation.
+2. Prefer a cooled-down, compatible fallback only after verifying its provenance, release age,
+   advisory status, dependency graph, and required runtime behavior.
+3. Use a cooldown exception only when all of these conditions hold:
+   - The user or maintainer explicitly approves the exception. Do not infer approval from a request
+     for the "latest" or "safe" version.
+   - A current candidate has a relevant known vulnerability or compatibility failure, and no
+     cooled-down, non-vulnerable compatible fallback is available.
+   - For a vulnerability, first-party release metadata and a maintained advisory source identify
+     the proposed artifact as the applicable fix.
+   - For a compatibility failure, first-party release notes or issue history and a reproducible
+     local or CI failure identify the proposed artifact as the applicable fix.
+4. Keep an approved exception narrow and reviewer-visible:
+   - Pin the exact package version, commit SHA, or image digest. Preserve lockfile hashes or verify
+     the upstream checksum, signature, SBOM, or provenance attestation when available.
+   - Exempt only the affected artifact from the cooldown. Do not weaken the repository-wide policy.
+   - Re-check the complete resolved dependency graph, run relevant executable checks, and confirm
+     the pinned artifact is the one actually installed or executed.
+   - Record the advisory, source URLs or API endpoints, release and upload timestamps, rejected
+     fallbacks, approval, residual risk, and a dated removal or review condition.
+5. If these conditions cannot be met, report the blocker and the safest verified fallback instead
+   of silently weakening the policy.
+
 ## Maintenance
 
 - Re-check current tool behavior, package-manager documentation, platform
@@ -162,6 +198,10 @@ description: >-
 - Stricter external requirements were followed when applicable.
 - Supply-chain-sensitive artifacts satisfied cooldown, pinning, provenance, and
   runtime-behavior checks, or blockers/residual risk were recorded.
+- Trusted-source fallbacks retained first-party metadata authority, named the advisory source, and
+  recorded any verification limits.
+- Cooldown exceptions had explicit approval, exact and narrow pins, full-graph revalidation, and a
+  removal or review condition.
 - Secrets, permissions, unsafe defaults, and untrusted input paths were checked
   when relevant.
 - Suspected vulnerabilities were kept out of public channels when sensitive
