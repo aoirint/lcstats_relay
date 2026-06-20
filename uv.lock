@@ -423,7 +423,7 @@ wheels = [
 [[package]]
 name = "lcstats-relay"
 version = "0.0.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "flet", extra = ["all"] },
     { name = "httpx" },
