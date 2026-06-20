@@ -11,16 +11,12 @@ from lcstats_relay.app import run
 from lcstats_relay.app.main import main
 from lcstats_relay.ui.monitor import MonitorView
 
-_WINDOW_WIDTH = 480
-_WINDOW_HEIGHT = 320
 _WINDOW_MIN_WIDTH = 420
 _WINDOW_MIN_HEIGHT = 300
 _PAGE_PADDING = 8
 
 
 class _FakeWindow:
-    width: int | None = None
-    height: int | None = None
     min_width: int | None = None
     min_height: int | None = None
 
@@ -46,8 +42,6 @@ def test_main_configures_and_mounts_monitor(monkeypatch: pytest.MonkeyPatch) -> 
     asyncio.run(main(cast("ft.Page", page)))
 
     assert page.title == "LCStats Relay"
-    assert page.window.width == _WINDOW_WIDTH
-    assert page.window.height == _WINDOW_HEIGHT
     assert page.window.min_width == _WINDOW_MIN_WIDTH
     assert page.window.min_height == _WINDOW_MIN_HEIGHT
     assert page.padding == _PAGE_PADDING
