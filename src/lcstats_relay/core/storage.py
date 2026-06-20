@@ -6,15 +6,9 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import cast
 from uuid import uuid4
 
-type JSONValue = None | bool | int | float | str | list[JSONValue] | dict[str, JSONValue]
-
-
-def parse_json(raw_json: str) -> JSONValue:
-    """Parse a JSON value without leaking an untyped result."""
-    return cast("JSONValue", json.loads(raw_json))
+from lcstats_relay.core.payload import JSONValue, RelayPayload, parse_json
 
 
 def _write_atomic(path: Path, content: str) -> None:
@@ -42,11 +36,11 @@ class ArchiveWriter:
 
 @dataclass(frozen=True, slots=True)
 class RetryItem:
-    """One failed Sheets delivery stored for a later retry."""
+    """One failed output delivery stored for a later retry."""
 
     path: Path
-    payload: JSONValue
-    archive_file: str
+    output_key: str
+    payload: RelayPayload
 
 
 class RetryQueue:
@@ -58,9 +52,9 @@ class RetryQueue:
 
     def enqueue(
         self,
-        payload: JSONValue,
+        output_key: str,
+        payload: RelayPayload,
         *,
-        archive_file: Path,
         queued_at: datetime,
     ) -> Path:
         """Persist a failed delivery and return the queue file path."""
@@ -68,8 +62,11 @@ class RetryQueue:
         queue_path = self._root / filename
         record: dict[str, JSONValue] = {
             "queued_at": queued_at.isoformat(),
-            "archive_file": str(archive_file),
-            "payload": payload,
+            "output_key": output_key,
+            "received_at": payload.received_at.isoformat(),
+            "raw_json": payload.raw_json,
+            "payload": payload.payload,
+            "parse_error": payload.parse_error,
         }
         _write_atomic(queue_path, f"{json.dumps(record, ensure_ascii=False, indent=2)}\n")
         return queue_path
@@ -85,21 +82,57 @@ class RetryQueue:
             if not isinstance(record, dict):
                 msg = f"Retry queue record must be an object: {path.name}"
                 raise TypeError(msg)
-            archive_file = record.get("archive_file")
-            if not isinstance(archive_file, str) or "payload" not in record:
+            if "payload" not in record:
                 msg = f"Retry queue record is missing required fields: {path.name}"
                 raise ValueError(msg)
-            items.append(
-                RetryItem(path=path, payload=record["payload"], archive_file=archive_file),
-            )
+            items.append(self._load_item(path, record))
         return items
 
     def remove(self, item: RetryItem) -> None:
         """Remove a successfully delivered queue item."""
         item.path.unlink(missing_ok=True)
 
-    def count(self) -> int:
-        """Return the number of queued deliveries without parsing them."""
+    def count(self, output_key: str | None = None) -> int:
+        """Return all queued deliveries or those belonging to one output."""
         if not self._root.exists():
             return 0
-        return sum(1 for _path in self._root.glob("*.json"))
+        if output_key is None:
+            return sum(1 for _path in self._root.glob("*.json"))
+        return sum(item.output_key == output_key for item in self.pending())
+
+    @staticmethod
+    def _load_item(path: Path, record: dict[str, JSONValue]) -> RetryItem:
+        output_key = record.get("output_key", "gas")
+        if not isinstance(output_key, str):
+            msg = f"Retry queue output key must be a string: {path.name}"
+            raise TypeError(msg)
+
+        queued_at = record.get("queued_at")
+        received_at = record.get("received_at", queued_at)
+        if not isinstance(received_at, str):
+            msg = f"Retry queue timestamp must be a string: {path.name}"
+            raise TypeError(msg)
+        try:
+            received_datetime = datetime.fromisoformat(received_at)
+        except ValueError as exc:
+            msg = f"Retry queue timestamp is invalid: {path.name}"
+            raise ValueError(msg) from exc
+
+        payload = record["payload"]
+        raw_json = record.get("raw_json")
+        if not isinstance(raw_json, str):
+            raw_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        parse_error = record.get("parse_error")
+        if parse_error is not None and not isinstance(parse_error, str):
+            msg = f"Retry queue parse error must be a string or null: {path.name}"
+            raise TypeError(msg)
+        return RetryItem(
+            path=path,
+            output_key=output_key,
+            payload=RelayPayload(
+                raw_json=raw_json,
+                payload=payload,
+                received_at=received_datetime,
+                parse_error=parse_error,
+            ),
+        )

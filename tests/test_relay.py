@@ -1,21 +1,33 @@
-"""Tests for receive, archive, send, and retry coordination."""
+"""Tests for manager, dispatcher, outputs, authentication, and state."""
 
 import asyncio
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 import httpx
 import pytest
 
-from lcstats_relay.core.relay import (
-    ConnectionManager,
-    ConnectionState,
-    RelayStatus,
-    SheetSender,
-    _make_client,
+from lcstats_relay.app.composition import create_connection_manager
+from lcstats_relay.core.auth import NoAuthentication, QueryTokenAuthentication
+from lcstats_relay.core.dispatcher import BoundOutput, OutputDispatcher
+from lcstats_relay.core.outputs import (
+    ArchiveOutput,
+    GasOutput,
+    OutputDeliveryError,
+    OutputReceipt,
+    OutputRegistration,
 )
-from lcstats_relay.core.storage import JSONValue, RetryQueue
+from lcstats_relay.core.payload import JSONValue, RelayPayload
+from lcstats_relay.core.relay import ConnectionManager, _make_client
+from lcstats_relay.core.state import (
+    ConnectionState,
+    OutputStatus,
+    RelayStateStore,
+    RelayStatus,
+)
+from lcstats_relay.core.storage import ArchiveWriter, RetryQueue
 
 _EXPECTED_RETRY_REQUESTS = 2
 
@@ -29,15 +41,30 @@ async def _wait_for(predicate: Callable[[], bool]) -> None:
     raise AssertionError(msg)
 
 
+@dataclass
+class _Sink:
+    name: str
+    calls: list[str]
+    fail: OutputDeliveryError | None = None
+
+    async def deliver(self, payload: RelayPayload) -> OutputReceipt:
+        self.calls.append(self.name)
+        if self.fail is not None:
+            raise self.fail
+        return OutputReceipt(message=f"{self.name} ok {payload.raw_json}")
+
+
 class _TransportHandler:
     def __init__(self, *, first_post_status: int = 200, payload: str = '{"Seed":42}') -> None:
         self.first_post_status = first_post_status
         self.payload = payload
         self.get_count = 0
         self.post_count = 0
+        self.last_request_url: str | None = None
         self.blocked = asyncio.Event()
 
     async def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.last_request_url = str(request.url)
         if request.method == "POST":
             self.post_count += 1
             status = self.first_post_status if self.post_count == 1 else 200
@@ -57,20 +84,275 @@ def _client_factory(handler: _TransportHandler) -> Callable[[httpx.Timeout], htt
     return create
 
 
-def test_manager_archives_and_sends_payload(tmp_path: Path) -> None:
-    """Archive each payload before forwarding it and waiting for the next response."""
+def _payload(raw_json: str = '{"Seed":42}') -> RelayPayload:
+    return RelayPayload(
+        raw_json=raw_json,
+        payload={"Seed": 42},
+        received_at=datetime(2026, 6, 20, 9, 15, 33),
+    )
+
+
+def test_authentication_policies_mutate_requests_independently() -> None:
+    """Keep request credentials separate from GAS delivery implementation."""
+    request = httpx.Request("POST", "https://script.google.com/macros/s/id/exec")
+    NoAuthentication().apply(request)
+    assert str(request.url) == "https://script.google.com/macros/s/id/exec"
+
+    QueryTokenAuthentication("secret").apply(request)
+    assert str(request.url) == "https://script.google.com/macros/s/id/exec?token=secret"
+
+
+def test_archive_output_writes_raw_payload(tmp_path: Path) -> None:
+    """ArchiveOutput owns archive-specific success text and persistence."""
+
+    async def scenario() -> None:
+        output = ArchiveOutput(ArchiveWriter(tmp_path))
+        receipt = await output.deliver(_payload())
+
+        [archive] = (tmp_path / "archive" / "2026-06-20").glob("*.json")
+        assert archive.read_text(encoding="utf-8") == '{"Seed":42}\n'
+        assert receipt.message.startswith("保存しました:")
+
+    asyncio.run(scenario())
+
+
+def test_archive_output_reports_safe_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Expose archive failure without leaking filesystem details."""
+
+    async def scenario() -> None:
+        writer = ArchiveWriter(tmp_path)
+
+        def fail_write(_raw_json: str, *, received_at: datetime) -> Path:
+            del received_at
+            msg = "disk full"
+            raise OSError(msg)
+
+        monkeypatch.setattr(writer, "write", fail_write)
+        with pytest.raises(OutputDeliveryError, match="ローカル保存"):
+            await ArchiveOutput(writer).deliver(_payload())
+
+    asyncio.run(scenario())
+
+
+def test_gas_output_sends_authenticated_payload() -> None:
+    """GasOutput handles delivery while auth stays injectable."""
 
     async def scenario() -> None:
         handler = _TransportHandler()
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            output = GasOutput(
+                "https://script.google.com/macros/s/id/exec",
+                client,
+                QueryTokenAuthentication("secret"),
+            )
+            receipt = await output.deliver(_payload())
+
+        assert receipt.message == "Google Sheetsへ送信しました"
+        assert handler.post_count == 1
+        assert handler.last_request_url is not None
+        assert "token=secret" in handler.last_request_url
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    ("transport_error", "message"),
+    [
+        (httpx.Response(503), "HTTP 503"),
+        (httpx.ConnectError("offline"), "ConnectError"),
+    ],
+)
+def test_gas_output_reports_retryable_failures(
+    transport_error: httpx.Response | httpx.HTTPError,
+    message: str,
+) -> None:
+    """Convert HTTP client failures to safe retryable output errors."""
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if isinstance(transport_error, httpx.Response):
+            transport_error.request = request
+            return transport_error
+        raise transport_error
+
+    async def scenario() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            output = GasOutput(
+                "https://script.google.com/macros/s/id/exec",
+                client,
+                NoAuthentication(),
+            )
+            with pytest.raises(OutputDeliveryError, match=message) as error:
+                await output.deliver(_payload())
+            assert error.value.retryable is True
+
+    asyncio.run(scenario())
+
+
+def test_gas_output_rejects_unparsed_payload() -> None:
+    """Do not send malformed JSON to GAS."""
+
+    async def scenario() -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda _request: httpx.Response(200))
+        ) as client:
+            output = GasOutput(
+                "https://script.google.com/macros/s/id/exec",
+                client,
+                NoAuthentication(),
+            )
+            with pytest.raises(OutputDeliveryError, match="JSONを解析"):
+                await output.deliver(
+                    RelayPayload(
+                        raw_json="not-json",
+                        payload=None,
+                        received_at=datetime(2026, 6, 20),
+                        parse_error="JSONDecodeError",
+                    ),
+                )
+
+    asyncio.run(scenario())
+
+
+def test_dispatcher_handles_success_required_failure_and_queue(tmp_path: Path) -> None:
+    """Dispatch outputs generically and stop after a required output failure."""
+
+    async def scenario() -> None:
+        calls: list[str] = []
+        states: list[ConnectionState] = []
+        state = RelayStateStore(
+            [("archive", "ローカル保存"), ("gas", "Google Sheets"), ("third", "Third")],
+            states.append,
+        )
+        archive = _Sink(
+            "archive",
+            calls,
+            fail=OutputDeliveryError("archive failed", retryable=False),
+        )
+        gas = _Sink("gas", calls)
+        dispatcher = OutputDispatcher(
+            [
+                BoundOutput(
+                    OutputRegistration(
+                        "archive", "ローカル保存", lambda _client: archive, required=True
+                    ),
+                    archive,
+                ),
+                BoundOutput(OutputRegistration("gas", "Google Sheets", lambda _client: gas), gas),
+            ],
+            RetryQueue(tmp_path),
+            state,
+            clock=lambda: datetime(2026, 6, 20),
+        )
+
+        await dispatcher.dispatch(_payload())
+
+        assert calls == ["archive"]
+        assert state.state.outputs["archive"].status is OutputStatus.ERROR
+        assert state.state.outputs["gas"].status is OutputStatus.IDLE
+
+        calls.clear()
+        archive.fail = None
+        gas.fail = OutputDeliveryError("gas offline", retryable=True)
+        await dispatcher.dispatch(_payload())
+
+        assert calls == ["archive", "gas"]
+        assert state.state.outputs["archive"].success_count == 1
+        assert state.state.outputs["gas"].pending_count == 1
+        assert RetryQueue(tmp_path).count("gas") == 1
+
+    asyncio.run(scenario())
+
+
+def test_dispatcher_retries_known_outputs_and_skips_unknown(tmp_path: Path) -> None:
+    """Retry queue entries by output key instead of hard-coding GAS."""
+
+    async def scenario() -> None:
+        calls: list[str] = []
+        state = RelayStateStore([("gas", "Google Sheets")], lambda _state: None)
+        gas = _Sink("gas", calls)
+        queue = RetryQueue(tmp_path)
+        queued_at = datetime(2026, 6, 20)
+        queue.enqueue("gas", _payload(), queued_at=queued_at)
+        queue.enqueue("missing", _payload('{"Seed":43}'), queued_at=queued_at)
+        dispatcher = OutputDispatcher(
+            [BoundOutput(OutputRegistration("gas", "Google Sheets", lambda _client: gas), gas)],
+            queue,
+            state,
+            clock=lambda: queued_at,
+        )
+
+        await dispatcher.retry_pending()
+
+        assert calls == ["gas"]
+        assert queue.count("gas") == 0
+        assert queue.count("missing") == 1
+
+        gas.fail = OutputDeliveryError("still offline", retryable=True)
+        queue.enqueue("gas", _payload(), queued_at=queued_at)
+        await dispatcher.retry_pending()
+        assert state.state.outputs["gas"].message == "still offline"
+
+    asyncio.run(scenario())
+
+
+def test_dispatcher_reports_queue_write_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep output-specific failure visible when retry persistence fails too."""
+
+    async def scenario() -> None:
+        calls: list[str] = []
+        state = RelayStateStore([("gas", "Google Sheets")], lambda _state: None)
+        gas = _Sink("gas", calls, fail=OutputDeliveryError("gas offline", retryable=True))
+        queue = RetryQueue(tmp_path)
+
+        def fail_enqueue(_output_key: str, _payload: RelayPayload, *, queued_at: datetime) -> Path:
+            del queued_at
+            msg = "disk full"
+            raise OSError(msg)
+
+        monkeypatch.setattr(queue, "enqueue", fail_enqueue)
+        dispatcher = OutputDispatcher(
+            [BoundOutput(OutputRegistration("gas", "Google Sheets", lambda _client: gas), gas)],
+            queue,
+            state,
+            clock=lambda: datetime(2026, 6, 20),
+        )
+
+        await dispatcher.dispatch(_payload())
+
+        assert state.state.outputs["gas"].status is OutputStatus.ERROR
+        assert (
+            state.state.outputs["gas"].message == "gas offline / 再送キューの保存にも失敗しました"
+        )
+
+    asyncio.run(scenario())
+
+
+def test_manager_dispatches_received_payload_to_registered_outputs(tmp_path: Path) -> None:
+    """ConnectionManager receives input and delegates outputs by registration."""
+
+    async def scenario() -> None:
+        handler = _TransportHandler()
+        calls: list[str] = []
         states: list[ConnectionState] = []
         payloads: list[JSONValue] = []
+        archive = _Sink("archive", calls)
+        gas = _Sink("gas", calls)
         manager = ConnectionManager(
             sse_url="http://localhost:2145/",
-            gas_url="https://example.invalid/exec?token=secret",
+            outputs=[
+                OutputRegistration(
+                    "archive", "ローカル保存", lambda _client: archive, required=True
+                ),
+                OutputRegistration("gas", "Google Sheets", lambda _client: gas),
+            ],
             data_dir=tmp_path,
             on_state=states.append,
             on_payload=payloads.append,
-            reconnect_delay=0.001,
             retry_interval=60,
             clock=lambda: datetime(2026, 6, 20, 9, 15, 33),
             client_factory=_client_factory(handler),
@@ -78,94 +360,55 @@ def test_manager_archives_and_sends_payload(tmp_path: Path) -> None:
 
         manager.start()
         manager.start()
-        await _wait_for(lambda: manager.state.send_count == 1)
+        await _wait_for(lambda: manager.state.outputs["gas"].success_count == 1)
         await manager.stop()
 
+        assert calls == ["archive", "gas"]
         assert payloads == [{"Seed": 42}]
-        assert manager.state.receive_count == 1
-        assert manager.state.archive_count == 1
-        assert manager.state.send_count == 1
-        assert manager.state.queue_count == 0
         assert manager.state.status is RelayStatus.STOPPED
-        assert any(state.status is RelayStatus.ARCHIVED for state in states)
-        [archive] = (tmp_path / "archive" / "2026-06-20").glob("*.json")
-        assert archive.read_text(encoding="utf-8") == '{"Seed":42}\n'
+        assert any(state.status is RelayStatus.DISPATCHING for state in states)
 
     asyncio.run(scenario())
 
 
-def test_manager_retries_failed_delivery(tmp_path: Path) -> None:
-    """Persist a failed delivery and remove it after a later successful retry."""
-
-    async def scenario() -> None:
-        handler = _TransportHandler(first_post_status=503)
-        states: list[ConnectionState] = []
-        manager = ConnectionManager(
-            sse_url="http://localhost:2145/",
-            gas_url="https://example.invalid/exec?token=secret",
-            data_dir=tmp_path,
-            on_state=states.append,
-            on_payload=lambda _payload: None,
-            retry_interval=0.01,
-            client_factory=_client_factory(handler),
-        )
-
-        manager.start()
-        await _wait_for(lambda: any(state.status is RelayStatus.RETRY_QUEUED for state in states))
-        queued_state = next(state for state in states if state.status is RelayStatus.RETRY_QUEUED)
-        assert queued_state.last_error == "Sheets送信エラー: HTTP 503"
-        await _wait_for(lambda: manager.state.status is RelayStatus.SENT)
-        await manager.stop()
-
-        assert handler.post_count == _EXPECTED_RETRY_REQUESTS
-        assert manager.state.send_count == 1
-        assert manager.state.queue_count == 0
-        assert RetryQueue(tmp_path).pending() == []
-
-    asyncio.run(scenario())
-
-
-def test_manager_archives_invalid_json_without_sending(tmp_path: Path) -> None:
-    """Keep malformed source data in the archive and report a parse error."""
+def test_manager_archives_invalid_json_without_payload_callback(tmp_path: Path) -> None:
+    """Malformed JSON remains dispatchable to archive while GAS can reject it."""
 
     async def scenario() -> None:
         handler = _TransportHandler(payload="not-json")
+        calls: list[str] = []
+        payloads: list[JSONValue] = []
+        archive = _Sink("archive", calls)
+        gas = _Sink(
+            "gas",
+            calls,
+            fail=OutputDeliveryError(
+                "JSONを解析できないため送信しません: JSONDecodeError", retryable=False
+            ),
+        )
         manager = ConnectionManager(
             sse_url="http://localhost:2145/",
-            gas_url="https://example.invalid/exec?token=secret",
+            outputs=[
+                OutputRegistration(
+                    "archive", "ローカル保存", lambda _client: archive, required=True
+                ),
+                OutputRegistration("gas", "Google Sheets", lambda _client: gas),
+            ],
             data_dir=tmp_path,
             on_state=lambda _state: None,
-            on_payload=lambda _payload: None,
+            on_payload=payloads.append,
             retry_interval=60,
             client_factory=_client_factory(handler),
         )
 
         manager.start()
-        await _wait_for(
-            lambda: manager.state.last_error == "JSON解析エラー: JSONDecodeError",
-        )
+        await _wait_for(lambda: manager.state.outputs["gas"].failure_count == 1)
         await manager.stop()
 
-        assert handler.post_count == 0
-        assert manager.state.archive_count == 1
-
-    asyncio.run(scenario())
-
-
-def test_manager_can_stop_before_start(tmp_path: Path) -> None:
-    """Treat stop as idempotent even before network work starts."""
-
-    async def scenario() -> None:
-        states: list[ConnectionState] = []
-        manager = ConnectionManager(
-            sse_url="http://localhost:2145/",
-            gas_url="https://example.invalid/exec",
-            data_dir=tmp_path,
-            on_state=states.append,
-            on_payload=lambda _payload: None,
-        )
-        await manager.stop()
-        assert states[-1].status is RelayStatus.STOPPED
+        assert calls == ["archive", "gas"]
+        assert payloads == []
+        assert manager.state.outputs["archive"].success_count == 1
+        assert manager.state.outputs["gas"].status is OutputStatus.ERROR
 
     asyncio.run(scenario())
 
@@ -189,7 +432,7 @@ def test_manager_reconnects_after_receive_error(tmp_path: Path) -> None:
         states: list[ConnectionState] = []
         manager = ConnectionManager(
             sse_url="http://localhost:2145/",
-            gas_url="https://example.invalid/exec",
+            outputs=[],
             data_dir=tmp_path,
             on_state=states.append,
             on_payload=lambda _payload: None,
@@ -209,149 +452,92 @@ def test_manager_reconnects_after_receive_error(tmp_path: Path) -> None:
     asyncio.run(scenario())
 
 
-def test_manager_reports_archive_failure(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+def test_retry_loop_reports_queue_read_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Do not send a consumed payload when durable archiving fails."""
+    """Keep retry queue parsing failures observable outside output states."""
 
     async def scenario() -> None:
-        handler = _TransportHandler()
         manager = ConnectionManager(
             sse_url="http://localhost:2145/",
-            gas_url="https://example.invalid/exec",
+            outputs=[],
             data_dir=tmp_path,
             on_state=lambda _state: None,
-            on_payload=lambda _payload: None,
-            client_factory=_client_factory(handler),
-        )
-
-        def fail_archive(_raw_json: str, *, received_at: datetime) -> Path:
-            del received_at
-            msg = "disk full"
-            raise OSError(msg)
-
-        monkeypatch.setattr(manager._archive, "write", fail_archive)
-        manager.start()
-        await _wait_for(lambda: manager.state.last_error == "アーカイブエラー: OSError")
-        await manager.stop()
-        assert handler.post_count == 0
-
-    asyncio.run(scenario())
-
-
-def test_manager_reports_queue_write_failure(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Surface a queue disk failure after a Sheets delivery error."""
-
-    async def scenario() -> None:
-        manager = ConnectionManager(
-            sse_url="http://localhost:2145/",
-            gas_url="https://example.invalid/exec",
-            data_dir=tmp_path,
-            on_state=lambda _state: None,
-            on_payload=lambda _payload: None,
-        )
-
-        def fail_enqueue(
-            _payload: JSONValue,
-            *,
-            archive_file: Path,
-            queued_at: datetime,
-        ) -> Path:
-            del archive_file, queued_at
-            msg = "disk full"
-            raise OSError(msg)
-
-        monkeypatch.setattr(manager._queue, "enqueue", fail_enqueue)
-        transport = httpx.MockTransport(lambda _request: httpx.Response(503))
-        async with httpx.AsyncClient(transport=transport) as client:
-            sender = SheetSender("https://example.invalid/exec", client)
-            await manager._send_or_queue(sender, {"Seed": 42}, tmp_path / "archive.json")
-
-        assert manager.state.last_error == "再送キュー保存エラー: OSError"
-
-    asyncio.run(scenario())
-
-
-def test_retry_loop_reports_queue_and_send_errors(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Keep retry-loop failures observable while retaining queued data."""
-
-    async def scenario() -> None:
-        states: list[ConnectionState] = []
-        manager = ConnectionManager(
-            sse_url="http://localhost:2145/",
-            gas_url="https://example.invalid/exec",
-            data_dir=tmp_path,
-            on_state=states.append,
             on_payload=lambda _payload: None,
             retry_interval=0.001,
         )
-        transport = httpx.MockTransport(lambda _request: httpx.Response(503))
-        async with httpx.AsyncClient(transport=transport) as client:
-            sender = SheetSender("https://example.invalid/exec", client)
 
-            def fail_pending() -> list[object]:
-                msg = "invalid queue"
-                raise TypeError(msg)
+        async def retry_once() -> None:
+            dispatcher = OutputDispatcher([], manager._queue, manager._state)
+            await manager._retry_loop(dispatcher)
 
-            original_pending = manager._queue.pending
-            monkeypatch.setattr(manager._queue, "pending", fail_pending)
-            queue_task = asyncio.create_task(manager._retry_loop(sender))
-            await _wait_for(lambda: manager.state.last_error == "再送キュー読込エラー: TypeError")
-            queue_task.cancel()
-            with pytest.raises(asyncio.CancelledError):
-                await queue_task
+        def fail_pending() -> list[object]:
+            msg = "invalid queue"
+            raise TypeError(msg)
 
-            monkeypatch.setattr(manager._queue, "pending", original_pending)
-            manager._queue.enqueue(
-                {"Seed": 42},
-                archive_file=tmp_path / "archive.json",
-                queued_at=datetime(2026, 6, 20),
-            )
-            send_task = asyncio.create_task(manager._retry_loop(sender))
-            await _wait_for(lambda: manager.state.last_error == "再送エラー: HTTP 503")
-            send_task.cancel()
-            with pytest.raises(asyncio.CancelledError):
-                await send_task
-
-        assert manager._queue.count() == 1
-        assert any(state.last_error == "再送エラー: HTTP 503" for state in states)
+        monkeypatch.setattr(manager._queue, "pending", fail_pending)
+        task = asyncio.create_task(retry_once())
+        await _wait_for(lambda: manager.state.last_error == "再送キュー読込エラー: TypeError")
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
 
     asyncio.run(scenario())
 
 
-def test_send_and_retry_propagate_cancellation(tmp_path: Path) -> None:
-    """Let cancellation stop both delivery paths immediately."""
+def test_retry_loop_propagates_dispatcher_cancellation(tmp_path: Path) -> None:
+    """Let dispatcher cancellation stop the retry loop immediately."""
 
-    async def cancel_request(_request: httpx.Request) -> httpx.Response:
-        raise asyncio.CancelledError
+    class CancellingDispatcher:
+        async def retry_pending(self) -> None:
+            raise asyncio.CancelledError
 
     async def scenario() -> None:
         manager = ConnectionManager(
             sse_url="http://localhost:2145/",
-            gas_url="https://example.invalid/exec",
+            outputs=[],
             data_dir=tmp_path,
             on_state=lambda _state: None,
             on_payload=lambda _payload: None,
             retry_interval=0,
         )
-        manager._queue.enqueue(
-            {"Seed": 42},
-            archive_file=tmp_path / "archive.json",
-            queued_at=datetime(2026, 6, 20),
+        with pytest.raises(asyncio.CancelledError):
+            await manager._retry_loop(CancellingDispatcher())  # type: ignore[arg-type]
+
+    asyncio.run(scenario())
+
+
+def test_stop_before_start_and_cancellation_paths(tmp_path: Path) -> None:
+    """Treat stop as idempotent and propagate delivery cancellation."""
+
+    async def scenario() -> None:
+        states: list[ConnectionState] = []
+        manager = ConnectionManager(
+            sse_url="http://localhost:2145/",
+            outputs=[],
+            data_dir=tmp_path,
+            on_state=states.append,
+            on_payload=lambda _payload: None,
         )
-        async with httpx.AsyncClient(transport=httpx.MockTransport(cancel_request)) as client:
-            sender = SheetSender("https://example.invalid/exec", client)
-            with pytest.raises(asyncio.CancelledError):
-                await manager._send_or_queue(sender, {"Seed": 42}, tmp_path / "archive.json")
-            with pytest.raises(asyncio.CancelledError):
-                await manager._retry_loop(sender)
+        await manager.stop()
+        assert states[-1].status is RelayStatus.STOPPED
+
+        class CancelSink:
+            async def deliver(self, _payload: RelayPayload) -> OutputReceipt:
+                raise asyncio.CancelledError
+
+        dispatcher = OutputDispatcher(
+            [
+                BoundOutput(
+                    OutputRegistration("gas", "Google Sheets", lambda _client: CancelSink()),
+                    CancelSink(),
+                )
+            ],
+            RetryQueue(tmp_path),
+            RelayStateStore([("gas", "Google Sheets")], lambda _state: None),
+        )
+        with pytest.raises(asyncio.CancelledError):
+            await dispatcher.dispatch(_payload())
 
     asyncio.run(scenario())
 
@@ -369,5 +555,29 @@ def test_default_client_factory_uses_supplied_timeout() -> None:
         timeout = httpx.Timeout(30)
         async with _make_client(timeout) as client:
             assert client.timeout == timeout
+
+    asyncio.run(scenario())
+
+
+def test_app_composition_builds_standard_outputs(tmp_path: Path) -> None:
+    """Assemble archive, GAS, and auth without putting those details in the UI."""
+    manager = create_connection_manager(
+        "http://localhost:2145/",
+        "https://script.google.com/macros/s/id/exec",
+        "secret",
+        tmp_path,
+        lambda _state: None,
+        lambda _payload: None,
+    )
+
+    assert isinstance(manager, ConnectionManager)
+    assert list(manager.state.outputs) == ["archive", "gas"]
+
+    async def scenario() -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda _request: httpx.Response(200)),
+        ) as client:
+            gas_output = manager._outputs[1].build(client)
+            assert isinstance(gas_output, GasOutput)
 
     asyncio.run(scenario())
