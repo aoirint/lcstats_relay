@@ -19,8 +19,11 @@ The standard output surfaces are:
 The local archive is the required durability boundary. If archiving fails, later
 outputs are not attempted for that payload.
 
-For the detailed input and output contract, see
-[LCStatsTracker input and output contract](docs/lcstats-tracker-io.md).
+For the LCStatsTracker source contract, see
+[LCStatsTracker input contract](docs/lcstats-tracker-io.md).
+
+For the Relay output design, see
+[Relay output architecture](docs/relay-output-architecture.md).
 
 ## Run
 

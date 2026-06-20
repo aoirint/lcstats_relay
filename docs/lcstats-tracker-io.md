@@ -1,7 +1,12 @@
-# LCStatsTracker input and output contract
+# LCStatsTracker input contract
 
-This document describes the external data contract that LCStats Relay expects
-from LCStatsTracker and the output model used after a payload is received.
+This document describes only the external source contract that LCStats Relay
+expects from LCStatsTracker.
+
+It does not describe LCStats Relay outputs such as local archive storage,
+Google Apps Script delivery, retry queues, or UI state. Those are Relay
+implementation concerns and are documented separately in
+[Relay output architecture](relay-output-architecture.md).
 
 ## Input source
 
@@ -42,60 +47,7 @@ reason, LCStats Relay should be the only client consuming the endpoint.
 
 ## Payload handling
 
-The raw JSON payload extracted from the `data:` line is preserved first so the
-original payload can be archived. The JSON is parsed before it is sent to
-structured outputs such as Google Apps Script.
-
-If parsing fails, LCStats Relay can still keep the raw payload in the archive,
-but structured outputs that require JSON are not delivered.
-
-## Output model
-
-Outputs are modeled as registered output surfaces. Each output has its own
-implementation and its own UI-facing state.
-
-This separation is intentional:
-
-- Output delivery logic is separate from state reporting.
-- Google Apps Script authentication is separate from Google Apps Script delivery.
-- The UI displays per-output success, error, and message state without depending
-  on the implementation details of each output.
-
-Additional output surfaces should be added as peers of the existing outputs, not
-as special cases inside an existing output.
-
-## Standard output surfaces
-
-LCStats Relay currently registers two standard outputs.
-
-### Local archive
-
-The local archive writes the received payload under:
-
-```text
-data/archive/YYYY-MM-DD/
-```
-
-The archive is required. It is the durability boundary for a received payload.
-If the archive write fails, later outputs are not attempted for that payload.
-
-### Google Sheets through Google Apps Script
-
-The Google Sheets output posts the parsed JSON payload to a configured Google
-Apps Script Web App URL.
-
-Authentication data is provided through a separate authentication component.
-The token is not embedded in the URL by the UI and is not saved to the settings
-file.
-
-If the Google Apps Script output fails after the archive succeeds, the failed
-delivery can be stored in `data/queue/` and retried later.
-
-## Delivery guarantees
-
-LCStats Relay preserves the received payload locally before attempting later
-outputs. Retried outputs should be treated as at-least-once delivery. A receiving
-output should therefore tolerate duplicate submissions when practical.
-
-The queue is output-oriented so that future output surfaces can be retried as
-peers of the existing Google Apps Script output.
+LCStats Relay extracts the raw JSON payload from the first `data:` line in the
+response. JSON parsing happens after extraction and is not part of the
+LCStatsTracker transport contract beyond the requirement that the `data:` value
+be JSON.
