@@ -45,6 +45,27 @@ this integration. In particular, the current contract does not rely on:
 LCStatsTracker may reset its pending data after a client receives it. For that
 reason, LCStats Relay should be the only client consuming the endpoint.
 
+## Query window and single-use data
+
+LCStatsTracker has an important timing constraint around Lethal Company days.
+After one in-game day ends, the resulting statistics can be queried only once
+before the next in-game day ends.
+
+That means a successful query is also a consumption event. If LCStats Relay, the
+network stack, or any other client fails after the data is consumed, the same
+payload may no longer be recoverable from LCStatsTracker.
+
+Expected behavior:
+
+- A payload should be queried exactly once during the window between the end of
+  one in-game day and the end of the next in-game day.
+- If the payload has already been consumed, LCStatsTracker is expected to return
+  an error response according to its own API behavior.
+- LCStats Relay must treat such an error response as a source-side failure, not
+  as a signal that the previous payload can be fetched again.
+- Multiple consumers are unsafe because the first successful consumer may make
+  the payload unavailable to the others.
+
 ## Payload handling
 
 LCStats Relay extracts the raw JSON payload from the first `data:` line in the
