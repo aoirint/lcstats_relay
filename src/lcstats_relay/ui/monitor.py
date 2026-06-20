@@ -49,12 +49,6 @@ class PagePort(Protocol):
     def update(self) -> None:
         """Push changed controls to the client."""
 
-    def show_dialog(self, dialog: ft.AlertDialog) -> None:
-        """Display a modal dialog."""
-
-    def pop_dialog(self) -> object | None:
-        """Close the active modal dialog."""
-
 
 class ManagerPort(Protocol):
     """Connection manager operations used by the view."""
@@ -160,10 +154,10 @@ class MonitorView:
         )
         self.status = ft.Text(_STATUS_LABELS[RelayStatus.STOPPED], weight=ft.FontWeight.BOLD)
         self.health = ft.Text(
-            "停止中", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_700
+            "停止中", size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_700
         )
-        self.health_detail = ft.Text("接続は開始されていません", selectable=True)
-        self.health_icon = ft.Icon(ft.Icons.ERROR_OUTLINE, size=48, color=ft.Colors.RED_700)
+        self.health_detail = ft.Text("未接続", selectable=True)
+        self.health_icon = ft.Icon(ft.Icons.ERROR_OUTLINE, size=36, color=ft.Colors.RED_700)
         self.receive_count = ft.Text("0")
         self.last_received = ft.Text("-")
         self.error = ft.Text("", color=ft.Colors.RED_700, selectable=True)
@@ -193,16 +187,16 @@ class MonitorView:
         return self.root_container
 
     def open_settings(self, _event: object | None = None) -> None:
-        """Open tracker, local storage, and output settings in a modal."""
+        """Switch to the full-window tracker, storage, and output settings view."""
         self.tracker_url_field.value = self._settings.tracker_url
         self.data_dir_field.value = str(self._settings.data_dir)
-        self._page.show_dialog(self._settings_dialog())
+        self._show_settings_view(update=True)
 
     def open_gas_auth(self, _event: object | None = None) -> None:
-        """Open Google Apps Script destination and token settings in a modal."""
+        """Switch to the full-window Google Apps Script settings view."""
         self.gas_url_field.value = self._settings.gas_url
         self.gas_token_field.value = self._gas_token
-        self._page.show_dialog(self._gas_auth_dialog())
+        self._show_gas_auth_view(update=True)
 
     def save_settings(self, tracker_url: str, data_dir: str) -> None:
         """Validate and persist tracker plus local storage settings."""
@@ -321,68 +315,74 @@ class MonitorView:
         if update:
             self._page.update()
 
-    def _settings_dialog(self) -> ft.AlertDialog:
-        return ft.AlertDialog(
-            modal=True,
-            title=self._modal_title("設定"),
-            content=ft.Column(
+    def _show_settings_view(self, *, update: bool) -> None:
+        self.root_view.controls = [
+            self._full_view_title("設定"),
+            self.tracker_url_field,
+            self.data_dir_field,
+            ft.Divider(),
+            ft.Text("出力先設定", size=16, weight=ft.FontWeight.BOLD),
+            ft.Row(
                 [
-                    self.tracker_url_field,
-                    self.data_dir_field,
-                    ft.Divider(),
-                    ft.Text("出力先設定", size=16, weight=ft.FontWeight.BOLD),
-                    ft.Row(
-                        [
-                            ft.Text("Google Apps Script", expand=True),
-                            ft.OutlinedButton(
-                                "設定",
-                                icon=ft.Icons.KEY,
-                                on_click=self._open_gas_auth_from_settings,
-                            ),
-                        ],
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ft.Text("Google Apps Script", expand=True),
+                    ft.OutlinedButton(
+                        "設定",
+                        icon=ft.Icons.KEY,
+                        on_click=self._open_gas_auth_from_settings,
                     ),
                 ],
-                tight=True,
-                spacing=12,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
-            actions=[
-                ft.FilledButton(
-                    "保存", icon=ft.Icons.SAVE, on_click=self._save_settings_from_modal
-                ),
-            ],
-        )
+            ft.Row(
+                [
+                    ft.FilledButton(
+                        "保存",
+                        icon=ft.Icons.SAVE,
+                        on_click=self._save_settings_from_view,
+                    ),
+                ],
+                wrap=True,
+            ),
+        ]
+        if update:
+            self._page.update()
 
-    def _gas_auth_dialog(self) -> ft.AlertDialog:
-        return ft.AlertDialog(
-            modal=True,
-            title=self._modal_title("GAS認証"),
-            content=ft.Column([self.gas_url_field, self.gas_token_field], tight=True, spacing=12),
-            actions=[
-                ft.FilledButton(
-                    "保存", icon=ft.Icons.SAVE, on_click=self._save_gas_auth_from_modal
-                ),
-            ],
-        )
+    def _show_gas_auth_view(self, *, update: bool) -> None:
+        self.root_view.controls = [
+            self._full_view_title("GAS認証"),
+            self.gas_url_field,
+            self.gas_token_field,
+            ft.Row(
+                [
+                    ft.FilledButton(
+                        "保存",
+                        icon=ft.Icons.SAVE,
+                        on_click=self._save_gas_auth_from_view,
+                    ),
+                ],
+                wrap=True,
+            ),
+        ]
+        if update:
+            self._page.update()
 
-    def _modal_title(self, title: str) -> ft.Row:
+    def _full_view_title(self, title: str) -> ft.Row:
         return ft.Row(
             [
-                ft.Text(title, size=20, weight=ft.FontWeight.BOLD, expand=True),
+                ft.Text(title, size=26, weight=ft.FontWeight.BOLD, expand=True),
                 ft.IconButton(
                     icon=ft.Icons.CLOSE,
                     tooltip="閉じる",
-                    on_click=lambda _event: self._page.pop_dialog(),
+                    on_click=lambda _event: self._show_monitor_view(update=True),
                 ),
             ],
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
     def _open_gas_auth_from_settings(self, _event: object | None = None) -> None:
-        self._page.pop_dialog()
         self.open_gas_auth()
 
-    def _save_settings_from_modal(self, _event: object | None = None) -> None:
+    def _save_settings_from_view(self, _event: object | None = None) -> None:
         try:
             self.save_settings(
                 self.tracker_url_field.value or "",
@@ -392,10 +392,9 @@ class MonitorView:
             self.error.value = str(exc)
             self._page.update()
             return
-        self._page.pop_dialog()
         self._show_monitor_view(update=True)
 
-    def _save_gas_auth_from_modal(self, _event: object | None = None) -> None:
+    def _save_gas_auth_from_view(self, _event: object | None = None) -> None:
         try:
             self.save_gas_auth(
                 self.gas_url_field.value or "",
@@ -405,8 +404,7 @@ class MonitorView:
             self.error.value = str(exc)
             self._page.update()
             return
-        self._page.pop_dialog()
-        self._show_monitor_view(update=True)
+        self.open_settings()
 
     def _refresh_settings_summary(self) -> None:
         self.settings_summary.value = (
@@ -433,19 +431,19 @@ class MonitorView:
             self.health.color = ft.Colors.RED_700
             self.health_icon.icon = ft.Icons.WARNING_AMBER
             self.health_icon.color = ft.Colors.RED_700
-            self.health_detail.value = "出力に失敗または再送待ちがあります"
+            self.health_detail.value = "出力先を確認"
         elif state.running:
             self.health.value = "異常なし"
             self.health.color = ft.Colors.GREEN_700
             self.health_icon.icon = ft.Icons.CHECK_CIRCLE
             self.health_icon.color = ft.Colors.GREEN_700
-            self.health_detail.value = "受信と出力を監視中です"
+            self.health_detail.value = "監視中"
         else:
             self.health.value = "停止中"
             self.health.color = ft.Colors.GREY_700
             self.health_icon.icon = ft.Icons.ERROR_OUTLINE
             self.health_icon.color = ft.Colors.RED_700
-            self.health_detail.value = "接続は開始されていません"
+            self.health_detail.value = "未接続"
 
         self.output_destinations.controls = [
             self._output_destination(output) for output in state.outputs.values()
@@ -457,17 +455,8 @@ class MonitorView:
                 [
                     ft.Row([self.health_icon, self.health], spacing=12),
                     self.health_detail,
-                    ft.Divider(),
-                    self._metric("接続状態", self.status),
-                    ft.Row(
-                        [
-                            self._metric("受信", self.receive_count),
-                            self._metric("最終受信", self.last_received),
-                        ],
-                        wrap=True,
-                    ),
                 ],
-                spacing=10,
+                spacing=8,
             ),
             border=ft.Border.all(1, ft.Colors.GREY_300),
             border_radius=8,
@@ -479,10 +468,9 @@ class MonitorView:
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Text("出力先", size=18, weight=ft.FontWeight.BOLD),
                     self.output_destinations,
                 ],
-                spacing=8,
+                spacing=6,
             ),
             border=ft.Border.all(1, ft.Colors.GREY_300),
             border_radius=8,
@@ -498,33 +486,20 @@ class MonitorView:
             weight=ft.FontWeight.BOLD,
         )
         icon = MonitorView._output_icon(output)
-        return ft.Container(
-            content=ft.Column(
+        controls: list[ft.Control] = [
+            ft.Row(
                 [
-                    ft.Row(
-                        [
-                            icon,
-                            ft.Text(output.label, weight=ft.FontWeight.BOLD, expand=True),
-                            status,
-                        ],
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                    ),
-                    ft.Row(
-                        [
-                            ft.Text(f"成功: {output.success_count}"),
-                            ft.Text(f"失敗: {output.failure_count}"),
-                            ft.Text(f"再送待ち: {output.pending_count}"),
-                        ],
-                        wrap=True,
-                    ),
-                    ft.Text(output.message, selectable=True),
-                    ft.Text(
-                        f"最終成功: {MonitorView._format_time(output.last_success_at)}",
-                        selectable=True,
-                    ),
+                    icon,
+                    ft.Text(output.label, weight=ft.FontWeight.BOLD, expand=True),
+                    status,
                 ],
-                spacing=4,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
+        ]
+        if output.status in _UNHEALTHY_OUTPUT_STATUSES or output.pending_count > 0:
+            controls.append(ft.Text(output.message, selectable=True))
+        return ft.Container(
+            content=ft.Column(controls, spacing=4),
             border=ft.Border.all(1, ft.Colors.GREY_300),
             border_radius=8,
             padding=12,
@@ -541,15 +516,6 @@ class MonitorView:
         if output.status == OutputStatus.RUNNING:
             return ft.Icon(ft.Icons.SYNC, color=ft.Colors.BLUE_700)
         return ft.Icon(ft.Icons.RADIO_BUTTON_UNCHECKED, color=ft.Colors.GREY_700)
-
-    @staticmethod
-    def _metric(label: str, value: ft.Text) -> ft.Container:
-        return ft.Container(
-            content=ft.Column([ft.Text(label, color=ft.Colors.GREY_700), value], spacing=4),
-            border=ft.Border.all(1, ft.Colors.GREY_300),
-            border_radius=8,
-            padding=12,
-        )
 
     @staticmethod
     def _format_time(value: datetime | None) -> str:

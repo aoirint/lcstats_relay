@@ -26,21 +26,9 @@ _OUTPUT_DESTINATION_COUNT = 2
 class _FakePage:
     def __init__(self) -> None:
         self.update_count = 0
-        self.dialogs: list[ft.AlertDialog] = []
 
     def update(self) -> None:
         self.update_count += 1
-
-    def show_dialog(self, dialog: ft.AlertDialog) -> None:
-        dialog.open = True
-        self.dialogs.append(dialog)
-
-    def pop_dialog(self) -> ft.AlertDialog | None:
-        if not self.dialogs:
-            return None
-        dialog = self.dialogs.pop()
-        dialog.open = False
-        return dialog
 
 
 class _FakeManager:
@@ -305,7 +293,7 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
     view.update_state(ConnectionState(status=RelayStatus.WAITING, running=True))
 
     assert view.health.value == "異常なし"
-    assert view.health_detail.value == "受信と出力を監視中です"
+    assert view.health_detail.value == "監視中"
     assert view.health_icon.icon == ft.Icons.CHECK_CIRCLE
     assert len(view.output_destinations.controls) == 1
 
@@ -333,7 +321,7 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
     )
 
     assert view.health.value == "要確認"
-    assert view.health_detail.value == "出力に失敗または再送待ちがあります"
+    assert view.health_detail.value == "出力先を確認"
     assert view.health_icon.icon == ft.Icons.WARNING_AMBER
     assert len(view.output_destinations.controls) == _OUTPUT_DESTINATION_COUNT
 
@@ -395,38 +383,32 @@ def test_output_destination_icons_reflect_each_output_state(tmp_path: Path) -> N
     ]
 
 
-def test_settings_modal_links_to_gas_auth_modal(tmp_path: Path) -> None:
-    """Open GAS auth as an output setting from the settings modal."""
+def test_settings_view_links_to_full_window_gas_auth_view(tmp_path: Path) -> None:
+    """Open GAS auth as an output setting without using modal backdrops."""
     page = _FakePage()
     store = _settings_store(tmp_path)
     view = MonitorView(page, settings_store=store, manager_factory=_factory_for(_FakeManager()))
     view.build()
 
     view.open_settings()
-    assert page.dialogs[-1].open is True
-    settings_dialog = page.dialogs[-1]
-    settings_title = cast("ft.Row", settings_dialog.title)
-    assert cast("ft.Text", settings_title.controls[0]).value == "設定"
+    assert _active_heading(view) == "設定"
     view.tracker_url_field.value = "http://localhost:2145/"
     view.data_dir_field.value = str(tmp_path / "archive-root")
 
-    settings_content = cast("ft.Column", settings_dialog.content)
-    output_row = cast("ft.Row", settings_content.controls[4])
+    output_row = cast("ft.Row", view.root_view.controls[5])
     gas_button = cast("Any", output_row.controls[1])
     gas_button.on_click(None)
 
-    assert settings_dialog.open is False
-    gas_dialog = page.dialogs[-1]
-    gas_title = cast("ft.Row", gas_dialog.title)
-    assert cast("ft.Text", gas_title.controls[0]).value == "GAS認証"
+    assert _active_heading(view) == "GAS認証"
     view.gas_url_field.value = "https://script.google.com/macros/s/id/exec"
     view.gas_token_field.value = "secret"
-    view._save_gas_auth_from_modal()
+    view._save_gas_auth_from_view()
+    assert _active_heading(view) == "設定"
 
-    view.open_settings()
     view.tracker_url_field.value = "http://localhost:2145/"
     view.data_dir_field.value = str(tmp_path / "archive-root")
-    view._save_settings_from_modal()
+    view._save_settings_from_view()
+    assert _active_heading(view) == "LCStats Relay Monitor"
 
     settings = store.load()
     assert settings.tracker_url == "http://localhost:2145/"
@@ -436,8 +418,8 @@ def test_settings_modal_links_to_gas_auth_modal(tmp_path: Path) -> None:
     assert "secret" not in store.path.read_text(encoding="utf-8")
 
 
-def test_modal_save_errors_keep_modal_open(tmp_path: Path) -> None:
-    """Report validation errors without closing the active modal."""
+def test_full_window_view_save_errors_keep_active_view(tmp_path: Path) -> None:
+    """Report validation errors without leaving the active settings view."""
     page = _FakePage()
     view = MonitorView(
         page,
@@ -448,13 +430,11 @@ def test_modal_save_errors_keep_modal_open(tmp_path: Path) -> None:
 
     view.open_settings()
     view.data_dir_field.value = ""
-    settings_dialog = page.dialogs[-1]
-    view._save_settings_from_modal()
-    assert settings_dialog.open is True
+    view._save_settings_from_view()
+    assert _active_heading(view) == "設定"
     assert view.error.value == "ローカル保存先ディレクトリを指定してください"
 
     view.open_gas_auth()
-    gas_dialog = page.dialogs[-1]
-    view._save_gas_auth_from_modal()
-    assert gas_dialog.open is True
+    view._save_gas_auth_from_view()
+    assert _active_heading(view) == "GAS認証"
     assert view.error.value == "GAS URLにはscript.google.comのHTTPS URLを指定してください"
