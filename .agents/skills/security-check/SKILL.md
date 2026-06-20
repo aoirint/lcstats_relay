@@ -128,7 +128,7 @@ description: >-
     used by that command form.
   - Confirm the policy applies before downloading or executing the package.
   - Use source-backed and preferably test-backed evidence before documenting
-    `npx`, `npm exec`, `pnpm dlx`, or similar commands as acceptable.
+    `uvx`, `npx`, `npm exec`, `pnpm dlx`, or similar commands as acceptable.
 - Do not treat hash pinning alone as sufficient trust when the pinned artifact
   can fetch or execute additional remote content at runtime, such as online
   installers, bootstrappers, package runners, remote API clients, or tools with
