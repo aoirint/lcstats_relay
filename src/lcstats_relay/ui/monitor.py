@@ -322,20 +322,25 @@ class MonitorView:
     def _show_settings_view(self, *, update: bool) -> None:
         self.root_view.controls = [
             self._full_view_title("設定"),
-            self.tracker_url_field,
-            ft.Divider(),
-            ft.Text("出力先設定", size=14, weight=ft.FontWeight.BOLD),
-            self.data_dir_field,
-            ft.Row(
+            ft.Column(
                 [
-                    ft.Text("Google Apps Script", expand=True),
-                    ft.OutlinedButton(
-                        "設定",
-                        icon=ft.Icons.KEY,
-                        on_click=self._open_gas_auth_from_settings,
+                    self.error,
+                    self._settings_section(
+                        "接続元",
+                        [
+                            self.tracker_url_field,
+                        ],
+                    ),
+                    self._settings_section(
+                        "出力先",
+                        [
+                            self.data_dir_field,
+                            self._gas_output_setting_row(),
+                        ],
                     ),
                 ],
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=12,
+                expand=True,
             ),
             ft.Row(
                 [
@@ -345,11 +350,37 @@ class MonitorView:
                         on_click=self._save_settings_from_view,
                     ),
                 ],
-                wrap=True,
+                alignment=ft.MainAxisAlignment.END,
             ),
         ]
         if update:
             self._page.update()
+
+    @staticmethod
+    def _settings_section(title: str, controls: list[ft.Control]) -> ft.Column:
+        return ft.Column(
+            [
+                ft.Text(title, size=13, weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_700),
+                *controls,
+            ],
+            spacing=6,
+        )
+
+    def _gas_output_setting_row(self) -> ft.Container:
+        return ft.Container(
+            content=ft.Row(
+                [
+                    ft.Text("Google Apps Script", weight=ft.FontWeight.BOLD, expand=True),
+                    ft.OutlinedButton(
+                        "設定",
+                        icon=ft.Icons.KEY,
+                        on_click=self._open_gas_auth_from_settings,
+                    ),
+                ],
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            padding=2,
+        )
 
     def _show_gas_auth_view(self, *, update: bool) -> None:
         self.root_view.controls = [

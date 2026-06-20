@@ -435,7 +435,10 @@ def test_settings_view_links_to_full_window_gas_auth_view(tmp_path: Path) -> Non
     view.tracker_url_field.value = "http://localhost:2145/"
     view.data_dir_field.value = str(tmp_path / "archive-root")
 
-    output_row = cast("ft.Row", view.root_view.controls[5])
+    settings_body = cast("ft.Column", view.root_view.controls[1])
+    output_section = cast("ft.Column", settings_body.controls[2])
+    output_row_container = cast("ft.Container", output_section.controls[2])
+    output_row = cast("ft.Row", output_row_container.content)
     gas_button = cast("Any", output_row.controls[1])
     gas_button.on_click(None)
 
