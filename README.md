@@ -1,6 +1,6 @@
 # LCStats Relay
 
-LCStatsTracker が `http://localhost:2145/` で公開する統計 JSON を受信し、Google Apps
+LCStatsTracker が `http://127.0.0.1:2145/` で公開する統計 JSON を受信し、Google Apps
 Script Web App 経由で Google Sheets へ転送する Flet デスクトップアプリです。
 
 受信元は1レスポンスにつき1ペイロードを返して接続を閉じます。
@@ -34,9 +34,13 @@ uv run python -m lcstats_relay
 
 画面で以下を指定して「接続開始」を押します。
 
-- SSE URL: 通常は `http://localhost:2145/`
+- SSE URL: 通常は `http://127.0.0.1:2145/`
 - GAS Web App URL: `https://script.google.com/macros/s/.../exec` の形式の実行 URL
 - GAS Token: GAS側でtoken検証している場合のtoken値
+
+既定のSSE URLは `localhost` ではなく `127.0.0.1` です。
+これは `localhost` の名前解決でIPv6/IPv4の接続試行が発生し、環境によって接続開始が遅くなることを避けるためです。
+互換性のため `http://localhost:2145/` も入力できますが、受信時は `Host` ヘッダーを維持したままIPv4ループバックへ接続します。
 
 GAS Token はURLに含めず、Token欄に入力してください。
 GAS Token は画面上でマスクされ、設定ファイルには保存されません。

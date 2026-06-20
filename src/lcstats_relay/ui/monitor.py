@@ -14,7 +14,7 @@ import flet as ft
 from lcstats_relay.core.payload import JSONValue
 from lcstats_relay.core.state import ConnectionState, OutputState, OutputStatus, RelayStatus
 
-_DEFAULT_SSE_URL = "http://localhost:2145/"
+_DEFAULT_SSE_URL = "http://127.0.0.1:2145/"
 _MAX_LOG_ENTRIES = 100
 _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 

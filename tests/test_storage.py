@@ -24,8 +24,8 @@ def test_retry_queue_round_trip(tmp_path: Path) -> None:
     queue = RetryQueue(tmp_path)
     received_at = datetime(2026, 6, 20, 10, 8, 12)
     payload = RelayPayload(
-        raw_json='{"Seed":42,"Players":["aoi"]}',
-        payload={"Seed": 42, "Players": ["aoi"]},
+        raw_json='{"Seed":42,"Players":["player-1"]}',
+        payload={"Seed": 42, "Players": ["player-1"]},
         received_at=received_at,
     )
 

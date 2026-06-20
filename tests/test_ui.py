@@ -146,8 +146,8 @@ def test_start_replaces_manager_and_stop_unlocks_settings(tmp_path: Path) -> Non
         await view.start()
 
         assert arguments == [
-            ("http://localhost:2145/", view.gas_url.value, "secret", tmp_path),
-            ("http://localhost:2145/", view.gas_url.value, "secret", tmp_path),
+            ("http://127.0.0.1:2145/", view.gas_url.value, "secret", tmp_path),
+            ("http://127.0.0.1:2145/", view.gas_url.value, "secret", tmp_path),
         ]
         assert managers[0].start_count == 1
         assert managers[0].stop_count == 1
