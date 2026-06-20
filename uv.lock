@@ -440,7 +440,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "flet", extras = ["all"], specifier = ">=0.85.3,<0.86.0" },
-    { name = "httpx", specifier = "==0.28.1" },
+    { name = "httpx", specifier = ">=0.28.1,<0.29.0" },
 ]
 
 [package.metadata.requires-dev]
