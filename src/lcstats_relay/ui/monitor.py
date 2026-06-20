@@ -49,12 +49,6 @@ class PagePort(Protocol):
     def update(self) -> None:
         """Push changed controls to the client."""
 
-    def show_dialog(self, dialog: ft.AlertDialog) -> None:
-        """Display a modal dialog."""
-
-    def pop_dialog(self) -> object | None:
-        """Close the active modal dialog."""
-
 
 class ManagerPort(Protocol):
     """Connection manager operations used by the view."""
@@ -162,12 +156,23 @@ class MonitorView:
         self.receive_count = ft.Text("0")
         self.last_received = ft.Text("-")
         self.error = ft.Text("", color=ft.Colors.RED_700, selectable=True)
+        self.tracker_url_field = ft.TextField(label="LCStatsTracker URL", expand=True)
+        self.data_dir_field = ft.TextField(label="ローカル保存先ディレクトリ", expand=True)
+        self.gas_url_field = ft.TextField(label="GAS Web App URL", expand=True)
+        self.gas_token_field = ft.TextField(
+            label="GAS Token",
+            password=True,
+            can_reveal_password=True,
+            expand=True,
+        )
         self.outputs = ft.Column([], spacing=8)
         self.event_list = ft.ListView(expand=True, spacing=6, auto_scroll=True)
+        self.view_body = ft.Column([], spacing=12, expand=True)
         self._refresh_settings_summary()
 
     def build(self) -> ft.Column:
         """Build the complete monitor control tree."""
+        self._show_monitor_view(update=False)
         return ft.Column(
             [
                 ft.Text("LCStats Relay", size=26, weight=ft.FontWeight.BOLD),
@@ -183,101 +188,25 @@ class MonitorView:
                 ),
                 self.settings_summary,
                 self.gas_summary,
-                ft.Divider(),
-                ft.Row(
-                    [
-                        self._metric("状態", self.status),
-                        self._metric("受信", self.receive_count),
-                    ],
-                    wrap=True,
-                ),
-                self._detail("最終受信", self.last_received),
                 self.error,
-                ft.Text("出力面", size=18, weight=ft.FontWeight.BOLD),
-                self.outputs,
                 ft.Divider(),
-                ft.Text("最近のペイロード", size=18, weight=ft.FontWeight.BOLD),
-                ft.Container(
-                    content=self.event_list,
-                    border=ft.Border.all(1, ft.Colors.GREY_300),
-                    border_radius=8,
-                    padding=12,
-                    expand=True,
-                ),
+                self.view_body,
             ],
             expand=True,
             spacing=12,
         )
 
     def open_settings(self, _event: object | None = None) -> None:
-        """Open tracker and local storage settings in a dedicated dialog."""
-        tracker_url = ft.TextField(
-            label="LCStatsTracker URL",
-            value=self._settings.tracker_url,
-            expand=True,
-        )
-        data_dir = ft.TextField(
-            label="ローカル保存先ディレクトリ",
-            value=str(self._settings.data_dir),
-            expand=True,
-        )
-
-        def save(_save_event: object | None = None) -> None:
-            try:
-                self.save_settings(tracker_url.value or "", data_dir.value or "")
-            except ValueError as exc:
-                self.error.value = str(exc)
-                self._page.update()
-                return
-            self._close_dialog()
-
-        self._open_dialog(
-            ft.AlertDialog(
-                modal=True,
-                title=ft.Text("設定"),
-                content=ft.Column([tracker_url, data_dir], tight=True, spacing=12),
-                actions=[
-                    ft.TextButton("キャンセル", on_click=lambda _event: self._close_dialog()),
-                    ft.FilledButton("保存", icon=ft.Icons.SAVE, on_click=save),
-                ],
-            ),
-        )
+        """Switch to the tracker and local storage settings view."""
+        self.tracker_url_field.value = self._settings.tracker_url
+        self.data_dir_field.value = str(self._settings.data_dir)
+        self._show_settings_view(update=True)
 
     def open_gas_auth(self, _event: object | None = None) -> None:
-        """Open Google Apps Script destination and token fields in a dedicated dialog."""
-        gas_url = ft.TextField(
-            label="GAS Web App URL",
-            value=self._settings.gas_url,
-            expand=True,
-        )
-        gas_token = ft.TextField(
-            label="GAS Token",
-            value=self._gas_token,
-            password=True,
-            can_reveal_password=True,
-            expand=True,
-        )
-
-        def save(_save_event: object | None = None) -> None:
-            try:
-                self.save_gas_auth(gas_url.value or "", gas_token.value or "")
-            except ValueError as exc:
-                self.error.value = str(exc)
-                self._page.update()
-                return
-            self._close_dialog()
-
-        self._open_dialog(
-            ft.AlertDialog(
-                modal=True,
-                title=ft.Text("GAS認証"),
-                content=ft.Column([gas_url, gas_token], tight=True, spacing=12),
-                actions=[
-                    ft.TextButton("キャンセル", on_click=lambda _event: self._close_dialog()),
-                    ft.FilledButton("保存", icon=ft.Icons.SAVE, on_click=save),
-                ],
-            ),
-        )
+        """Switch to the Google Apps Script destination and token view."""
+        self.gas_url_field.value = self._settings.gas_url
+        self.gas_token_field.value = self._gas_token
+        self._show_gas_auth_view(update=True)
 
     def save_settings(self, tracker_url: str, data_dir: str) -> None:
         """Validate and persist tracker plus local storage settings."""
@@ -330,6 +259,7 @@ class MonitorView:
         self.stop_button.disabled = False
         self.settings_button.disabled = True
         self.gas_auth_button.disabled = True
+        self._show_monitor_view(update=False)
         self._manager.start()
         self._page.update()
 
@@ -342,6 +272,7 @@ class MonitorView:
         self.stop_button.disabled = True
         self.settings_button.disabled = False
         self.gas_auth_button.disabled = False
+        self._show_monitor_view(update=False)
         self._page.update()
 
     async def close(self, _event: object | None = None) -> None:
@@ -368,11 +299,102 @@ class MonitorView:
             self.event_list.controls.pop(0)
         self._page.update()
 
-    def _open_dialog(self, dialog: ft.AlertDialog) -> None:
-        self._page.show_dialog(dialog)
+    def _show_monitor_view(self, *, update: bool) -> None:
+        self.view_body.controls = [
+            ft.Row(
+                [
+                    self._metric("状態", self.status),
+                    self._metric("受信", self.receive_count),
+                ],
+                wrap=True,
+            ),
+            self._detail("最終受信", self.last_received),
+            ft.Text("出力面", size=18, weight=ft.FontWeight.BOLD),
+            self.outputs,
+            ft.Divider(),
+            ft.Text("最近のペイロード", size=18, weight=ft.FontWeight.BOLD),
+            ft.Container(
+                content=self.event_list,
+                border=ft.Border.all(1, ft.Colors.GREY_300),
+                border_radius=8,
+                padding=12,
+                expand=True,
+            ),
+        ]
+        if update:
+            self._page.update()
 
-    def _close_dialog(self) -> None:
-        self._page.pop_dialog()
+    def _show_settings_view(self, *, update: bool) -> None:
+        self.view_body.controls = [
+            ft.Text("設定", size=20, weight=ft.FontWeight.BOLD),
+            self.tracker_url_field,
+            self.data_dir_field,
+            ft.Row(
+                [
+                    ft.OutlinedButton(
+                        "戻る",
+                        icon=ft.Icons.ARROW_BACK,
+                        on_click=lambda _event: self._show_monitor_view(update=True),
+                    ),
+                    ft.FilledButton(
+                        "保存",
+                        icon=ft.Icons.SAVE,
+                        on_click=self._save_settings_from_view,
+                    ),
+                ],
+                wrap=True,
+            ),
+        ]
+        if update:
+            self._page.update()
+
+    def _show_gas_auth_view(self, *, update: bool) -> None:
+        self.view_body.controls = [
+            ft.Text("GAS認証", size=20, weight=ft.FontWeight.BOLD),
+            self.gas_url_field,
+            self.gas_token_field,
+            ft.Row(
+                [
+                    ft.OutlinedButton(
+                        "戻る",
+                        icon=ft.Icons.ARROW_BACK,
+                        on_click=lambda _event: self._show_monitor_view(update=True),
+                    ),
+                    ft.FilledButton(
+                        "保存",
+                        icon=ft.Icons.SAVE,
+                        on_click=self._save_gas_auth_from_view,
+                    ),
+                ],
+                wrap=True,
+            ),
+        ]
+        if update:
+            self._page.update()
+
+    def _save_settings_from_view(self, _event: object | None = None) -> None:
+        try:
+            self.save_settings(
+                self.tracker_url_field.value or "",
+                self.data_dir_field.value or "",
+            )
+        except ValueError as exc:
+            self.error.value = str(exc)
+            self._page.update()
+            return
+        self._show_monitor_view(update=True)
+
+    def _save_gas_auth_from_view(self, _event: object | None = None) -> None:
+        try:
+            self.save_gas_auth(
+                self.gas_url_field.value or "",
+                self.gas_token_field.value or "",
+            )
+        except ValueError as exc:
+            self.error.value = str(exc)
+            self._page.update()
+            return
+        self._show_monitor_view(update=True)
 
     def _refresh_settings_summary(self) -> None:
         self.settings_summary.value = (

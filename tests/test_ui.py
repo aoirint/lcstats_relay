@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import flet as ft
 import pytest
@@ -27,24 +27,9 @@ _OUTPUT_CARD_COUNT = 2
 class _FakePage:
     def __init__(self) -> None:
         self.update_count = 0
-        self.dialog: ft.AlertDialog | None = None
 
     def update(self) -> None:
         self.update_count += 1
-
-    def show_dialog(self, dialog: ft.AlertDialog) -> None:
-        if dialog.open:
-            msg = "Dialog is already opened"
-            raise RuntimeError(msg)
-        self.dialog = dialog
-        dialog.open = True
-
-    def pop_dialog(self) -> ft.AlertDialog | None:
-        if self.dialog is None or not self.dialog.open:
-            return None
-        dialog = self.dialog
-        dialog.open = False
-        return dialog
 
 
 class _FakeManager:
@@ -87,6 +72,11 @@ def _factory_for(
 
 def _settings_store(tmp_path: Path) -> SettingsStore:
     return SettingsStore(tmp_path / "settings.json")
+
+
+def _active_heading(view: MonitorView) -> str | None:
+    heading = cast("ft.Text", view.view_body.controls[0])
+    return heading.value
 
 
 def test_url_validation_accepts_expected_endpoints() -> None:
@@ -311,39 +301,25 @@ def test_payload_log_is_bounded(tmp_path: Path) -> None:
     assert page.update_count == _PAYLOAD_CALLS
 
 
-def test_settings_and_gas_auth_are_saved_from_separate_dialogs(tmp_path: Path) -> None:
-    """Keep connection settings and GAS auth on separate UI paths."""
+def test_settings_and_gas_auth_are_saved_from_separate_views(tmp_path: Path) -> None:
+    """Keep connection settings and GAS auth on separate in-page views."""
     page = _FakePage()
     store = _settings_store(tmp_path)
     view = MonitorView(page, settings_store=store, manager_factory=_factory_for(_FakeManager()))
+    view.build()
 
     view.open_settings()
-    assert page.dialog is not None
-    assert page.dialog.open is True
-    settings_dialog = page.dialog
-    settings_content = cast("ft.Column", settings_dialog.content)
-    tracker_url = cast("ft.TextField", settings_content.controls[0])
-    data_dir = cast("ft.TextField", settings_content.controls[1])
-    tracker_url.value = "http://localhost:2145/"
-    data_dir.value = str(tmp_path / "archive-root")
-    save_settings = cast("Any", settings_dialog.actions[1]).on_click
-    assert save_settings is not None
-    save_settings(None)
-    assert settings_dialog.open is False
+    assert _active_heading(view) == "設定"
+    view.tracker_url_field.value = "http://localhost:2145/"
+    view.data_dir_field.value = str(tmp_path / "archive-root")
+    view._save_settings_from_view()
+    assert isinstance(view.view_body.controls[0], ft.Row)
 
     view.open_gas_auth()
-    assert page.dialog is not None
-    assert page.dialog.open is True
-    gas_dialog = page.dialog
-    gas_content = cast("ft.Column", gas_dialog.content)
-    gas_url = cast("ft.TextField", gas_content.controls[0])
-    gas_token = cast("ft.TextField", gas_content.controls[1])
-    gas_url.value = "https://script.google.com/macros/s/id/exec"
-    gas_token.value = "secret"
-    save_gas_auth = cast("Any", gas_dialog.actions[1]).on_click
-    assert save_gas_auth is not None
-    save_gas_auth(None)
-    assert gas_dialog.open is False
+    assert _active_heading(view) == "GAS認証"
+    view.gas_url_field.value = "https://script.google.com/macros/s/id/exec"
+    view.gas_token_field.value = "secret"
+    view._save_gas_auth_from_view()
 
     settings = store.load()
     assert settings.tracker_url == "http://localhost:2145/"
@@ -353,35 +329,23 @@ def test_settings_and_gas_auth_are_saved_from_separate_dialogs(tmp_path: Path) -
     assert "secret" not in store.path.read_text(encoding="utf-8")
 
 
-def test_dialog_save_errors_keep_dialog_open(tmp_path: Path) -> None:
-    """Report validation errors from dialog save buttons without closing the dialog."""
+def test_view_save_errors_keep_active_view(tmp_path: Path) -> None:
+    """Report validation errors without leaving the active settings view."""
     page = _FakePage()
     view = MonitorView(
         page,
         settings_store=_settings_store(tmp_path),
         manager_factory=_factory_for(_FakeManager()),
     )
+    view.build()
 
     view.open_settings()
-    assert page.dialog is not None
-    settings_dialog = page.dialog
-    settings_content = cast("ft.Column", settings_dialog.content)
-    data_dir = cast("ft.TextField", settings_content.controls[1])
-    data_dir.value = ""
-    save_settings = cast("Any", settings_dialog.actions[1]).on_click
-    assert save_settings is not None
-    save_settings(None)
-    assert settings_dialog.open is True
+    view.data_dir_field.value = ""
+    view._save_settings_from_view()
+    assert _active_heading(view) == "設定"
     assert view.error.value == "ローカル保存先ディレクトリを指定してください"
 
     view.open_gas_auth()
-    assert page.dialog is not None
-    gas_dialog = page.dialog
-    save_gas_auth = cast("Any", gas_dialog.actions[1]).on_click
-    assert save_gas_auth is not None
-    save_gas_auth(None)
-    assert gas_dialog.open is True
+    view._save_gas_auth_from_view()
+    assert _active_heading(view) == "GAS認証"
     assert view.error.value == "GAS URLにはscript.google.comのHTTPS URLを指定してください"
-
-    page.dialog = None
-    view._close_dialog()
