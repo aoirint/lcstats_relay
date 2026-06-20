@@ -1,0 +1,4 @@
+interface:
+  display_name: "Python Quality Check"
+  short_description: "Validate Python changes with uv, Ruff, mypy, and pytest"
+  default_prompt: "Use $python-quality-check to validate Python source, tests, dependencies, and tool configuration."
