@@ -37,10 +37,11 @@ LCStats Relay currently registers two standard outputs.
 
 ### Local archive
 
-The local archive writes the received payload under:
+The local archive writes the received payload under the configured local data
+directory:
 
 ```text
-data/archive/YYYY-MM-DD/
+<data-dir>/archive/YYYY-MM-DD/
 ```
 
 The archive is required. It is the durability boundary for a received payload.
@@ -53,10 +54,10 @@ Apps Script Web App URL.
 
 Authentication data is provided through a separate authentication component.
 The token is not embedded in the URL by the UI and is not saved to the settings
-file.
+file. The GAS destination URL is saved with the rest of the non-secret settings.
 
 If the Google Apps Script output fails after the archive succeeds, the failed
-delivery can be stored in `data/queue/` and retried later.
+delivery can be stored in `<data-dir>/queue/` and retried later.
 
 ## Delivery guarantees
 

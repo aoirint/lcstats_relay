@@ -13,7 +13,7 @@ the next one.
 LCStats Relay dispatches each received payload to registered output surfaces.
 The standard output surfaces are:
 
-- Local archive: stores the received JSON under `data/archive/YYYY-MM-DD/`.
+- Local archive: stores the received JSON under the configured directory.
 - Google Sheets: posts the parsed JSON to a configured Google Apps Script Web App.
 
 The local archive is the required durability boundary. If archiving fails, later
@@ -34,12 +34,13 @@ uv sync --locked --all-groups
 uv run python -m lcstats_relay
 ```
 
-In the app window, provide:
+In the app window:
 
-- SSE URL: usually `http://127.0.0.1:2145/`.
-- GAS Web App URL: the deployed `https://script.google.com/macros/s/.../exec`
-  URL.
-- GAS Token: the token value if the Google Apps Script deployment validates one.
+- Open Settings to configure the LCStatsTracker URL, usually
+  `http://127.0.0.1:2145/`, and the local save directory.
+- Open GAS Auth to configure the deployed
+  `https://script.google.com/macros/s/.../exec` URL and the token value if the
+  Google Apps Script deployment validates one.
 
 The default SSE URL uses `127.0.0.1` instead of `localhost` to avoid unnecessary
 dual-stack loopback connection delays. Explicitly entered URLs are honored as
@@ -49,7 +50,8 @@ For the detailed loopback policy, see
 [Loopback connection policy](docs/loopback-connection-policy.md).
 
 GAS tokens are entered separately from the URL. They are masked in the UI and are
-not saved to the settings file.
+not saved to the settings file. The LCStatsTracker URL, GAS Web App URL, and
+local save directory are saved in the user settings file.
 
 ## Development checks
 

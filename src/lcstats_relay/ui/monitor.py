@@ -6,15 +6,15 @@ import json
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 from urllib.parse import parse_qsl, urlparse
 
 import flet as ft
 
+from lcstats_relay.core.config import RelaySettings, SettingsStore
 from lcstats_relay.core.payload import JSONValue
 from lcstats_relay.core.state import ConnectionState, OutputState, OutputStatus, RelayStatus
 
-_DEFAULT_SSE_URL = "http://127.0.0.1:2145/"
 _MAX_LOG_ENTRIES = 100
 _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
@@ -50,6 +50,10 @@ class PagePort(Protocol):
         """Push changed controls to the client."""
 
 
+class _DialogPagePort(Protocol):
+    dialog: ft.AlertDialog | None
+
+
 class ManagerPort(Protocol):
     """Connection manager operations used by the view."""
 
@@ -78,10 +82,10 @@ def validate_sse_url(value: str) -> str:
     url = value.strip()
     parsed = urlparse(url)
     if parsed.scheme != "http" or parsed.hostname not in _LOCAL_HOSTS:
-        msg = "SSE URLにはlocalhostのHTTP URLを指定してください"
+        msg = "LCStatsTracker URLにはlocalhostのHTTP URLを指定してください"
         raise ValueError(msg)
     if parsed.username is not None or parsed.password is not None:
-        msg = "SSE URLに認証情報を含めることはできません"
+        msg = "LCStatsTracker URLに認証情報を含めることはできません"
         raise ValueError(msg)
     return url
 
@@ -102,6 +106,15 @@ def validate_gas_url(value: str) -> str:
     return url
 
 
+def validate_data_dir(value: str) -> Path:
+    """Validate and normalize the local archive root directory."""
+    raw_path = value.strip()
+    if not raw_path:
+        msg = "ローカル保存先ディレクトリを指定してください"
+        raise ValueError(msg)
+    return Path(raw_path).expanduser()
+
+
 class MonitorView:
     """Render relay state and translate user actions into manager calls."""
 
@@ -109,22 +122,28 @@ class MonitorView:
         self,
         page: PagePort,
         *,
-        data_dir: Path = Path("data"),
+        settings_store: SettingsStore | None = None,
         manager_factory: ManagerFactory,
     ) -> None:
         """Create controls and retain injected application boundaries."""
         self._page = page
-        self._data_dir = data_dir
+        self._settings_store = settings_store or SettingsStore()
+        self._settings = self._settings_store.load()
         self._manager_factory = manager_factory
         self._manager: ManagerPort | None = None
+        self._gas_token = ""
 
-        self.sse_url = ft.TextField(label="SSE URL", value=_DEFAULT_SSE_URL, expand=True)
-        self.gas_url = ft.TextField(label="GAS Web App URL", expand=True)
-        self.gas_token = ft.TextField(
-            label="GAS Token",
-            password=True,
-            can_reveal_password=True,
-            expand=True,
+        self.settings_summary = ft.Text(selectable=True)
+        self.gas_summary = ft.Text(selectable=True)
+        self.settings_button = ft.OutlinedButton(
+            "設定",
+            icon=ft.Icons.SETTINGS,
+            on_click=self.open_settings,
+        )
+        self.gas_auth_button = ft.OutlinedButton(
+            "GAS認証",
+            icon=ft.Icons.KEY,
+            on_click=self.open_gas_auth,
         )
         self.start_button = ft.FilledButton(
             "接続開始",
@@ -143,6 +162,7 @@ class MonitorView:
         self.error = ft.Text("", color=ft.Colors.RED_700, selectable=True)
         self.outputs = ft.Column([], spacing=8)
         self.event_list = ft.ListView(expand=True, spacing=6, auto_scroll=True)
+        self._refresh_settings_summary()
 
     def build(self) -> ft.Column:
         """Build the complete monitor control tree."""
@@ -150,10 +170,17 @@ class MonitorView:
             [
                 ft.Text("LCStats Relay", size=26, weight=ft.FontWeight.BOLD),
                 ft.Text("受信した統計JSONを保存して設定済みの出力面へ転送します。"),
-                self.sse_url,
-                self.gas_url,
-                self.gas_token,
-                ft.Row([self.start_button, self.stop_button]),
+                ft.Row(
+                    [
+                        self.settings_button,
+                        self.gas_auth_button,
+                        self.start_button,
+                        self.stop_button,
+                    ],
+                    wrap=True,
+                ),
+                self.settings_summary,
+                self.gas_summary,
                 ft.Divider(),
                 ft.Row(
                     [
@@ -180,11 +207,107 @@ class MonitorView:
             spacing=12,
         )
 
-    async def start(self) -> None:
+    def open_settings(self, _event: object | None = None) -> None:
+        """Open tracker and local storage settings in a dedicated dialog."""
+        tracker_url = ft.TextField(
+            label="LCStatsTracker URL",
+            value=self._settings.tracker_url,
+            expand=True,
+        )
+        data_dir = ft.TextField(
+            label="ローカル保存先ディレクトリ",
+            value=str(self._settings.data_dir),
+            expand=True,
+        )
+
+        def save(_save_event: object | None = None) -> None:
+            try:
+                self.save_settings(tracker_url.value or "", data_dir.value or "")
+            except ValueError as exc:
+                self.error.value = str(exc)
+                self._page.update()
+                return
+            self._close_dialog()
+
+        self._open_dialog(
+            ft.AlertDialog(
+                modal=True,
+                title=ft.Text("設定"),
+                content=ft.Column([tracker_url, data_dir], tight=True, spacing=12),
+                actions=[
+                    ft.TextButton("キャンセル", on_click=lambda _event: self._close_dialog()),
+                    ft.FilledButton("保存", icon=ft.Icons.SAVE, on_click=save),
+                ],
+            ),
+        )
+
+    def open_gas_auth(self, _event: object | None = None) -> None:
+        """Open Google Apps Script destination and token fields in a dedicated dialog."""
+        gas_url = ft.TextField(
+            label="GAS Web App URL",
+            value=self._settings.gas_url,
+            expand=True,
+        )
+        gas_token = ft.TextField(
+            label="GAS Token",
+            value=self._gas_token,
+            password=True,
+            can_reveal_password=True,
+            expand=True,
+        )
+
+        def save(_save_event: object | None = None) -> None:
+            try:
+                self.save_gas_auth(gas_url.value or "", gas_token.value or "")
+            except ValueError as exc:
+                self.error.value = str(exc)
+                self._page.update()
+                return
+            self._close_dialog()
+
+        self._open_dialog(
+            ft.AlertDialog(
+                modal=True,
+                title=ft.Text("GAS認証"),
+                content=ft.Column([gas_url, gas_token], tight=True, spacing=12),
+                actions=[
+                    ft.TextButton("キャンセル", on_click=lambda _event: self._close_dialog()),
+                    ft.FilledButton("保存", icon=ft.Icons.SAVE, on_click=save),
+                ],
+            ),
+        )
+
+    def save_settings(self, tracker_url: str, data_dir: str) -> None:
+        """Validate and persist tracker plus local storage settings."""
+        self._settings = RelaySettings(
+            tracker_url=validate_sse_url(tracker_url),
+            gas_url=self._settings.gas_url,
+            data_dir=validate_data_dir(data_dir),
+        )
+        self._settings_store.save(self._settings)
+        self.error.value = ""
+        self._refresh_settings_summary()
+        self._page.update()
+
+    def save_gas_auth(self, gas_url: str, gas_token: str) -> None:
+        """Validate and persist the GAS destination while keeping the token in memory."""
+        self._settings = RelaySettings(
+            tracker_url=self._settings.tracker_url,
+            gas_url=validate_gas_url(gas_url),
+            data_dir=self._settings.data_dir,
+        )
+        self._gas_token = gas_token.strip()
+        self._settings_store.save(self._settings)
+        self.error.value = ""
+        self._refresh_settings_summary()
+        self._page.update()
+
+    async def start(self, _event: object | None = None) -> None:
         """Validate settings and start a new connection manager."""
         try:
-            sse_url = validate_sse_url(self.sse_url.value or "")
-            gas_url = validate_gas_url(self.gas_url.value or "")
+            tracker_url = validate_sse_url(self._settings.tracker_url)
+            gas_url = validate_gas_url(self._settings.gas_url)
+            data_dir = validate_data_dir(str(self._settings.data_dir))
         except ValueError as exc:
             self.error.value = str(exc)
             self._page.update()
@@ -193,35 +316,33 @@ class MonitorView:
         if self._manager is not None:
             await self._manager.stop()
         self._manager = self._manager_factory(
-            sse_url,
+            tracker_url,
             gas_url,
-            (self.gas_token.value or "").strip(),
-            self._data_dir,
+            self._gas_token,
+            data_dir,
             self.update_state,
             self.add_payload,
         )
         self.error.value = ""
         self.start_button.disabled = True
         self.stop_button.disabled = False
-        self.sse_url.disabled = True
-        self.gas_url.disabled = True
-        self.gas_token.disabled = True
+        self.settings_button.disabled = True
+        self.gas_auth_button.disabled = True
         self._manager.start()
         self._page.update()
 
-    async def stop(self) -> None:
+    async def stop(self, _event: object | None = None) -> None:
         """Stop the active manager and unlock connection settings."""
         if self._manager is not None:
             await self._manager.stop()
             self._manager = None
         self.start_button.disabled = False
         self.stop_button.disabled = True
-        self.sse_url.disabled = False
-        self.gas_url.disabled = False
-        self.gas_token.disabled = False
+        self.settings_button.disabled = False
+        self.gas_auth_button.disabled = False
         self._page.update()
 
-    async def close(self) -> None:
+    async def close(self, _event: object | None = None) -> None:
         """Stop background work when the desktop window closes."""
         if self._manager is not None:
             await self._manager.stop()
@@ -244,6 +365,26 @@ class MonitorView:
         if len(self.event_list.controls) > _MAX_LOG_ENTRIES:
             self.event_list.controls.pop(0)
         self._page.update()
+
+    def _open_dialog(self, dialog: ft.AlertDialog) -> None:
+        dialog_page = cast("_DialogPagePort", self._page)
+        dialog_page.dialog = dialog
+        dialog.open = True
+        self._page.update()
+
+    def _close_dialog(self) -> None:
+        dialog = getattr(cast("_DialogPagePort", self._page), "dialog", None)
+        if dialog is not None:
+            dialog.open = False
+        self._page.update()
+
+    def _refresh_settings_summary(self) -> None:
+        self.settings_summary.value = (
+            f"LCStatsTracker: {self._settings.tracker_url} / 保存先: {self._settings.data_dir}"
+        )
+        gas_state = self._settings.gas_url if self._settings.gas_url else "未設定"
+        token_state = "設定済み" if self._gas_token else "未設定"
+        self.gas_summary.value = f"GAS: {gas_state} / Token: {token_state}"
 
     @staticmethod
     def _output_card(output: OutputState) -> ft.Container:
