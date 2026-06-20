@@ -11,9 +11,9 @@ If the server only listens on one address family, the client may first try the
 other one, wait for that attempt to fail, and then fall back.
 
 For a local desktop integration, that extra connection attempt can make startup
-or reconnects feel unnecessarily slow. The common case for LCStatsTracker is a
-loopback HTTP endpoint on port `2145`, so the default should avoid avoidable name
-resolution and dual-stack fallback work.
+or reconnects feel unnecessarily slow. The common case is a loopback HTTP
+endpoint on port `2145`, so the default should avoid avoidable name resolution
+and dual-stack fallback work.
 
 ## Policy
 
