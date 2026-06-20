@@ -468,6 +468,12 @@ class MonitorView:
             self.health_icon.icon = ft.Icons.WARNING_AMBER
             self.health_icon.color = ft.Colors.RED_700
             self.health_detail.value = "出力先を確認"
+        elif state.running and state.receive_count == 0:
+            self.health.value = "接続中"
+            self.health.color = ft.Colors.BLUE_700
+            self.health_icon.icon = ft.Icons.SYNC
+            self.health_icon.color = ft.Colors.BLUE_700
+            self.health_detail.value = "接続試行中"
         elif state.running:
             self.health.value = "異常なし"
             self.health.color = ft.Colors.GREEN_700
