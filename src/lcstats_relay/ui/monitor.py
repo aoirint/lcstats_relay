@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -15,7 +14,6 @@ from lcstats_relay.core.config import RelaySettings, SettingsStore
 from lcstats_relay.core.payload import JSONValue
 from lcstats_relay.core.state import ConnectionState, OutputState, OutputStatus, RelayStatus
 
-_MAX_LOG_ENTRIES = 100
 _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
 _STATUS_LABELS = {
@@ -41,6 +39,8 @@ _OUTPUT_STATUS_COLORS = {
     OutputStatus.ERROR: ft.Colors.RED_700,
     OutputStatus.RETRY_QUEUED: ft.Colors.ORANGE_800,
 }
+
+_UNHEALTHY_OUTPUT_STATUSES = frozenset({OutputStatus.ERROR, OutputStatus.RETRY_QUEUED})
 
 
 class PagePort(Protocol):
@@ -153,6 +153,10 @@ class MonitorView:
             disabled=True,
         )
         self.status = ft.Text(_STATUS_LABELS[RelayStatus.STOPPED], weight=ft.FontWeight.BOLD)
+        self.health = ft.Text(
+            "停止中", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_700
+        )
+        self.health_detail = ft.Text("接続は開始されていません", selectable=True)
         self.receive_count = ft.Text("0")
         self.last_received = ft.Text("-")
         self.error = ft.Text("", color=ft.Colors.RED_700, selectable=True)
@@ -165,10 +169,10 @@ class MonitorView:
             can_reveal_password=True,
             expand=True,
         )
-        self.outputs = ft.Column([], spacing=8)
-        self.event_list = ft.ListView(expand=True, spacing=6, auto_scroll=True)
+        self.output_alerts = ft.Column([], spacing=8)
         self.root_view = ft.Column([], spacing=12, expand=True)
         self._refresh_settings_summary()
+        self._refresh_health(ConnectionState())
 
     def build(self) -> ft.Column:
         """Build the complete monitor control tree."""
@@ -266,22 +270,15 @@ class MonitorView:
         self.receive_count.value = str(state.receive_count)
         self.last_received.value = self._format_time(state.last_received_at)
         self.error.value = state.last_error or ""
-        self.outputs.controls = [self._output_card(output) for output in state.outputs.values()]
+        self._refresh_health(state)
         self._page.update()
 
     def add_payload(self, payload: JSONValue) -> None:
-        """Append a compact JSON preview while bounding UI memory use."""
-        rendered = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        self.event_list.controls.append(ft.Text(f"{timestamp}  {rendered}", selectable=True))
-        if len(self.event_list.controls) > _MAX_LOG_ENTRIES:
-            self.event_list.controls.pop(0)
-        self._page.update()
+        """Accept payload callbacks without rendering raw details in the monitor."""
 
     def _show_monitor_view(self, *, update: bool) -> None:
         self.root_view.controls = [
-            ft.Text("LCStats Relay", size=26, weight=ft.FontWeight.BOLD),
-            ft.Text("受信した統計JSONを保存して設定済みの出力面へ転送します。"),
+            ft.Text("LCStats Relay Monitor", size=26, weight=ft.FontWeight.BOLD),
             ft.Row(
                 [
                     self.settings_button,
@@ -291,29 +288,24 @@ class MonitorView:
                 ],
                 wrap=True,
             ),
-            self.settings_summary,
-            self.gas_summary,
             self.error,
             ft.Divider(),
-            ft.Row(
-                [
-                    self._metric("状態", self.status),
-                    self._metric("受信", self.receive_count),
-                ],
-                wrap=True,
-            ),
-            self._detail("最終受信", self.last_received),
-            ft.Text("出力面", size=18, weight=ft.FontWeight.BOLD),
-            self.outputs,
-            ft.Divider(),
-            ft.Text("最近のペイロード", size=18, weight=ft.FontWeight.BOLD),
             ft.Container(
-                content=self.event_list,
+                content=ft.Column([self.health, self.health_detail], spacing=6),
                 border=ft.Border.all(1, ft.Colors.GREY_300),
                 border_radius=8,
                 padding=12,
-                expand=True,
             ),
+            ft.Row(
+                [
+                    self._metric("接続状態", self.status),
+                    self._metric("受信", self.receive_count),
+                    self._metric("最終受信", self.last_received),
+                ],
+                wrap=True,
+            ),
+            ft.Text("出力異常", size=18, weight=ft.FontWeight.BOLD),
+            self.output_alerts,
         ]
         if update:
             self._page.update()
@@ -400,8 +392,37 @@ class MonitorView:
         token_state = "設定済み" if self._gas_token else "未設定"
         self.gas_summary.value = f"GAS: {gas_state} / Token: {token_state}"
 
+    def _refresh_health(self, state: ConnectionState) -> None:
+        unhealthy_outputs = [
+            output
+            for output in state.outputs.values()
+            if output.status in _UNHEALTHY_OUTPUT_STATUSES or output.pending_count > 0
+        ]
+        if state.last_error:
+            self.health.value = "要確認"
+            self.health.color = ft.Colors.RED_700
+            self.health_detail.value = state.last_error
+        elif unhealthy_outputs:
+            self.health.value = "要確認"
+            self.health.color = ft.Colors.RED_700
+            self.health_detail.value = "出力に失敗または再送待ちがあります"
+        elif state.running:
+            self.health.value = "異常なし"
+            self.health.color = ft.Colors.GREEN_700
+            self.health_detail.value = "受信と出力を監視中です"
+        else:
+            self.health.value = "停止中"
+            self.health.color = ft.Colors.GREY_700
+            self.health_detail.value = "接続は開始されていません"
+
+        self.output_alerts.controls = (
+            [self._output_alert(output) for output in unhealthy_outputs]
+            if unhealthy_outputs
+            else [ft.Text("出力異常なし", color=ft.Colors.GREEN_700)]
+        )
+
     @staticmethod
-    def _output_card(output: OutputState) -> ft.Container:
+    def _output_alert(output: OutputState) -> ft.Container:
         status = ft.Text(
             _OUTPUT_STATUS_LABELS[output.status],
             color=_OUTPUT_STATUS_COLORS[output.status],
@@ -413,7 +434,6 @@ class MonitorView:
                     ft.Row([ft.Text(output.label, weight=ft.FontWeight.BOLD), status]),
                     ft.Row(
                         [
-                            ft.Text(f"成功: {output.success_count}"),
                             ft.Text(f"失敗: {output.failure_count}"),
                             ft.Text(f"再送待ち: {output.pending_count}"),
                         ],
@@ -440,10 +460,6 @@ class MonitorView:
             border_radius=8,
             padding=12,
         )
-
-    @staticmethod
-    def _detail(label: str, value: ft.Text) -> ft.Row:
-        return ft.Row([ft.Text(f"{label}:", width=90), value], wrap=True)
 
     @staticmethod
     def _format_time(value: datetime | None) -> str:

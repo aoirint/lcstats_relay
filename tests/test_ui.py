@@ -19,9 +19,7 @@ from lcstats_relay.ui.monitor import (
     validate_sse_url,
 )
 
-_PAYLOAD_LIMIT = 100
 _PAYLOAD_CALLS = 101
-_OUTPUT_CARD_COUNT = 2
 
 
 class _FakePage:
@@ -264,21 +262,66 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
     assert view.receive_count.value == "4"
     assert view.last_received.value == "2026-06-20 09:15:33"
     assert view.error.value == "受信エラー: HTTP 503"
-    assert len(view.outputs.controls) == _OUTPUT_CARD_COUNT
+    assert view.health.value == "要確認"
+    assert view.health_detail.value == "受信エラー: HTTP 503"
+    assert len(view.output_alerts.controls) == 1
 
-    first = view.outputs.controls[0]
-    second = view.outputs.controls[1]
+    first = view.output_alerts.controls[0]
     assert isinstance(first, ft.Container)
-    assert isinstance(second, ft.Container)
 
     view.update_state(ConnectionState())
     assert view.last_received.value == "-"
     assert view.error.value == ""
-    assert view.outputs.controls == []
+    assert view.health.value == "停止中"
+    assert len(view.output_alerts.controls) == 1
 
 
-def test_payload_log_is_bounded(tmp_path: Path) -> None:
-    """Retain only the latest 100 rendered payloads."""
+def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> None:
+    """Summarize normal operation and surface only abnormal outputs."""
+    page = _FakePage()
+    view = MonitorView(
+        page,
+        settings_store=_settings_store(tmp_path),
+        manager_factory=_factory_for(_FakeManager()),
+    )
+    view.build()
+
+    view.update_state(ConnectionState(status=RelayStatus.WAITING, running=True))
+
+    assert view.health.value == "異常なし"
+    assert view.health_detail.value == "受信と出力を監視中です"
+    assert len(view.output_alerts.controls) == 1
+
+    view.update_state(
+        ConnectionState(
+            status=RelayStatus.DISPATCHING,
+            running=True,
+            outputs={
+                "archive": OutputState(
+                    key="archive",
+                    label="ローカル保存",
+                    status=OutputStatus.SUCCESS,
+                    success_count=1,
+                    message="保存しました",
+                ),
+                "gas": OutputState(
+                    key="gas",
+                    label="Google Sheets",
+                    status=OutputStatus.ERROR,
+                    failure_count=1,
+                    message="GAS送信に失敗しました",
+                ),
+            },
+        ),
+    )
+
+    assert view.health.value == "要確認"
+    assert view.health_detail.value == "出力に失敗または再送待ちがあります"
+    assert len(view.output_alerts.controls) == 1
+
+
+def test_payload_callback_does_not_render_raw_payloads(tmp_path: Path) -> None:
+    """Avoid raw payload logs on the abnormality-focused monitor."""
     page = _FakePage()
     view = MonitorView(
         page,
@@ -289,16 +332,7 @@ def test_payload_log_is_bounded(tmp_path: Path) -> None:
     for seed in range(_PAYLOAD_CALLS):
         view.add_payload({"Seed": seed})
 
-    assert len(view.event_list.controls) == _PAYLOAD_LIMIT
-    first = view.event_list.controls[0]
-    last = view.event_list.controls[-1]
-    assert isinstance(first, ft.Text)
-    assert isinstance(last, ft.Text)
-    assert first.value is not None
-    assert '"Seed":1' in first.value
-    assert last.value is not None
-    assert '"Seed":100' in last.value
-    assert page.update_count == _PAYLOAD_CALLS
+    assert page.update_count == 0
 
 
 def test_settings_and_gas_auth_are_saved_from_separate_views(tmp_path: Path) -> None:
@@ -313,7 +347,7 @@ def test_settings_and_gas_auth_are_saved_from_separate_views(tmp_path: Path) -> 
     view.tracker_url_field.value = "http://localhost:2145/"
     view.data_dir_field.value = str(tmp_path / "archive-root")
     view._save_settings_from_view()
-    assert _active_heading(view) == "LCStats Relay"
+    assert _active_heading(view) == "LCStats Relay Monitor"
 
     view.open_gas_auth()
     assert _active_heading(view) == "GAS認証"
