@@ -1,7 +1,7 @@
 # Loopback connection policy
 
-This document records the current localhost connection-delay policy for LCStats
-Relay. It is intentionally narrow. If the networking behavior grows later, this
+This document records the current localhost connection-delay policy for the app.
+It is intentionally narrow. If the networking behavior grows later, this
 content should be folded into a broader connection or receiver specification.
 
 ## Problem
@@ -17,7 +17,7 @@ resolution and dual-stack fallback work.
 
 ## Policy
 
-LCStats Relay uses this policy:
+The receiver uses this policy:
 
 - The default SSE URL is `http://127.0.0.1:2145/`.
 - `127.0.0.1` is used because it directly selects IPv4 loopback and avoids
