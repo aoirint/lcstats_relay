@@ -75,7 +75,7 @@ def _settings_store(tmp_path: Path) -> SettingsStore:
 
 
 def _active_heading(view: MonitorView) -> str | None:
-    heading = cast("ft.Text", view.view_body.controls[0])
+    heading = cast("ft.Text", view.root_view.controls[0])
     return heading.value
 
 
@@ -313,7 +313,7 @@ def test_settings_and_gas_auth_are_saved_from_separate_views(tmp_path: Path) -> 
     view.tracker_url_field.value = "http://localhost:2145/"
     view.data_dir_field.value = str(tmp_path / "archive-root")
     view._save_settings_from_view()
-    assert isinstance(view.view_body.controls[0], ft.Row)
+    assert _active_heading(view) == "LCStats Relay"
 
     view.open_gas_auth()
     assert _active_heading(view) == "GAS認証"

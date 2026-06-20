@@ -167,34 +167,13 @@ class MonitorView:
         )
         self.outputs = ft.Column([], spacing=8)
         self.event_list = ft.ListView(expand=True, spacing=6, auto_scroll=True)
-        self.view_body = ft.Column([], spacing=12, expand=True)
+        self.root_view = ft.Column([], spacing=12, expand=True)
         self._refresh_settings_summary()
 
     def build(self) -> ft.Column:
         """Build the complete monitor control tree."""
         self._show_monitor_view(update=False)
-        return ft.Column(
-            [
-                ft.Text("LCStats Relay", size=26, weight=ft.FontWeight.BOLD),
-                ft.Text("受信した統計JSONを保存して設定済みの出力面へ転送します。"),
-                ft.Row(
-                    [
-                        self.settings_button,
-                        self.gas_auth_button,
-                        self.start_button,
-                        self.stop_button,
-                    ],
-                    wrap=True,
-                ),
-                self.settings_summary,
-                self.gas_summary,
-                self.error,
-                ft.Divider(),
-                self.view_body,
-            ],
-            expand=True,
-            spacing=12,
-        )
+        return self.root_view
 
     def open_settings(self, _event: object | None = None) -> None:
         """Switch to the tracker and local storage settings view."""
@@ -300,7 +279,22 @@ class MonitorView:
         self._page.update()
 
     def _show_monitor_view(self, *, update: bool) -> None:
-        self.view_body.controls = [
+        self.root_view.controls = [
+            ft.Text("LCStats Relay", size=26, weight=ft.FontWeight.BOLD),
+            ft.Text("受信した統計JSONを保存して設定済みの出力面へ転送します。"),
+            ft.Row(
+                [
+                    self.settings_button,
+                    self.gas_auth_button,
+                    self.start_button,
+                    self.stop_button,
+                ],
+                wrap=True,
+            ),
+            self.settings_summary,
+            self.gas_summary,
+            self.error,
+            ft.Divider(),
             ft.Row(
                 [
                     self._metric("状態", self.status),
@@ -325,10 +319,11 @@ class MonitorView:
             self._page.update()
 
     def _show_settings_view(self, *, update: bool) -> None:
-        self.view_body.controls = [
-            ft.Text("設定", size=20, weight=ft.FontWeight.BOLD),
+        self.root_view.controls = [
+            ft.Text("設定", size=26, weight=ft.FontWeight.BOLD),
             self.tracker_url_field,
             self.data_dir_field,
+            self.error,
             ft.Row(
                 [
                     ft.OutlinedButton(
@@ -349,10 +344,11 @@ class MonitorView:
             self._page.update()
 
     def _show_gas_auth_view(self, *, update: bool) -> None:
-        self.view_body.controls = [
-            ft.Text("GAS認証", size=20, weight=ft.FontWeight.BOLD),
+        self.root_view.controls = [
+            ft.Text("GAS認証", size=26, weight=ft.FontWeight.BOLD),
             self.gas_url_field,
             self.gas_token_field,
+            self.error,
             ft.Row(
                 [
                     ft.OutlinedButton(
