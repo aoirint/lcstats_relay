@@ -3,30 +3,11 @@
 This document describes only behavior that can be explained from the
 `MakuAureo/LCStatsTracker` repository.
 
-## Source snapshot
+## Reference
 
 - Repository: <https://github.com/MakuAureo/LCStatsTracker>
-- Branch: `main`
-- Commit: `3cca19b38e54ccb1610d0cd3a838922dbf696560`
-- Commit date: `2026-06-02T10:08:07-03:00`
-- Reviewed on: `2026-06-20`
 - LCStatsTracker version: `1.2.4`
-- License: MIT
-- Files checked:
-  - `LICENSE`
-  - `README.md`
-  - `StatsTracker.csproj`
-  - `Util/HttpSSE.cs`
-  - `Patches/ServerEvents.cs`
-
-When updating this document, first refresh the repository snapshot and re-check:
-
-- the plugin version in `StatsTracker.csproj`;
-- the local server description in `README.md`;
-- the listener prefix, status code, content type, and reset behavior in
-  `Util/HttpSSE.cs`;
-- the point where day stats are published in `Patches/ServerEvents.cs`.
-- the repository license if this document starts to quote or copy upstream text.
+- Commit: `3cca19b38e54ccb1610d0cd3a838922dbf696560`
 
 ## Input source
 
