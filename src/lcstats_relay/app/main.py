@@ -11,9 +11,11 @@ from lcstats_relay.ui.monitor import MonitorView
 async def main(page: ft.Page) -> None:
     """Configure the desktop page and mount the async monitor view."""
     page.title = "LCStats Relay"
-    page.window.min_width = 560
-    page.window.min_height = 380
-    page.padding = 10
+    page.window.width = 480
+    page.window.height = 320
+    page.window.min_width = 420
+    page.window.min_height = 300
+    page.padding = 8
 
     view = MonitorView(page, manager_factory=create_connection_manager)
     page.on_close = view.close
