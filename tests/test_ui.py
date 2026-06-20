@@ -290,6 +290,9 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
     view.update_state(state)
 
     assert isinstance(control, ft.Container)
+    monitor_row = cast("ft.Row", view.root_view.controls[4])
+    output_panel = cast("ft.Container", monitor_row.controls[1])
+    assert output_panel.border is None
     assert view.status.value == "出力処理中"
     assert view.receive_count.value == "4"
     assert view.last_received.value == "2026-06-20 09:15:33"
@@ -307,7 +310,14 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
     assert view.error.value == ""
     assert view.health.value == "停止中"
     assert view.health_icon.icon == ft.Icons.ERROR_OUTLINE
-    assert len(view.output_destinations.controls) == _OUTPUT_DESTINATION_COUNT
+    assert len(view.output_destinations.controls) == 1
+
+    disconnected_item = cast("ft.Container", view.output_destinations.controls[0])
+    disconnected_row = cast("ft.Row", cast("ft.Column", disconnected_item.content).controls[0])
+    disconnected_icon = cast("ft.Icon", disconnected_row.controls[0])
+    disconnected_status = cast("ft.Text", disconnected_row.controls[2])
+    assert disconnected_icon.icon == ft.Icons.LINK_OFF
+    assert disconnected_status.value == "未接続"
 
 
 def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> None:
@@ -325,7 +335,7 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
     assert view.health.value == "異常なし"
     assert view.health_detail.value == "監視中"
     assert view.health_icon.icon == ft.Icons.CHECK_CIRCLE
-    assert len(view.output_destinations.controls) == _OUTPUT_DESTINATION_COUNT
+    assert len(view.output_destinations.controls) == 1
 
     view.update_state(
         ConnectionState(

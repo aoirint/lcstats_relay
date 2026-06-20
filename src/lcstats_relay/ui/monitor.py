@@ -451,21 +451,22 @@ class MonitorView:
             self.health_detail.value = "未接続"
 
         self.output_destinations.controls = [
-            self._output_destination(output) for output in display_outputs
+            self._output_destination(output, connected=state.running) for output in display_outputs
         ]
 
     def _display_outputs(self, state: ConnectionState) -> list[OutputState]:
         if state.outputs and not any(key in state.outputs for key in _DEFAULT_OUTPUT_ORDER):
             return list(state.outputs.values())
         outputs = self._default_output_states() | state.outputs
-        return [outputs[key] for key in _DEFAULT_OUTPUT_ORDER]
+        return [outputs[key] for key in _DEFAULT_OUTPUT_ORDER if key in outputs]
 
     def _default_output_states(self) -> dict[str, OutputState]:
-        gas_label = "Google Sheets" if self._settings.gas_url else "Google Sheets (未設定)"
-        return {
+        outputs = {
             "archive": OutputState(key="archive", label="ローカル保存"),
-            "gas": OutputState(key="gas", label=gas_label),
         }
+        if self._settings.gas_url:
+            outputs["gas"] = OutputState(key="gas", label="Google Sheets")
+        return outputs
 
     def _global_alert_panel(self) -> ft.Container:
         return ft.Container(
@@ -484,26 +485,23 @@ class MonitorView:
 
     def _output_destinations_panel(self) -> ft.Container:
         return ft.Container(
-            content=ft.Column(
-                [
-                    self.output_destinations,
-                ],
-                spacing=4,
-            ),
-            border=ft.Border.all(1, ft.Colors.GREY_300),
-            border_radius=6,
-            padding=8,
+            content=self.output_destinations,
             expand=1,
         )
 
     @staticmethod
-    def _output_destination(output: OutputState) -> ft.Container:
+    def _output_destination(output: OutputState, *, connected: bool) -> ft.Container:
+        status_label = _OUTPUT_STATUS_LABELS[output.status]
+        status_color = _OUTPUT_STATUS_COLORS[output.status]
+        if output.status == OutputStatus.IDLE and not connected:
+            status_label = "未接続"
+            status_color = ft.Colors.GREY_700
         status = ft.Text(
-            _OUTPUT_STATUS_LABELS[output.status],
-            color=_OUTPUT_STATUS_COLORS[output.status],
+            status_label,
+            color=status_color,
             weight=ft.FontWeight.BOLD,
         )
-        icon = MonitorView._output_icon(output)
+        icon = MonitorView._output_icon(output, connected=connected)
         controls: list[ft.Control] = [
             ft.Row(
                 [
@@ -524,7 +522,7 @@ class MonitorView:
         )
 
     @staticmethod
-    def _output_icon(output: OutputState) -> ft.Icon:
+    def _output_icon(output: OutputState, *, connected: bool) -> ft.Icon:
         if output.status == OutputStatus.ERROR:
             return ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.RED_700)
         if output.status == OutputStatus.RETRY_QUEUED or output.pending_count > 0:
@@ -533,6 +531,8 @@ class MonitorView:
             return ft.Icon(ft.Icons.CHECK_CIRCLE, color=ft.Colors.GREEN_700)
         if output.status == OutputStatus.RUNNING:
             return ft.Icon(ft.Icons.SYNC, color=ft.Colors.BLUE_700)
+        if not connected:
+            return ft.Icon(ft.Icons.LINK_OFF, color=ft.Colors.GREY_700)
         return ft.Icon(ft.Icons.RADIO_BUTTON_UNCHECKED, color=ft.Colors.GREY_700)
 
     @staticmethod
