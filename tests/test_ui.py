@@ -20,6 +20,7 @@ from lcstats_relay.ui.monitor import (
 )
 
 _PAYLOAD_CALLS = 101
+_OUTPUT_DESTINATION_COUNT = 2
 
 
 class _FakePage:
@@ -278,9 +279,10 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
     assert view.health.value == "要確認"
     assert view.health_detail.value == "受信エラー: HTTP 503"
     assert view.root_container.bgcolor == ft.Colors.RED_50
-    assert len(view.output_alerts.controls) == 1
+    assert view.health_icon.icon == ft.Icons.ERROR_OUTLINE
+    assert len(view.output_destinations.controls) == _OUTPUT_DESTINATION_COUNT
 
-    first = view.output_alerts.controls[0]
+    first = view.output_destinations.controls[0]
     assert isinstance(first, ft.Container)
 
     view.update_state(ConnectionState())
@@ -288,7 +290,8 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
     assert view.error.value == ""
     assert view.health.value == "停止中"
     assert view.root_container.bgcolor == ft.Colors.RED_50
-    assert len(view.output_alerts.controls) == 1
+    assert view.health_icon.icon == ft.Icons.ERROR_OUTLINE
+    assert len(view.output_destinations.controls) == 1
 
 
 def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> None:
@@ -306,7 +309,8 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
     assert view.health.value == "異常なし"
     assert view.health_detail.value == "受信と出力を監視中です"
     assert view.root_container.bgcolor == ft.Colors.GREEN_50
-    assert len(view.output_alerts.controls) == 1
+    assert view.health_icon.icon == ft.Icons.CHECK_CIRCLE
+    assert len(view.output_destinations.controls) == 1
 
     view.update_state(
         ConnectionState(
@@ -334,7 +338,8 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
     assert view.health.value == "要確認"
     assert view.health_detail.value == "出力に失敗または再送待ちがあります"
     assert view.root_container.bgcolor == ft.Colors.RED_50
-    assert len(view.output_alerts.controls) == 1
+    assert view.health_icon.icon == ft.Icons.WARNING_AMBER
+    assert len(view.output_destinations.controls) == _OUTPUT_DESTINATION_COUNT
 
 
 def test_payload_callback_does_not_render_raw_payloads(tmp_path: Path) -> None:
@@ -350,6 +355,48 @@ def test_payload_callback_does_not_render_raw_payloads(tmp_path: Path) -> None:
         view.add_payload({"Seed": seed})
 
     assert page.update_count == 0
+
+
+def test_output_destination_icons_reflect_each_output_state(tmp_path: Path) -> None:
+    """Show a compact status icon for each configured destination."""
+    page = _FakePage()
+    view = MonitorView(
+        page,
+        settings_store=_settings_store(tmp_path),
+        manager_factory=_factory_for(_FakeManager()),
+    )
+    view.build()
+
+    view.update_state(
+        ConnectionState(
+            running=True,
+            outputs={
+                "idle": OutputState(key="idle", label="待機", status=OutputStatus.IDLE),
+                "running": OutputState(
+                    key="running",
+                    label="処理",
+                    status=OutputStatus.RUNNING,
+                ),
+                "queued": OutputState(
+                    key="queued",
+                    label="再送",
+                    status=OutputStatus.SUCCESS,
+                    pending_count=1,
+                ),
+            },
+        ),
+    )
+
+    icons = [
+        cast("ft.Icon", cast("ft.Row", cast("ft.Column", item.content).controls[0]).controls[0])
+        for item in cast("list[ft.Container]", view.output_destinations.controls)
+    ]
+
+    assert [icon.icon for icon in icons] == [
+        ft.Icons.RADIO_BUTTON_UNCHECKED,
+        ft.Icons.SYNC,
+        ft.Icons.WARNING_AMBER,
+    ]
 
 
 def test_settings_modal_links_to_gas_auth_modal(tmp_path: Path) -> None:

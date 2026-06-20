@@ -163,6 +163,7 @@ class MonitorView:
             "停止中", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_700
         )
         self.health_detail = ft.Text("接続は開始されていません", selectable=True)
+        self.health_icon = ft.Icon(ft.Icons.ERROR_OUTLINE, size=48, color=ft.Colors.RED_700)
         self.receive_count = ft.Text("0")
         self.last_received = ft.Text("-")
         self.error = ft.Text("", color=ft.Colors.RED_700, selectable=True)
@@ -175,7 +176,7 @@ class MonitorView:
             can_reveal_password=True,
             expand=True,
         )
-        self.output_alerts = ft.Column([], spacing=8)
+        self.output_destinations = ft.Column([], spacing=8)
         self.root_view = ft.Column([], spacing=12, expand=True)
         self.root_container = ft.Container(
             content=self.root_view,
@@ -308,22 +309,14 @@ class MonitorView:
             ),
             self.error,
             ft.Divider(),
-            ft.Container(
-                content=ft.Column([self.health, self.health_detail], spacing=6),
-                border=ft.Border.all(1, ft.Colors.GREY_300),
-                border_radius=8,
-                padding=12,
-            ),
             ft.Row(
                 [
-                    self._metric("接続状態", self.status),
-                    self._metric("受信", self.receive_count),
-                    self._metric("最終受信", self.last_received),
+                    self._global_alert_panel(),
+                    self._output_destinations_panel(),
                 ],
-                wrap=True,
+                spacing=12,
+                vertical_alignment=ft.CrossAxisAlignment.START,
             ),
-            ft.Text("出力異常", size=18, weight=ft.FontWeight.BOLD),
-            self.output_alerts,
         ]
         if update:
             self._page.update()
@@ -432,43 +425,97 @@ class MonitorView:
         if state.last_error:
             self.health.value = "要確認"
             self.health.color = ft.Colors.RED_700
+            self.health_icon.icon = ft.Icons.ERROR_OUTLINE
+            self.health_icon.color = ft.Colors.RED_700
             self.health_detail.value = state.last_error
             self.root_container.bgcolor = ft.Colors.RED_50
         elif unhealthy_outputs:
             self.health.value = "要確認"
             self.health.color = ft.Colors.RED_700
+            self.health_icon.icon = ft.Icons.WARNING_AMBER
+            self.health_icon.color = ft.Colors.RED_700
             self.health_detail.value = "出力に失敗または再送待ちがあります"
             self.root_container.bgcolor = ft.Colors.RED_50
         elif state.running:
             self.health.value = "異常なし"
             self.health.color = ft.Colors.GREEN_700
+            self.health_icon.icon = ft.Icons.CHECK_CIRCLE
+            self.health_icon.color = ft.Colors.GREEN_700
             self.health_detail.value = "受信と出力を監視中です"
             self.root_container.bgcolor = ft.Colors.GREEN_50
         else:
             self.health.value = "停止中"
             self.health.color = ft.Colors.GREY_700
+            self.health_icon.icon = ft.Icons.ERROR_OUTLINE
+            self.health_icon.color = ft.Colors.RED_700
             self.health_detail.value = "接続は開始されていません"
             self.root_container.bgcolor = ft.Colors.RED_50
 
-        self.output_alerts.controls = (
-            [self._output_alert(output) for output in unhealthy_outputs]
-            if unhealthy_outputs
-            else [ft.Text("出力異常なし", color=ft.Colors.GREEN_700)]
+        self.output_destinations.controls = [
+            self._output_destination(output) for output in state.outputs.values()
+        ] or [ft.Text("出力先は接続開始後に表示されます", color=ft.Colors.GREY_700)]
+
+    def _global_alert_panel(self) -> ft.Container:
+        return ft.Container(
+            content=ft.Column(
+                [
+                    ft.Row([self.health_icon, self.health], spacing=12),
+                    self.health_detail,
+                    ft.Divider(),
+                    self._metric("接続状態", self.status),
+                    ft.Row(
+                        [
+                            self._metric("受信", self.receive_count),
+                            self._metric("最終受信", self.last_received),
+                        ],
+                        wrap=True,
+                    ),
+                ],
+                spacing=10,
+            ),
+            border=ft.Border.all(1, ft.Colors.GREY_300),
+            border_radius=8,
+            padding=12,
+            expand=1,
+        )
+
+    def _output_destinations_panel(self) -> ft.Container:
+        return ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("出力先", size=18, weight=ft.FontWeight.BOLD),
+                    self.output_destinations,
+                ],
+                spacing=8,
+            ),
+            border=ft.Border.all(1, ft.Colors.GREY_300),
+            border_radius=8,
+            padding=12,
+            expand=1,
         )
 
     @staticmethod
-    def _output_alert(output: OutputState) -> ft.Container:
+    def _output_destination(output: OutputState) -> ft.Container:
         status = ft.Text(
             _OUTPUT_STATUS_LABELS[output.status],
             color=_OUTPUT_STATUS_COLORS[output.status],
             weight=ft.FontWeight.BOLD,
         )
+        icon = MonitorView._output_icon(output)
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Row([ft.Text(output.label, weight=ft.FontWeight.BOLD), status]),
                     ft.Row(
                         [
+                            icon,
+                            ft.Text(output.label, weight=ft.FontWeight.BOLD, expand=True),
+                            status,
+                        ],
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    ft.Row(
+                        [
+                            ft.Text(f"成功: {output.success_count}"),
                             ft.Text(f"失敗: {output.failure_count}"),
                             ft.Text(f"再送待ち: {output.pending_count}"),
                         ],
@@ -486,6 +533,18 @@ class MonitorView:
             border_radius=8,
             padding=12,
         )
+
+    @staticmethod
+    def _output_icon(output: OutputState) -> ft.Icon:
+        if output.status == OutputStatus.ERROR:
+            return ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.RED_700)
+        if output.status == OutputStatus.RETRY_QUEUED or output.pending_count > 0:
+            return ft.Icon(ft.Icons.WARNING_AMBER, color=ft.Colors.ORANGE_800)
+        if output.status == OutputStatus.SUCCESS:
+            return ft.Icon(ft.Icons.CHECK_CIRCLE, color=ft.Colors.GREEN_700)
+        if output.status == OutputStatus.RUNNING:
+            return ft.Icon(ft.Icons.SYNC, color=ft.Colors.BLUE_700)
+        return ft.Icon(ft.Icons.RADIO_BUTTON_UNCHECKED, color=ft.Colors.GREY_700)
 
     @staticmethod
     def _metric(label: str, value: ft.Text) -> ft.Container:
