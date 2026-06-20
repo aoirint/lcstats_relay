@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "flet[all]>=0.85.3,<0.86.0",
+    "httpx==0.28.1",
 ]
 
 [tool.uv]
