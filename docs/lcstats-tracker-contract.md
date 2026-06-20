@@ -13,14 +13,16 @@ concerns of a specific client and are documented separately in the
 A client connects to the local LCStatsTracker endpoint and waits for a
 statistics payload.
 
-The default endpoint is:
+The upstream README describes a local server on port `2145`, and the current
+implementation registers this endpoint:
 
 ```text
-http://127.0.0.1:2145/
+http://localhost:2145/
 ```
 
-The receiver also accepts explicit loopback URLs such as `http://localhost:2145/`
-and `http://[::1]:2145/`, but it does not rewrite them before connecting.
+A client may choose a concrete loopback address if that works in its target
+environment, but that is a client-side connection policy rather than an
+LCStatsTracker protocol feature.
 
 ## Response model
 
@@ -30,6 +32,7 @@ Expected behavior:
 
 - The endpoint returns one statistics payload in a single HTTP response.
 - The response body uses an SSE-style `data:` line containing JSON.
+- The HTTP response uses `text/event-stream`.
 - The source closes the response after the payload is sent.
 - The client reconnects after processing that payload.
 
@@ -59,10 +62,13 @@ Expected behavior:
 
 - A payload should be queried exactly once during the window between the end of
   one in-game day and the end of the next in-game day.
-- If the payload has already been consumed, LCStatsTracker is expected to return
-  an error response according to its own API behavior.
-- A client must treat such an error response as a source-side failure, not as a
-  signal that the previous payload can be fetched again.
+- The current implementation does not expose a distinct "already consumed" HTTP
+  error response.
+- After a payload is sent, the server resets its pending data and waits for the
+  next day to finish.
+- A request made after the payload has been consumed should therefore be
+  expected to wait for the next available payload, not to recover the previous
+  payload.
 - Multiple consumers are unsafe because the first successful consumer may make
   the payload unavailable to the others.
 
@@ -72,3 +78,11 @@ A client extracts the raw JSON payload from the first `data:` line in the
 response. JSON parsing happens after extraction and is not part of the
 LCStatsTracker transport contract beyond the requirement that the `data:` value
 be JSON.
+
+## Source basis
+
+This contract summarizes the public `MakuAureo/LCStatsTracker` repository
+without copying implementation code.
+
+The repository is MIT licensed. The behavior above is based on the upstream
+README and the current `Util/HttpSSE.cs` implementation.
