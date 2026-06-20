@@ -344,11 +344,12 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
             status=RelayStatus.ERROR,
             running=True,
             last_error="受信エラー: ConnectError",
+            retry_after_seconds=3.0,
         ),
     )
 
     assert view.health.value == "接続試行中"
-    assert view.health_detail.value == "再試行中"
+    assert view.health_detail.value == "3秒後に再試行"
     assert view.health_icon.icon == ft.Icons.SYNC
 
     view.update_state(

@@ -53,6 +53,7 @@ class ConnectionState:
     last_received_at: datetime | None = None
     last_payload_preview: str | None = None
     last_error: str | None = None
+    retry_after_seconds: float | None = None
     outputs: dict[str, OutputState] = field(default_factory=dict)
 
 
@@ -83,17 +84,20 @@ class RelayStateStore:
         """Mark the receiver as active and waiting."""
         self.state.running = True
         self.state.status = RelayStatus.WAITING
+        self.state.retry_after_seconds = None
         self._emit()
 
     def stop(self) -> None:
         """Mark the receiver as stopped."""
         self.state.running = False
         self.state.status = RelayStatus.STOPPED
+        self.state.retry_after_seconds = None
         self._emit()
 
     def waiting(self) -> None:
         """Mark the receiver as waiting for the next response."""
         self.state.status = RelayStatus.WAITING
+        self.state.retry_after_seconds = None
         self._emit()
 
     def received(self, *, at: datetime, preview: str) -> None:
@@ -103,12 +107,14 @@ class RelayStateStore:
         self.state.last_received_at = at
         self.state.last_payload_preview = preview
         self.state.last_error = None
+        self.state.retry_after_seconds = None
         self._emit()
 
-    def receiver_error(self, message: str) -> None:
+    def receiver_error(self, message: str, *, retry_after_seconds: float | None = None) -> None:
         """Expose an input-side error independently from output failures."""
         self.state.status = RelayStatus.ERROR
         self.state.last_error = message
+        self.state.retry_after_seconds = retry_after_seconds
         self._emit()
 
     def output_started(self, key: str, *, at: datetime) -> None:

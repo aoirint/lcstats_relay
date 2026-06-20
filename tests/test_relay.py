@@ -448,6 +448,7 @@ def test_manager_reconnects_after_receive_error(tmp_path: Path) -> None:
 
         error_state = next(state for state in states if state.status is RelayStatus.ERROR)
         assert error_state.last_error == "受信エラー: HTTP 503"
+        assert error_state.retry_after_seconds == 0
         assert request_count >= _EXPECTED_RETRY_REQUESTS
 
     asyncio.run(scenario())

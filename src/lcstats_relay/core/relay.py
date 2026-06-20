@@ -112,7 +112,10 @@ class ConnectionManager:
             except asyncio.CancelledError:
                 raise
             except (httpx.HTTPError, ValueError) as exc:
-                self._state.receiver_error(self._safe_error("受信", exc))
+                self._state.receiver_error(
+                    self._safe_error("受信", exc),
+                    retry_after_seconds=self._reconnect_delay,
+                )
                 await asyncio.sleep(self._reconnect_delay)
                 continue
 

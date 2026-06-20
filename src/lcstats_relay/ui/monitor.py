@@ -461,7 +461,7 @@ class MonitorView:
             self.health.color = ft.Colors.ORANGE_800
             self.health_icon.icon = ft.Icons.SYNC
             self.health_icon.color = ft.Colors.ORANGE_800
-            self.health_detail.value = "再試行中" if state.last_error else "待機中"
+            self.health_detail.value = self._connection_attempt_detail(state)
         elif state.last_error:
             self.health.value = "要確認"
             self.health.color = ft.Colors.RED_700
@@ -504,6 +504,13 @@ class MonitorView:
         if self._settings.gas_url:
             outputs["gas"] = OutputState(key="gas", label="Google Sheets")
         return outputs
+
+    @staticmethod
+    def _connection_attempt_detail(state: ConnectionState) -> str:
+        if state.retry_after_seconds is not None:
+            retry_after = f"{state.retry_after_seconds:g}"
+            return f"{retry_after}秒後に再試行"
+        return "再試行中" if state.last_error else "待機中"
 
     def _global_alert_panel(self) -> ft.Container:
         return ft.Container(
