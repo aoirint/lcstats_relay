@@ -19,11 +19,8 @@ The standard output surfaces are:
 The local archive is the required durability boundary. If archiving fails, later
 outputs are not attempted for that payload.
 
-For the LCStatsTracker source contract, see
-[LCStatsTracker contract](docs/lcstats-tracker-contract.md).
-
-For the Relay output design, see
-[Relay output architecture](docs/relay-output-architecture.md).
+The [developer documentation map](docs/README.md) separates external contracts,
+application architecture, and maintenance procedures.
 
 ## Run
 
@@ -31,7 +28,7 @@ Python 3.14 and [uv](https://docs.astral.sh/uv/) are required.
 
 ```powershell
 uv sync --locked --all-groups
-uv run python -m lcstats_relay
+uv run --locked python -m lcstats_relay
 ```
 
 In the app window:
@@ -47,7 +44,7 @@ dual-stack loopback connection delays. Explicitly entered URLs are honored as
 entered.
 
 For the detailed loopback policy, see
-[Loopback connection policy](docs/loopback-connection-policy.md).
+[Loopback connection policy](docs/domain/loopback-connection-policy.md).
 
 GAS tokens are entered separately from the URL. They are masked in the UI and are
 not saved to the settings file. The LCStatsTracker URL, GAS Web App URL, and
@@ -56,10 +53,10 @@ local save directory are saved in the user settings file.
 ## Development checks
 
 ```powershell
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy src tests
-uv run pytest
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked mypy src tests
+uv run --locked pytest
 ```
 
 ## Agent Skills
