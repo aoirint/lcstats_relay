@@ -5,10 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from lcstats_relay.infrastructure.config import (
-    CONFIG_FILENAME,
+from lcstats_relay.application.settings import (
     DEFAULT_TRACKER_URL,
     RelaySettings,
+)
+from lcstats_relay.infrastructure.config import (
+    CONFIG_FILENAME,
     SettingsStore,
     default_config_path,
 )

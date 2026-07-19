@@ -9,15 +9,18 @@ from typing import Any, cast
 import flet as ft
 import pytest
 
+from lcstats_relay.application.settings import DEFAULT_TRACKER_URL, RelaySettings
 from lcstats_relay.application.state import ConnectionState, OutputState, OutputStatus, RelayStatus
 from lcstats_relay.domain.payload import JSONValue
-from lcstats_relay.infrastructure.config import DEFAULT_TRACKER_URL, RelaySettings, SettingsStore
-from lcstats_relay.ui.monitor import (
-    ManagerFactory,
-    MonitorView,
+from lcstats_relay.infrastructure.config import SettingsStore
+from lcstats_relay.presentation.validation import (
     validate_data_dir,
     validate_gas_url,
     validate_sse_url,
+)
+from lcstats_relay.ui.monitor import (
+    ManagerFactory,
+    MonitorView,
 )
 
 _PAYLOAD_CALLS = 101
