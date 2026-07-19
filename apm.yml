@@ -1,0 +1,30 @@
+name: lcstats-relay
+version: 0.0.0
+description: APM-managed Agent Skills for LCStats Relay
+author: aoirint
+license: MIT
+# Which agent platforms to deploy to.
+# Resolution order: --target flag > this field > auto-detect from filesystem.
+# Accepted values: vscode, agents, copilot, claude, cursor, opencode, codex,
+# gemini, antigravity, windsurf, kiro, agent-skills, all
+targets:
+- codex
+dependencies:
+  apm:
+  - aoirint/skills/.apm/skills/apm-usage#eb69e4d3fd8477dd192f9adb0dd7549d077325f6
+  - aoirint/skills/.apm/skills/changelog-workflow#eb69e4d3fd8477dd192f9adb0dd7549d077325f6
+  - aoirint/skills/.apm/skills/code-quality-check#eb69e4d3fd8477dd192f9adb0dd7549d077325f6
+  - aoirint/skills/.apm/skills/commit-message-quality-check#eb69e4d3fd8477dd192f9adb0dd7549d077325f6
+  - aoirint/skills/.apm/skills/flet-project-quality-check#eb69e4d3fd8477dd192f9adb0dd7549d077325f6
+  - aoirint/skills/.apm/skills/git-worktree-workflow#eb69e4d3fd8477dd192f9adb0dd7549d077325f6
+  - aoirint/skills/.apm/skills/github-actions-quality-check#eb69e4d3fd8477dd192f9adb0dd7549d077325f6
+  - aoirint/skills/.apm/skills/gitignore-workflow#eb69e4d3fd8477dd192f9adb0dd7549d077325f6
+  - aoirint/skills/.apm/skills/issue-quality-check#eb69e4d3fd8477dd192f9adb0dd7549d077325f6
+  - aoirint/skills/.apm/skills/prose-quality-check#eb69e4d3fd8477dd192f9adb0dd7549d077325f6
+  - aoirint/skills/.apm/skills/pull-request-quality-check#eb69e4d3fd8477dd192f9adb0dd7549d077325f6
+  - aoirint/skills/.apm/skills/release-note-workflow#eb69e4d3fd8477dd192f9adb0dd7549d077325f6
+  - aoirint/skills/.apm/skills/security-check#eb69e4d3fd8477dd192f9adb0dd7549d077325f6
+  - aoirint/skills/.apm/skills/software-documentation-maintenance#eb69e4d3fd8477dd192f9adb0dd7549d077325f6
+  mcp: []
+includes: auto
+scripts: {}

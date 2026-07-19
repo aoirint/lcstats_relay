@@ -3,5 +3,4 @@ interface:
   short_description: "Update a canonical developer changelog."
   default_prompt: >-
     Use $changelog-workflow to update the canonical Keep a Changelog-style
-    release history, preserving developer-facing version, prerelease,
-    compatibility, and maintainer context.
+    release history with developer-facing version and compatibility context.

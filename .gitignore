@@ -1,6 +1,11 @@
 # Project files
 /work
 
+# Local Git worktrees used by coding agents
+/.agents/worktrees/
+
+apm_modules/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

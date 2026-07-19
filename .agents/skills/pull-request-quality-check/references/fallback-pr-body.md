@@ -2,6 +2,8 @@
 
 Use this fallback only when the repository has no applicable pull request
 template. If a repository template exists, the live template takes precedence.
+Use the pull request template section guidance in
+`CONTRIBUTING.md#pull-requests`.
 
 ## Contents
 
@@ -88,7 +90,7 @@ Optional H3 examples:
 
 <!--
 List the checks you ran and their results.
-Include commands, manual browser checks, screenshots, or videos when relevant.
+Include commands, manual in-game checks, screenshots, or videos when relevant.
 For docs-only changes, mention proofreading, link checks, formatting checks,
 or "Not run - docs only."
 If you did not run a relevant check, explain why.
@@ -106,7 +108,7 @@ Optional testing structure:
 <details>
 
 ```plain
-$ <build or verification command>
+$ DOTNET_CLI_UI_LANGUAGE=en dotnet build
 Paste the relevant output here.
 ```
 
@@ -117,4 +119,16 @@ Paste the relevant output here.
 ### Manual checks
 ### Screenshots / videos
 -->
+
+## Checklist
+
+<!--
+Check this item before submitting.
+Pull requests cannot be merged without Contribution License Agreement
+confirmation.
+-->
+
+As the pull request author, I have checked all required items:
+
+- [ ] I have read `CONTRIBUTING.md` and agree to the Contribution License Agreement.
 ````

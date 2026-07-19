@@ -1,7 +1,0 @@
-interface:
-  display_name: "Python Quality Check"
-  short_description: "Quality-check Python repository changes."
-  default_prompt: >-
-    Use $python-quality-check to review this Python change for uv dependency
-    setup, Ruff linting and formatting, strict mypy typing, pytest coverage,
-    and security-check-aligned package or lockfile updates.
