@@ -13,15 +13,16 @@ from lcstats_relay.application.settings import DEFAULT_TRACKER_URL, RelaySetting
 from lcstats_relay.application.state import ConnectionState, OutputState, OutputStatus, RelayStatus
 from lcstats_relay.domain.payload import JSONValue
 from lcstats_relay.infrastructure.config import SettingsStore
+from lcstats_relay.presentation.controller import (
+    ManagerFactory,
+    MonitorController,
+)
 from lcstats_relay.presentation.validation import (
     validate_data_dir,
     validate_gas_url,
     validate_sse_url,
 )
-from lcstats_relay.ui.monitor import (
-    ManagerFactory,
-    MonitorView,
-)
+from lcstats_relay.ui.monitor import MonitorView
 
 _PAYLOAD_CALLS = 101
 _OUTPUT_DESTINATION_COUNT = 2
@@ -67,6 +68,13 @@ def _factory_for(
 
 def _settings_store(tmp_path: Path) -> SettingsStore:
     return SettingsStore(tmp_path / "settings.json")
+
+
+def _controller_for(manager: _FakeManager, *, store: SettingsStore) -> MonitorController:
+    return MonitorController(
+        settings_gateway=store,
+        manager_factory=_factory_for(manager),
+    )
 
 
 def _active_heading(view: MonitorView) -> str | None:
@@ -122,8 +130,7 @@ def test_start_allows_connection_without_gas_destination(tmp_path: Path) -> None
         manager = _FakeManager()
         view = MonitorView(
             page,
-            settings_store=_settings_store(tmp_path),
-            manager_factory=_factory_for(manager),
+            controller=_controller_for(manager, store=_settings_store(tmp_path)),
         )
 
         await view.start()
@@ -151,8 +158,7 @@ def test_start_rejects_invalid_configured_gas_destination(tmp_path: Path) -> Non
         )
         view = MonitorView(
             page,
-            settings_store=store,
-            manager_factory=_factory_for(_FakeManager()),
+            controller=_controller_for(_FakeManager(), store=store),
         )
 
         await view.start()
@@ -187,7 +193,13 @@ def test_start_replaces_manager_and_stop_unlocks_settings(tmp_path: Path) -> Non
             managers.append(manager)
             return manager
 
-        view = MonitorView(page, settings_store=_settings_store(tmp_path), manager_factory=factory)
+        view = MonitorView(
+            page,
+            controller=MonitorController(
+                settings_gateway=_settings_store(tmp_path),
+                manager_factory=factory,
+            ),
+        )
         view.save_settings(DEFAULT_TRACKER_URL, data_dir=str(tmp_path))
         view.save_gas_auth(
             "https://script.google.com/macros/s/id/exec",
@@ -237,8 +249,7 @@ def test_close_stops_active_manager(tmp_path: Path) -> None:
         manager = _FakeManager()
         view = MonitorView(
             page,
-            settings_store=_settings_store(tmp_path),
-            manager_factory=_factory_for(manager),
+            controller=_controller_for(manager, store=_settings_store(tmp_path)),
         )
         view.save_gas_auth("https://script.google.com/macros/s/id/exec", gas_token="")
         await view.start()
@@ -258,8 +269,7 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
     page = _FakePage()
     view = MonitorView(
         page,
-        settings_store=_settings_store(tmp_path),
-        manager_factory=_factory_for(_FakeManager()),
+        controller=_controller_for(_FakeManager(), store=_settings_store(tmp_path)),
     )
 
     control = view.build()
@@ -326,8 +336,7 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
     page = _FakePage()
     view = MonitorView(
         page,
-        settings_store=_settings_store(tmp_path),
-        manager_factory=_factory_for(_FakeManager()),
+        controller=_controller_for(_FakeManager(), store=_settings_store(tmp_path)),
     )
     view.build()
 
@@ -396,8 +405,7 @@ def test_payload_callback_does_not_render_raw_payloads(tmp_path: Path) -> None:
     page = _FakePage()
     view = MonitorView(
         page,
-        settings_store=_settings_store(tmp_path),
-        manager_factory=_factory_for(_FakeManager()),
+        controller=_controller_for(_FakeManager(), store=_settings_store(tmp_path)),
     )
 
     for seed in range(_PAYLOAD_CALLS):
@@ -411,8 +419,7 @@ def test_output_destination_icons_reflect_each_output_state(tmp_path: Path) -> N
     page = _FakePage()
     view = MonitorView(
         page,
-        settings_store=_settings_store(tmp_path),
-        manager_factory=_factory_for(_FakeManager()),
+        controller=_controller_for(_FakeManager(), store=_settings_store(tmp_path)),
     )
     view.build()
 
@@ -452,7 +459,10 @@ def test_settings_view_links_to_full_window_gas_auth_view(tmp_path: Path) -> Non
     """Open GAS auth as an output setting without using modal backdrops."""
     page = _FakePage()
     store = _settings_store(tmp_path)
-    view = MonitorView(page, settings_store=store, manager_factory=_factory_for(_FakeManager()))
+    view = MonitorView(
+        page,
+        controller=_controller_for(_FakeManager(), store=store),
+    )
     view.build()
 
     view.open_settings()
@@ -491,8 +501,7 @@ def test_full_window_view_save_errors_keep_active_view(tmp_path: Path) -> None:
     page = _FakePage()
     view = MonitorView(
         page,
-        settings_store=_settings_store(tmp_path),
-        manager_factory=_factory_for(_FakeManager()),
+        controller=_controller_for(_FakeManager(), store=_settings_store(tmp_path)),
     )
     view.build()
 

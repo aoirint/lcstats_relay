@@ -16,6 +16,7 @@ from lcstats_relay.infrastructure.auth import (
     QueryTokenAuthentication,
     RequestAuthenticator,
 )
+from lcstats_relay.infrastructure.config import SettingsStore
 from lcstats_relay.infrastructure.outputs import ArchiveOutput, GasOutput
 from lcstats_relay.infrastructure.runtime import (
     ClientFactory,
@@ -24,6 +25,15 @@ from lcstats_relay.infrastructure.runtime import (
     make_http_client,
 )
 from lcstats_relay.infrastructure.storage import ArchiveWriter, RetryQueue
+from lcstats_relay.presentation.controller import MonitorController
+
+
+def create_monitor_controller() -> MonitorController:
+    """Compose the Flet-free monitor owner with production adapters."""
+    return MonitorController(
+        settings_gateway=SettingsStore(),
+        manager_factory=create_connection_manager,
+    )
 
 
 def create_connection_manager(  # noqa: PLR0913 - UI boundary passes user settings and callbacks.
