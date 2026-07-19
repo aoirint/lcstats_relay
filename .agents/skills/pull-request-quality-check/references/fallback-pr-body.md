@@ -2,8 +2,9 @@
 
 Use this fallback only when the repository has no applicable pull request
 template. If a repository template exists, the live template takes precedence.
-Use the pull request template section guidance in
-`CONTRIBUTING.md#pull-requests`.
+Apply repository-specific requirements only when they are present in current
+repository guidance. Do not infer a CLA, checklist, sign-off, or other policy
+from this generic scaffold.
 
 ## Contents
 
@@ -11,9 +12,9 @@ Use the pull request template section guidance in
 
 ## Fallback Scaffold
 
-Keep the fallback structure aligned with `.github/pull_request_template.md`.
-When a scaffold subsection has no applicable content, write `None` or
-`Not applicable` instead of removing the heading.
+Keep the universal headings below. When a section has no applicable content,
+write `None` or `Not applicable` instead of removing the heading. Add a
+repository-specific section only when current repository guidance requires it.
 
 ````markdown
 <!--
@@ -120,15 +121,4 @@ Paste the relevant output here.
 ### Screenshots / videos
 -->
 
-## Checklist
-
-<!--
-Check this item before submitting.
-Pull requests cannot be merged without Contribution License Agreement
-confirmation.
--->
-
-As the pull request author, I have checked all required items:
-
-- [ ] I have read `CONTRIBUTING.md` and agree to the Contribution License Agreement.
 ````

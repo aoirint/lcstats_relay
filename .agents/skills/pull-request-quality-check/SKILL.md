@@ -9,7 +9,12 @@ description: Quality-check repository pull requests and PR-thread communication.
 
 1. Identify the artifact: title, body, review, reply, or thread note.
 2. For titles, enforce `<type>[optional scope][optional !]: <description>` and use `commit-message-quality-check` for type and breaking-change notation.
-3. Before drafting or replacing a body, read the current repository PR template. Follow its visible headings, required checkboxes, and applicable sections; use HTML comments only as guidance, not rendered content. If no template exists, use [references/fallback-pr-body.md](references/fallback-pr-body.md). Do not invent unavailable template text or retain stale template content.
+3. Before drafting or replacing a body, read the current repository PR template and applicable
+   contributor guidance. Follow only their visible headings, required checkboxes, and applicable
+   sections; use HTML comments only as guidance, not rendered content. If no template exists, use
+   [references/fallback-pr-body.md](references/fallback-pr-body.md). Never infer a CLA,
+   contributor agreement, checklist, sign-off, or other repository policy from the fallback. Do
+   not invent unavailable template text or retain stale template content.
 4. For AI-agent-prepared PR bodies, add this alert at the absolute top:
 
 ```markdown

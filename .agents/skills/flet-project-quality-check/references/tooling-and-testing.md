@@ -252,8 +252,10 @@ tests/
   state, validation, stale/unknown/error variants.
 - UI adapter: event-to-intent binding, semantic control properties, lifecycle mount/unmount, one
   render transaction. Avoid asserting deep child indexes or exact incidental control nesting.
-- Infrastructure: HTTP method/URL/headers/body, timeouts, status mapping, malformed/oversized input,
-  atomic persistence, corrupt state, platform paths, secret redaction.
+- Infrastructure: HTTP method/URL/headers/body, operation-specific timeouts, status mapping,
+  malformed/oversized/invalidly encoded input, parser framing limits, atomic persistence, temporary
+  cleanup, corrupt state, new and legacy platform paths, explicit retry guarantees, secret
+  redaction, and synchronous-adapter offloading from async paths.
 - Integration: composition selects the intended adapters and closes them. Use local/fake transports;
   ordinary tests must not require internet, user credentials, or a graphical desktop.
 - Smoke: imports and starts the entry boundary without hanging; selected packaged artifacts receive

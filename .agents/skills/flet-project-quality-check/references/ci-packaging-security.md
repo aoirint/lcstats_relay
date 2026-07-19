@@ -24,6 +24,10 @@ Use `github-actions-quality-check` and `security-check` while implementing this 
 - Use `persist-credentials: false` on checkout when later steps do not need Git credentials.
 - Pin the uv CLI version in setup-uv. Install/select Python from `.python-version` or an explicit
   matrix consistent with `requires-python`.
+- Validate every action input against the pinned action version instead of inferring an input name
+  from another action or tool. For `astral-sh/setup-uv` v8, pass the selected version through
+  `python-version`; `python-version-file` is not a supported input. When `.python-version` is the
+  canonical source, read and validate its value in a local Composite Action or preceding step.
 - Keep dependency-cache keys bound to `uv.lock` and runner/Python identity. Do not cache `.venv`,
   secrets, credentials, build signing material, or mutable application data.
 - Never use `pull_request_target` to check out and execute untrusted PR code. Keep release/signing
@@ -69,11 +73,22 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Read project Python version
+        id: python
+        run: |
+          mapfile -t versions < .python-version
+          version="${versions[0]%$'\r'}"
+          if [[ "${#versions[@]}" -ne 1 || -z "${version}" ]]; then
+            echo ".python-version must select one Python version." >&2
+            exit 1
+          fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
       - name: Install uv and Python
         uses: astral-sh/setup-uv@<full-reviewed-sha> # <reviewed-version>
         with:
           enable-cache: true
-          python-version-file: .python-version
+          python-version: ${{ steps.python.outputs.version }}
           version: "<reviewed-uv-version>"
 
       - name: Verify lockfile
@@ -131,16 +146,41 @@ configuration visible to Git.
 ## Artifact and release verification
 
 - Build from the exact reviewed commit and `uv.lock`, with no dirty-tree input.
+- Gate immutable publication on the complete lint, type, test, documentation, workflow, and build
+  checks for the exact source commit. Independent workflows that can still fail after publication
+  are not a sufficient gate unless repository settings or the publishing workflow demonstrably
+  waits for their successful check runs.
 - Produce one manifest containing artifact name, target, app/build version, source commit, build
-  workflow/run, Python/Flet/uv versions, and SHA-256.
+  workflow/run, Flet/uv versions, and SHA-256. Record the builder interpreter separately from the
+  Python runtime actually packaged into each target artifact. Derive each packaged runtime identity
+  from the inspected final archive or bundle; do not copy the builder's `.python-version` value into
+  every target record by assumption.
 - Inspect the final archive/installer/app bundle for expected identity, entry point, assets,
-  licenses/notices, and absence of tests, caches, `.env`, credentials, local paths, source-control
-  metadata, development tools, and unrelated files.
+  licenses/notices, and absence of repository-owned tests, caches, `.env`, credentials, local
+  paths, source-control metadata, development tools, and unrelated files. Inspect archive entry
+  paths without unsafe extraction, reject traversal/unsupported special files, and verify
+  executable mode bits for launchers on targets that require them.
+- Make development-content rules provenance-aware. Reject repository-owned development-only source
+  outside the artifact contract, test, agent, cache, secret, and workflow paths, but do not classify
+  a dependency-owned `site-packages/.../tests` or package metadata directory as repository leakage
+  solely because of a basename match. Continue to reject unsafe paths, unsupported special files,
+  caches, and secret-bearing content at every depth where the rule is semantically valid.
 - Install or launch the produced artifact on every supported target class. Verify first run,
   upgrade/migration when supported, data path, settings, network failure, clean shutdown, and
   uninstall/residual-data policy.
 - Separate stable/prerelease/channel semantics and derive all artifact/release identities from one
   verified version source. Do not rewrite only a subset of metadata during CI.
+- Treat the canonical version source and publication trigger as maintained repository contracts.
+  Inspect and preserve an established `main`-push, version-tag, release-event, or manual promotion
+  flow unless the user explicitly changes that contract; do not replace a metadata-driven
+  `main`-push release with a tag-first procedure merely because both can publish the same assets.
+- Make automatic `main`-push publication idempotent. Read the version from the canonical metadata,
+  treat an explicit development placeholder and an already-published immutable version as safe
+  no-op states, bind a newly created version tag to the reviewed merged commit, and resume only a
+  mutable draft whose tag still identifies that commit. Before accepting an existing immutable
+  release as a no-op, verify its exact expected asset set plus every attestation or provenance
+  artifact required by the repository's established, supported release contract; a failed
+  post-publication verification must not turn green merely because a rerun sees the release.
 - Use protected environments and least-privilege release tokens. Validation jobs do not receive
   signing or publishing secrets.
 - Retain checksums and attestations/provenance when the release system supports them. GitHub Release

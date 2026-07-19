@@ -124,14 +124,34 @@ exist. Required documentation indexes may explicitly state that a section has no
 
 1. Inventory every task/coroutine, owner, start path, repeated-start behavior, cancellation, cleanup,
    exception observation, and retained reference.
-2. Replace unowned tasks and blocking async-path calls. Make start/stop/close idempotent.
-3. Add stale-result protection and explicit retry/backoff state.
+2. Replace unowned tasks and blocking async-path calls. Offload an unavoidable synchronous adapter
+   at the infrastructure boundary and account for worker completion after coroutine cancellation.
+   Make start/stop/close idempotent.
+3. Add stale-result protection and explicit retry/backoff state. Classify every retried effect as
+   idempotent, deduplicated, explicitly at-least-once, or not retryable; never infer exactly-once
+   delivery from a durable queue.
 4. Test cancellation at every await boundary that can leave state/resources changed, including
    cleanup failure. Assert no post-unmount/close render and no leaked task.
 5. Check the target Flet version's handler, page task, lifecycle, routing, and control update APIs;
    do not reuse an old example by name alone.
 
-### 4.5 UI behavior and accessibility
+### 4.5 Persistence and network closure
+
+1. Inventory config/data/cache/secret locations for each supported platform. Replace packaged-app
+   current-working-directory defaults while preserving saved legacy paths or implementing an
+   explicit tested migration.
+2. For each durable file, verify a unique same-directory temporary file, restrictive access,
+   flush/`fsync`, atomic replacement, failure cleanup, corrupt-state recovery, and the exact scope of
+   any crash-durability claim.
+3. For each network operation, record connect/read/write/total deadlines, maximum buffered framing
+   unit and response size, accepted encoding/schema, redirect/auth behavior, and safe error mapping.
+   Give ordinary requests their own total deadline when they share a client with a long-lived
+   stream.
+4. Test replacement failure, temporary cleanup, concurrent writes, corrupt persistence, legacy and
+   new platform paths, chunked and oversized frames, invalid encoding, timeouts, cancellation, and
+   retry/duplicate semantics using local fakes.
+
+### 4.6 UI behavior and accessibility
 
 1. Enumerate each screen/state and allowed intent/transition, including loading, empty, validation,
    partial/stale, error, retrying, success, and disabled states that apply.
@@ -141,7 +161,7 @@ exist. Required documentation indexes may explicitly state that a section has no
 4. Keep UI tests semantic. Add targeted manual/runtime checks for behavior that Flet adapters/fakes
    cannot prove.
 
-### 4.6 CI, build, and release
+### 4.7 CI, build, and release
 
 1. Implement the minimum SHA-pinned, least-privilege CI gate. Add docs/workflow checks required by
    repository policy.
