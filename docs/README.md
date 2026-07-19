@@ -35,6 +35,7 @@ The root [README](../README.md) remains the concise user entry point.
   identity, immutable publication, artifact provenance, verification, and
   failure recovery.
 
-Windows and Linux desktop bundles are validated in CI. A matching version tag
-starts the automated draft-first publication procedure, although no packaged
-release has been published yet.
+Windows and Linux desktop bundles are validated in CI. A push to `main` reads
+the version from `pyproject.toml` and starts the automated draft-first
+publication procedure when that version has not been released, although no
+packaged release has been published yet.

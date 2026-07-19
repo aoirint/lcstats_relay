@@ -2,8 +2,8 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -25,10 +25,11 @@ jobs:
       git_version: ${{ steps.version.outputs.git_version }}
       project_version: ${{ steps.version.outputs.project_version }}
       release_mode: ${{ steps.version.outputs.release_mode }}
+      should_release: ${{ steps.release.outputs.should_release }}
       source_commit: ${{ steps.source.outputs.commit }}
 
     steps:
-      - name: Check out tagged source
+      - name: Check out main source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
@@ -40,29 +41,43 @@ jobs:
         id: version
         uses: ./.github/actions/generate-version
 
-      - name: Resolve tagged source commit
+      - name: Resolve source commit
         id: source
         run: |
           commit="$(git rev-parse "${GITHUB_SHA}^{commit}")"
           echo "commit=${commit}" >> "${GITHUB_OUTPUT}"
 
-      - name: Validate release tag
+      - name: Determine release work
+        id: release
         env:
-          ACTUAL_TAG: ${{ github.ref_name }}
-          EXPECTED_TAG: ${{ steps.version.outputs.git_version }}
+          GH_TOKEN: ${{ github.token }}
           RELEASE_MODE: ${{ steps.version.outputs.release_mode }}
+          TAG: ${{ steps.version.outputs.git_version }}
         run: |
           if [[ "${RELEASE_MODE}" == "edge" ]]; then
-            echo "The placeholder project version 0.0.0 cannot be released." >&2
-            exit 1
+            echo "The placeholder project version 0.0.0 has no release work."
+            echo "should_release=false" >> "${GITHUB_OUTPUT}"
+            exit 0
           fi
-          if [[ "${ACTUAL_TAG}" != "${EXPECTED_TAG}" ]]; then
-            echo "Tag ${ACTUAL_TAG} does not match project version ${EXPECTED_TAG}." >&2
-            exit 1
+
+          if release_json="$(gh release view "${TAG}" --json isDraft,isImmutable 2>/dev/null)"; then
+            is_draft="$(jq -r '.isDraft' <<< "${release_json}")"
+            is_immutable="$(jq -r '.isImmutable' <<< "${release_json}")"
+            if [[ "${is_draft}" != "true" ]]; then
+              if [[ "${is_immutable}" != "true" ]]; then
+                echo "Existing published release is not immutable." >&2
+                exit 1
+              fi
+              echo "Version ${TAG} is already published and immutable."
+              echo "should_release=false" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
           fi
+          echo "should_release=true" >> "${GITHUB_OUTPUT}"
 
   build:
     needs: validate
+    if: needs.validate.outputs.should_release == 'true'
     name: Build release (${{ matrix.target }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
@@ -77,7 +92,7 @@ jobs:
             target: windows
 
     steps:
-      - name: Check out tagged source
+      - name: Check out release source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
@@ -102,6 +117,7 @@ jobs:
     needs:
       - validate
       - build
+    if: needs.validate.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -109,7 +125,7 @@ jobs:
       contents: write
 
     steps:
-      - name: Check out tagged source
+      - name: Check out release source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
@@ -165,14 +181,6 @@ jobs:
           SOURCE_COMMIT: ${{ needs.validate.outputs.source_commit }}
           TAG: ${{ needs.validate.outputs.git_version }}
         run: |
-          remote_commit="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/commits/${TAG}" \
-            --jq '.sha')"
-          if [[ "${remote_commit}" != "${SOURCE_COMMIT}" ]]; then
-            echo "Release tag no longer identifies the reviewed source commit." >&2
-            exit 1
-          fi
-
           if release_json="$(gh release view "${TAG}" --json isDraft,isImmutable 2>/dev/null)"; then
             is_draft="$(jq -r '.isDraft' <<< "${release_json}")"
             is_immutable="$(jq -r '.isImmutable' <<< "${release_json}")"
@@ -190,12 +198,30 @@ jobs:
               --draft
               --generate-notes
               --title "${TAG}"
-              --verify-tag
             )
             if [[ "${RELEASE_MODE}" == "prerelease" ]]; then
               create_args+=(--prerelease --latest=false)
             fi
+            if remote_commit="$(gh api \
+              "repos/${GITHUB_REPOSITORY}/commits/${TAG}" \
+              --jq '.sha' 2>/dev/null)"; then
+              if [[ "${remote_commit}" != "${SOURCE_COMMIT}" ]]; then
+                echo "Existing release tag identifies another source commit." >&2
+                exit 1
+              fi
+              create_args+=(--verify-tag)
+            else
+              create_args+=(--target "${SOURCE_COMMIT}")
+            fi
             gh release create "${create_args[@]}"
+          fi
+
+          remote_commit="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/commits/${TAG}" \
+            --jq '.sha')"
+          if [[ "${remote_commit}" != "${SOURCE_COMMIT}" ]]; then
+            echo "Release tag does not identify the reviewed source commit." >&2
+            exit 1
           fi
           echo "already_published=false" >> "${GITHUB_OUTPUT}"
 
