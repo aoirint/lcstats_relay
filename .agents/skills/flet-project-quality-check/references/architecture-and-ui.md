@@ -36,6 +36,16 @@ entrypoint -> composition -> ui -> presentation -> application -> domain
   no policy beyond product-selected implementation choices.
 - The entry point selects Flet runtime mode and invokes composition. Keep it import-safe and thin.
 
+Use these responsibility names consistently. Do not add a generic `app` package
+beside `application`: the names are near-synonyms and obscure whether code owns
+use cases, startup, or wiring. Put runtime entry functions under `entrypoints`
+and dependency assembly under `composition`. If an established public import
+requires `app`, keep only a compatibility shim there and document its removal
+path. `presentation` and `ui` may coexist because their boundary is semantic:
+`presentation` is Flet-free state, intents, controllers, and mapping, while
+`ui` is the Flet adapter. Merge either layer only when that responsibility is
+truly absent; do not use both names for interchangeable view code.
+
 Do not introduce a port for every function. Add one where a layer needs an effect, time, randomness,
 platform data, or external state that should be replaceable or controllable in tests. Do not create
 empty layers merely for visual symmetry; once a responsibility exists, put it in its canonical

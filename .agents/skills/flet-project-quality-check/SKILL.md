@@ -95,6 +95,10 @@ informal list.
    - Keep entry/composition code small. Put framework-free domain/application policy behind ports,
      presentation mapping and controllers in a Flet-free presentation layer, external effects in
      infrastructure adapters, and only Flet control construction/update code in `ui`.
+   - Use `entrypoints` and `composition` for startup and wiring; do not place a
+     generic `app` package beside `application`. Keep `presentation` and `ui`
+     distinct only when the former is Flet-free and the latter is the Flet
+     adapter.
    - Split by cohesive state/lifecycle ownership, not by file size alone. A large control tree,
      scattered `page.update()`, control-index navigation, or one object owning settings, networking,
      state transitions, and rendering is a finding.
