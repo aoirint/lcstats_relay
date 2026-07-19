@@ -1,0 +1,34 @@
+name: Generate project version metadata
+description: Extract and validate canonical build metadata from pyproject.toml.
+
+inputs:
+  pyproject_file:
+    description: Path to the canonical pyproject.toml file.
+    required: false
+    default: pyproject.toml
+
+outputs:
+  project_version:
+    description: Normalized PEP 440 project version.
+    value: ${{ steps.metadata.outputs.project_version }}
+  build_version:
+    description: Three-segment version accepted by Flet and Flutter desktop builds.
+    value: ${{ steps.metadata.outputs.build_version }}
+  git_version:
+    description: Git tag derived from the canonical project version.
+    value: ${{ steps.metadata.outputs.git_version }}
+  release_mode:
+    description: latest, prerelease, or edge.
+    value: ${{ steps.metadata.outputs.release_mode }}
+
+runs:
+  using: composite
+
+  steps:
+    - name: Extract and validate version
+      id: metadata
+      shell: bash
+      run: |
+        uv run --locked python scripts/version_metadata.py \
+          --pyproject "${{ inputs.pyproject_file }}" \
+          --github-output "${GITHUB_OUTPUT}"
