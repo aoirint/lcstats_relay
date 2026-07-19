@@ -100,11 +100,9 @@ class ConnectionManager:
         self._clock = clock
         self._reconnect_sleep = reconnect_sleep
         self._task: asyncio.Task[None] | None = None
-        pending = {output.key: self._queue.count(output.key) for output in self._output_policies}
         self._state = RelayStateStore(
             ((output.key, output.label) for output in self._output_policies),
             on_change=on_state,
-            pending_counts=pending,
         )
 
     @property
@@ -136,6 +134,10 @@ class ConnectionManager:
                 state=self._state,
                 clock=self._clock,
             )
+            try:
+                await dispatcher.load_pending_counts()
+            except (OSError, TypeError, ValueError) as exc:
+                self._state.receiver_error(_safe_error("再送キュー読込", error=exc))
             async with asyncio.TaskGroup() as tasks:
                 tasks.create_task(self._receive_loop(session.receiver, dispatcher=dispatcher))
                 tasks.create_task(

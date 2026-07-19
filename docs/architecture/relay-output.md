@@ -57,13 +57,21 @@ The token is not embedded in the URL by the UI and is not saved to the settings
 file. The GAS destination URL is saved with the rest of the non-secret settings.
 
 If the Google Apps Script output fails after the archive succeeds, the failed
-delivery can be stored in `<data-dir>/queue/` and retried later.
+delivery is stored in `<data-dir>/queue/` only when the failure is retryable.
 
 ## Delivery guarantees
 
 LCStats Relay preserves the received payload locally before attempting later
-outputs. Retried outputs should be treated as at-least-once delivery. A receiving
-output should therefore tolerate duplicate submissions when practical.
+outputs. Every output declares either `none` or `at-least-once` retry semantics.
+The local archive uses `none`; GAS uses `at-least-once`. A timeout or connection
+loss can occur after GAS accepted a request but before the relay observed the
+response, so automatic retries can submit a duplicate. GAS does not provide this
+relay with an idempotency contract, and the relay does not claim exactly-once
+delivery. A receiving script should therefore tolerate duplicate submissions.
+
+Each GAS attempt has a 30-second total application timeout. The separate SSE
+read remains open until LCStatsTracker produces a payload, so it intentionally
+does not share that finite read deadline.
 
 The queue is output-oriented so that future output surfaces can be retried as
 peers of the existing Google Apps Script output.

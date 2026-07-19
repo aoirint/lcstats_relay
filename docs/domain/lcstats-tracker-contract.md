@@ -77,3 +77,8 @@ A client extracts the raw JSON payload from the first `data:` line in the
 response. JSON parsing happens after extraction and is not part of the
 LCStatsTracker transport contract beyond the requirement that the `data:` value
 be JSON.
+
+LCStats Relay accepts at most 1 MiB for that line and requires its value to be
+valid UTF-8. An over-limit or invalidly encoded response is rejected and the
+normal reconnect policy applies. This limit bounds memory use at the untrusted
+HTTP boundary; it is a relay safety policy, not an upstream guarantee.

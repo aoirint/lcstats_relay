@@ -17,6 +17,7 @@ from lcstats_relay.application.ports import (
     OutputPolicy,
     OutputReceipt,
     RelayRuntime,
+    RetrySemantics,
 )
 from lcstats_relay.application.relay import ConnectionManager, RetryWorker, preview_payload
 from lcstats_relay.application.state import (
@@ -256,6 +257,28 @@ def test_gas_output_rejects_unparsed_payload() -> None:
     asyncio.run(scenario())
 
 
+def test_gas_output_bounds_total_request_time() -> None:
+    """Bound GAS delivery even though the shared SSE client has no read timeout."""
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        await asyncio.Event().wait()
+        return httpx.Response(200)
+
+    async def scenario() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            output = GasOutput(
+                "https://script.google.com/macros/s/id/exec",
+                client=client,
+                authenticator=NoAuthentication(),
+                request_timeout_seconds=0.001,
+            )
+            with pytest.raises(OutputDeliveryError, match="TimeoutError") as error:
+                await output.deliver(_payload())
+            assert error.value.retryable is True
+
+    asyncio.run(scenario())
+
+
 def test_dispatcher_handles_success_required_failure_and_queue(tmp_path: Path) -> None:
     """Dispatch outputs generically and stop after a required output failure."""
 
@@ -286,6 +309,7 @@ def test_dispatcher_handles_success_required_failure_and_queue(tmp_path: Path) -
                     policy=OutputPolicy(
                         key="gas",
                         label="Google Sheets",
+                        retry_semantics=RetrySemantics.AT_LEAST_ONCE,
                     ),
                     sink=gas,
                 ),
@@ -334,6 +358,7 @@ def test_dispatcher_retries_known_outputs_and_skips_unknown(tmp_path: Path) -> N
                     policy=OutputPolicy(
                         key="gas",
                         label="Google Sheets",
+                        retry_semantics=RetrySemantics.AT_LEAST_ONCE,
                     ),
                     sink=gas,
                 )
@@ -384,6 +409,7 @@ def test_dispatcher_reports_queue_write_failure(
                     policy=OutputPolicy(
                         key="gas",
                         label="Google Sheets",
+                        retry_semantics=RetrySemantics.AT_LEAST_ONCE,
                     ),
                     sink=gas,
                 )
@@ -569,6 +595,51 @@ def test_retry_loop_reports_queue_read_errors(
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
+
+    asyncio.run(scenario())
+
+
+def test_manager_keeps_running_after_initial_queue_read_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Report startup queue corruption without abandoning the receiver session."""
+
+    async def scenario() -> None:
+        handler = _TransportHandler()
+        states: list[ConnectionState] = []
+        queue = RetryQueue(tmp_path)
+        original_count = queue.count
+        attempts = 0
+
+        def fail_once(output_key: str | None = None) -> int:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                msg = "invalid queue"
+                raise ValueError(msg)
+            return original_count(output_key)
+
+        monkeypatch.setattr(queue, "count", fail_once)
+        archive_policy = OutputPolicy(
+            key="archive",
+            label="ローカル保存",
+            required=True,
+        )
+        manager = ConnectionManager(
+            output_policies=[archive_policy],
+            runtime_factory=_runtime_factory(handler, [(archive_policy, _Sink("archive", []))]),
+            retry_queue=queue,
+            on_state=states.append,
+            on_payload=lambda _payload: None,
+            retry_interval=60,
+        )
+
+        manager.start()
+        await _wait_for(lambda: manager.state.receive_count == 1)
+        await manager.stop()
+
+        assert any(state.last_error == "再送キュー読込エラー: ValueError" for state in states)
 
     asyncio.run(scenario())
 
