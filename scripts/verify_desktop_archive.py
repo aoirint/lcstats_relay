@@ -35,7 +35,7 @@ def _validate_path(name: str, *, label: str) -> PurePosixPath | None:
         raise ValueError(msg)
     for part in path.parts:
         lowered = part.lower()
-        if lowered in _FORBIDDEN_PARTS or lowered.startswith(".env") or lowered.endswith(".pyc"):
+        if lowered in _FORBIDDEN_PARTS or lowered.startswith(".env"):
             msg = f"{label} contains forbidden release content: {name}"
             raise ValueError(msg)
     return path

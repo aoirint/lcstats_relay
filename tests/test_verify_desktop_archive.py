@@ -76,6 +76,7 @@ def _required_linux_members(*, launcher_mode: int = 0o755) -> dict[str, tuple[by
         "THIRD_PARTY_NOTICES.md": (b"notices", 0o644),
         "lcstats-relay": (b"launcher", launcher_mode),
         "data/flutter_assets/app.so": (b"payload", 0o644),
+        "python3.12/__future__.pyc": (b"packaged runtime module", 0o644),
     }
 
 
@@ -114,7 +115,7 @@ def test_verify_desktop_archive_accepts_linux_bundle_and_safe_link(tmp_path: Pat
         ("/secret", "unsafe archive path"),
         ("tests/test_app.py", "forbidden release content"),
         ("config/.env.production", "forbidden release content"),
-        ("app/module.pyc", "forbidden release content"),
+        ("app/__pycache__/module.pyc", "forbidden release content"),
     ],
 )
 def test_verify_desktop_archive_rejects_unsafe_zip_content(
