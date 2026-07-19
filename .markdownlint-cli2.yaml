@@ -1,0 +1,29 @@
+---
+# Lint every committed Markdown document by default so documentation and
+# GitHub templates follow one repository-wide style.
+globs:
+  - "**/*.md"
+
+# APM-deployed Skill documentation and transient agent worktrees are external
+# to this application's maintained Markdown surface.
+ignores:
+  - ".agents/**"
+
+gitignore: true
+
+config:
+  default: true
+
+  MD013:
+    line_length: 120
+    code_blocks: false
+    headings: false
+    tables: false
+
+  MD007:
+    indent: 4
+
+  MD024:
+    siblings_only: true
+
+  MD041: false

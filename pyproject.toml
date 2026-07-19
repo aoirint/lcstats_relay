@@ -23,13 +23,24 @@ constraint-dependencies = ["msgpack==1.2.1"]
 exclude-newer = "P7D"
 exclude-newer-package = { msgpack = false }
 
+[tool.flet]
+product = "LCStats Relay"
+org = "com.aoirint"
+
 [tool.flet.app]
 path = "src"
 module = "main"
 
+[tool.flet.windows]
+artifact = "lcstats-relay"
+
+[tool.flet.linux]
+artifact = "lcstats-relay"
+
 [dependency-groups]
 dev = [
     "mypy>=2.1.0,<3.0.0",
+    "packaging>=26.2,<27.0",
     "pytest>=9.0.3,<10.0.0",
     "pytest-cov>=7.1.0,<8.0.0",
     "ruff>=0.15.17,<0.16.0",
@@ -140,16 +151,18 @@ addopts = [
     "--strict-markers",
     "-ra",
     "--cov=lcstats_relay",
+    "--cov=scripts",
     "--cov-branch",
     "--cov-report=term-missing",
     "--cov-report=xml",
     "--cov-fail-under=100",
 ]
+pythonpath = ["."]
 testpaths = ["tests"]
 
 [tool.coverage.run]
 branch = true
-source_pkgs = ["lcstats_relay"]
+source_pkgs = ["lcstats_relay", "scripts"]
 
 [tool.coverage.report]
 exclude_also = ['if __name__ == "__main__":']
