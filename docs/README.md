@@ -32,6 +32,7 @@ The root [README](../README.md) remains the concise user entry point.
 - [Data and recovery](operations/data-and-recovery.md) identifies settings,
   archives, retry records, secrets, and safe recovery actions.
 
-There is no documented release procedure yet because this repository does not
-currently define a verified build or publication target. Add one under
-`operations/` when release automation and an artifact contract are introduced.
+Windows and Linux desktop bundles are validated in CI, but no packaged release
+has been published and there is not yet an automated publication procedure.
+Release automation must add its artifact and operator contracts under
+`operations/` before the first tag is published.

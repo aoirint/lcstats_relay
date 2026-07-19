@@ -8,37 +8,44 @@ the parsed value to a Google Apps Script Web App.
 
 ## Current module map
 
-The executable entry point is `lcstats_relay.__main__`. The source tree has four
-current responsibilities:
+The executable entry point is `lcstats_relay.__main__`. The source tree has six
+current responsibility groups:
 
-- `app/main.py` configures the Flet page and mounts the monitor.
-- `app/composition.py` is the production composition root. It selects outputs,
+- `domain/` owns relay payload values and JSON parsing without Flet or concrete
+  I/O dependencies.
+- `application/` owns settings values, output/retry policies, relay state, and
+  connection orchestration through ports.
+- `presentation/` owns Flet-free validation, immutable presentation models,
+  presenters, settings, and connection lifecycle coordination.
+- `ui/` constructs Flet controls, emits intents to the controller, and renders
+  presentation state.
+- `infrastructure/` implements HTTP, authentication, settings, atomic files,
+  archives, and the retry queue.
+- `app/main.py` configures the Flet page and mounts the monitor, while
+  `app/composition.py` is the production composition root. It selects outputs,
   authentication policy, persistence implementations, and the connection
   manager without requiring the UI to construct those details.
-- `core/` contains the receiver, relay and retry orchestration, observable
-  connection state, output implementations, and filesystem persistence.
-- `ui/monitor.py` owns Flet controls, navigation, input validation, settings
-  editing, in-memory GAS credentials, manager start/stop actions, and rendering
-  connection snapshots.
 
-Dependencies currently point inward from the Flet entry point and composition
-root toward `core/`. However, `core/` still includes concrete HTTP and
-filesystem implementations; it is not yet a framework-independent domain
-layer.
+Dependencies point inward from the entry point and composition root through UI
+and presentation to application/domain policy. Infrastructure implements
+application-facing ports and is selected only by composition. Domain,
+application, and presentation modules do not import Flet.
 
 ## Runtime flow
 
-1. `app/main.py` creates `MonitorView` with the production manager factory.
+1. `app/main.py` creates `MonitorView` with a production `MonitorController`.
 2. The user supplies a loopback tracker URL, a data directory, and optionally a
    GAS destination and token.
 3. `app/composition.py` builds a required archive output and, when configured,
    a retryable GAS output.
-4. `ConnectionManager` creates one shared `httpx.AsyncClient`, a
-   `StatsReceiver`, an `OutputDispatcher`, and concurrent receive/retry loops.
+4. `ConnectionManager` opens one runtime-owned `httpx.AsyncClient`, a
+   `StatsReceiver`, registered output adapters, and concurrent receive/retry
+   loops. Blocking archive and queue operations are offloaded from the event
+   loop.
 5. Each received payload updates `RelayStateStore`, invokes the payload callback
    for valid JSON, and is dispatched in registration order.
-6. State snapshots flow back to the monitor through a callback. The monitor
-   renders summaries and never displays the raw payload body.
+6. Application state snapshots flow through Flet-free presenters to the
+   monitor. The UI renders summaries and never displays the raw payload body.
 
 The external receive contract is canonical in
 [`../domain/lcstats-tracker-contract.md`](../domain/lcstats-tracker-contract.md).
@@ -53,23 +60,25 @@ Output guarantees are canonical in [`relay-output.md`](relay-output.md).
   only while preparing an outgoing request.
 - Preserve the local archive as the required first output unless a deliberate
   architecture change updates `relay-output.md` and its tests.
-- Extend the fixed `app/`, `core/`, and `ui/` packages with focused modules
-  rather than growing existing orchestration or view modules indefinitely.
+- Extend the fixed `domain/`, `application/`, `presentation/`, `ui/`,
+  `infrastructure/`, and `app/` packages by cohesive ownership. Do not collapse
+  policy, presentation, controls, and adapters into one view or generic helper
+  module.
 - Introduce ports at I/O boundaries when replacing or testing concrete HTTP,
   filesystem, clock, sleep, or UI behavior.
 
 ## Known structural limitations
 
-The current layout is a starting point, not the target quality ceiling:
+The current layout still has bounded limitations:
 
-- `ui/monitor.py` combines presentation, navigation, validation, persistence,
-  credential state, and lifecycle coordination in one class.
-- `ConnectionManager` owns a background task but does not expose unexpected
-  terminal task failure as a first-class lifecycle result.
-- Filesystem reads and writes are synchronous even when called by asynchronous
-  relay paths.
-- Some callbacks and factories use positional arguments at boundaries where
-  keyword-only records would make contracts clearer.
+- `ConnectionManager` owns the session task but does not expose an unexpected
+  terminal task failure as a distinct lifecycle result.
+- Settings load/save remains a synchronous presentation gateway. Loading occurs
+  before a relay session is started and saving uses synchronous handler paths;
+  any future async settings path must offload the adapter explicitly.
+- LCStatsTracker values are validated as bounded UTF-8 JSON, but the relay does
+  not own a versioned field-level payload schema.
 
-Refactors should reduce these responsibilities without changing the receive,
-archive, retry, credential, or visible-state contracts documented here.
+Future changes must preserve the receive, archive, retry, credential, and
+visible-state contracts documented here or update their canonical documents and
+tests in the same change.
