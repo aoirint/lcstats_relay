@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import httpx
 
 from lcstats_relay.application.ports import OutputDeliveryError, OutputReceipt
@@ -20,7 +22,11 @@ class ArchiveOutput:
     async def deliver(self, payload: RelayPayload) -> OutputReceipt:
         """Archive raw JSON before any required downstream output proceeds."""
         try:
-            path = self._writer.write(payload.raw_json, received_at=payload.received_at)
+            path = await asyncio.to_thread(
+                self._writer.write,
+                payload.raw_json,
+                received_at=payload.received_at,
+            )
         except OSError as exc:
             msg = "ローカル保存に失敗しました"
             raise OutputDeliveryError(msg, retryable=False) from exc
@@ -36,11 +42,13 @@ class GasOutput:
         *,
         client: httpx.AsyncClient,
         authenticator: RequestAuthenticator,
+        request_timeout_seconds: float = 30.0,
     ) -> None:
         """Configure delivery while receiving authentication as a separate policy."""
         self._url = url
         self._client = client
         self._authenticator = authenticator
+        self._request_timeout_seconds = request_timeout_seconds
 
     async def deliver(self, payload: RelayPayload) -> OutputReceipt:
         """Send parsed JSON and return GAS-specific UI text."""
@@ -51,8 +59,12 @@ class GasOutput:
         request = self._client.build_request("POST", self._url, json=payload.payload)
         self._authenticator.apply(request)
         try:
-            response = await self._client.send(request)
+            async with asyncio.timeout(self._request_timeout_seconds):
+                response = await self._client.send(request)
             response.raise_for_status()
+        except TimeoutError as exc:
+            msg = "GAS送信に失敗しました: TimeoutError"
+            raise OutputDeliveryError(msg, retryable=True) from exc
         except httpx.HTTPStatusError as exc:
             msg = f"GAS送信に失敗しました: HTTP {exc.response.status_code}"
             raise OutputDeliveryError(msg, retryable=True) from exc

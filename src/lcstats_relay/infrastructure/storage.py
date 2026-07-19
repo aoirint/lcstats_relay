@@ -9,13 +9,7 @@ from uuid import uuid4
 
 from lcstats_relay.application.ports import RetryItem
 from lcstats_relay.domain.payload import JSONValue, RelayPayload, parse_json
-
-
-def _write_atomic(path: Path, *, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(f"{path.suffix}.tmp")
-    temporary.write_text(content, encoding="utf-8")
-    temporary.replace(path)
+from lcstats_relay.infrastructure.filesystem import write_text_atomic
 
 
 class ArchiveWriter:
@@ -30,7 +24,7 @@ class ArchiveWriter:
         date_dir = self._root / received_at.strftime("%Y-%m-%d")
         filename = f"{received_at:%Y-%m-%dT%H-%M-%S-%f}-{uuid4().hex[:8]}.json"
         archive_path = date_dir / filename
-        _write_atomic(archive_path, content=f"{raw_json}\n")
+        write_text_atomic(archive_path, content=f"{raw_json}\n")
         return archive_path
 
 
@@ -59,7 +53,7 @@ class RetryQueue:
             "payload": payload.payload,
             "parse_error": payload.parse_error,
         }
-        _write_atomic(
+        write_text_atomic(
             queue_path,
             content=f"{json.dumps(record, ensure_ascii=False, indent=2)}\n",
         )

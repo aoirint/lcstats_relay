@@ -11,6 +11,7 @@ from lcstats_relay.application.ports import (
     OutputDeliveryError,
     OutputReceipt,
     RetryQueuePort,
+    RetrySemantics,
 )
 from lcstats_relay.application.state import RelayStateStore
 from lcstats_relay.domain.payload import RelayPayload
@@ -47,16 +48,24 @@ class OutputDispatcher:
             if not succeeded and output.policy.required:
                 break
 
+    async def load_pending_counts(self) -> None:
+        """Load persisted queue state without blocking the event loop."""
+        counts = {
+            output.policy.key: await asyncio.to_thread(self._queue.count, output.policy.key)
+            for output in self._outputs
+        }
+        self._state.pending_counts_loaded(counts)
+
     async def retry_pending(self) -> None:
         """Attempt every queued item against its registered output."""
-        for item in self._queue.pending():
+        for item in await asyncio.to_thread(self._queue.pending):
             output = self._by_key.get(item.output_key)
             if output is None:
                 continue
             succeeded = await self._deliver(output, payload=item.payload, queue_on_failure=False)
             if succeeded:
-                self._queue.remove(item)
-                self._refresh_pending(output.policy.key)
+                await asyncio.to_thread(self._queue.remove, item)
+                await self._refresh_pending(output.policy.key)
 
     async def _deliver(
         self,
@@ -72,25 +81,25 @@ class OutputDispatcher:
         except asyncio.CancelledError:
             raise
         except OutputDeliveryError as exc:
-            self._handle_failure(
+            await self._handle_failure(
                 output,
                 payload=payload,
                 error=exc,
                 queue_on_failure=queue_on_failure,
             )
             return False
-        self._handle_success(key, receipt=receipt)
+        await self._handle_success(key, receipt=receipt)
         return True
 
-    def _handle_success(self, key: str, *, receipt: OutputReceipt) -> None:
+    async def _handle_success(self, key: str, *, receipt: OutputReceipt) -> None:
         self._state.output_succeeded(
             key,
             at=self._clock(),
             message=receipt.message,
-            pending_count=self._queue.count(key),
+            pending_count=await asyncio.to_thread(self._queue.count, key),
         )
 
-    def _handle_failure(
+    async def _handle_failure(
         self,
         output: BoundOutput,
         *,
@@ -101,9 +110,14 @@ class OutputDispatcher:
         policy = output.policy
         queued = False
         message = error.message
-        if queue_on_failure and policy.queue_failures and error.retryable:
+        if (
+            queue_on_failure
+            and policy.retry_semantics is RetrySemantics.AT_LEAST_ONCE
+            and error.retryable
+        ):
             try:
-                self._queue.enqueue(
+                await asyncio.to_thread(
+                    self._queue.enqueue,
                     policy.key,
                     payload=payload,
                     queued_at=self._clock(),
@@ -114,9 +128,12 @@ class OutputDispatcher:
         self._state.output_failed(
             policy.key,
             message=message,
-            pending_count=self._queue.count(policy.key),
+            pending_count=await asyncio.to_thread(self._queue.count, policy.key),
             queued=queued,
         )
 
-    def _refresh_pending(self, key: str) -> None:
-        self._state.state.outputs[key].pending_count = self._queue.count(key)
+    async def _refresh_pending(self, key: str) -> None:
+        self._state.pending_count_changed(
+            key,
+            count=await asyncio.to_thread(self._queue.count, key),
+        )

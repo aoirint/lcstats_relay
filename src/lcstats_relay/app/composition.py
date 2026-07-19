@@ -7,7 +7,7 @@ from pathlib import Path
 
 import httpx
 
-from lcstats_relay.application.ports import OutputPolicy
+from lcstats_relay.application.ports import OutputPolicy, RetrySemantics
 from lcstats_relay.application.relay import ConnectionManager
 from lcstats_relay.application.state import ConnectionState
 from lcstats_relay.domain.payload import JSONValue
@@ -55,7 +55,6 @@ def create_connection_manager(  # noqa: PLR0913 - UI boundary passes user settin
         key="archive",
         label="ローカル保存",
         required=True,
-        queue_failures=False,
     )
     output_policies = [archive_policy]
     output_bindings = [
@@ -65,7 +64,11 @@ def create_connection_manager(  # noqa: PLR0913 - UI boundary passes user settin
         ),
     ]
     if gas_url:
-        gas_policy = OutputPolicy(key="gas", label="Google Sheets")
+        gas_policy = OutputPolicy(
+            key="gas",
+            label="Google Sheets",
+            retry_semantics=RetrySemantics.AT_LEAST_ONCE,
+        )
         output_policies.append(gas_policy)
         output_bindings.append(
             HttpOutputBinding(

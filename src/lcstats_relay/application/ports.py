@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from types import TracebackType
 from typing import Protocol
 
@@ -27,6 +28,13 @@ class OutputReceipt:
     message: str
 
 
+class RetrySemantics(StrEnum):
+    """Delivery guarantee accepted by an output policy."""
+
+    NONE = "none"
+    AT_LEAST_ONCE = "at-least-once"
+
+
 class OutputSink(Protocol):
     """Deliver one received payload to an output surface."""
 
@@ -41,7 +49,7 @@ class OutputPolicy:
     key: str
     label: str
     required: bool = False
-    queue_failures: bool = True
+    retry_semantics: RetrySemantics = RetrySemantics.NONE
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)

@@ -12,14 +12,16 @@ LCStats Relay writes three categories of local data:
 - Retry queue: `<data_dir>/queue/*.json`, containing output identity, timestamps,
   raw and parsed payloads, and any parse error needed for a later attempt.
 
-The default `data_dir` is the relative path `data`, resolved from the process
-working directory. Operators who need a stable location should configure an
-absolute path.
+For new settings, the default `data_dir` is
+`%LOCALAPPDATA%/lcstats-relay/data` on Windows. On Linux it is
+`$XDG_DATA_HOME/lcstats-relay` when configured, otherwise
+`~/.local/share/lcstats-relay`. A data directory already saved in settings is
+preserved, including the former relative default, until the user changes it.
 
-Settings and individual data records are written to a sibling `.tmp` file and
-then replaced. This avoids exposing a partially written final file during an
-ordinary write, but the implementation does not currently claim filesystem
-crash durability or preserve custom file permissions.
+Settings and individual data records are written to a unique sibling temporary
+file, flushed to the filesystem, and atomically replaced. Unique names avoid
+collisions between concurrent writers. The application still does not claim
+whole-directory durability across sudden storage or operating-system failure.
 
 ## Secrets
 

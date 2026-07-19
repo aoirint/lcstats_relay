@@ -126,6 +126,17 @@ class RelayStateStore:
         self.state.status = RelayStatus.DISPATCHING
         self._emit()
 
+    def pending_counts_loaded(self, counts: Mapping[str, int]) -> None:
+        """Publish persisted queue counts after non-blocking startup I/O."""
+        for key, count in counts.items():
+            self.state.outputs[key].pending_count = count
+        self._emit()
+
+    def pending_count_changed(self, key: str, *, count: int) -> None:
+        """Publish one queue count after a retry record changes."""
+        self.state.outputs[key].pending_count = count
+        self._emit()
+
     def output_succeeded(
         self,
         key: str,

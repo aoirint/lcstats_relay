@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from lcstats_relay.domain.payload import RelayPayload, parse_json
+from lcstats_relay.infrastructure import filesystem as filesystem_module
 from lcstats_relay.infrastructure.storage import ArchiveWriter, RetryQueue
 
 
@@ -100,3 +101,24 @@ def test_empty_retry_queue_does_not_create_directory(tmp_path: Path) -> None:
     assert queue.pending() == []
     assert queue.count() == 0
     assert queue.count("gas") == 0
+
+
+def test_atomic_write_cleans_unique_temporary_file_after_replace_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Leave the previous final file intact and remove failed temporary output."""
+    target = tmp_path / "settings.json"
+    target.write_text("previous\n", encoding="utf-8")
+
+    def fail_replace(source: Path, destination: str | Path) -> None:
+        del source, destination
+        msg = "replace failed"
+        raise OSError(msg)
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+    with pytest.raises(OSError, match="replace failed"):
+        filesystem_module.write_text_atomic(target, content="next\n")
+
+    assert target.read_text(encoding="utf-8") == "previous\n"
+    assert list(tmp_path.glob(".*.tmp")) == []
