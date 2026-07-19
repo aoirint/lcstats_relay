@@ -18,7 +18,9 @@ creates the exact `v<project-version>` Git tag from the merged `main` commit.
   and required-check process.
 - Set `[project].version` to the intended non-`0.0.0` release version in that
   reviewed commit. Do not create the release tag manually.
-- Confirm that the Build, Lint, and Test workflows pass on `main`.
+- Confirm that the Build, Lint, and Test pull request checks pass before merge.
+  The Release workflow repeats their quality gates against the exact merged
+  source commit before publication.
 - Confirm that immutable releases remain enabled in the GitHub repository
   settings. The workflow checks this again before creating or publishing a
   release.
@@ -30,16 +32,19 @@ Merge the version change and intended release contents into `main`. The push to
 order:
 
 1. Reads the normalized project version from `pyproject.toml`. Version `0.0.0`
-   and an already-published immutable version complete without release work.
-2. Builds Windows and Linux from the resolved merged source commit through the
+   completes without release work. An already-published immutable version does
+   so only after its exact asset set and attestation pass again.
+2. Runs workflow lint, pin cooldown, Markdown lint, Ruff, strict mypy, and the
+   full-coverage test suite against the resolved merged source commit.
+3. Builds Windows and Linux from that same commit through the
    same local Composite Action used by the Build workflow.
-3. Packages the Windows bundle as ZIP and the Linux bundle as tar.gz so Unix
+4. Packages the Windows bundle as ZIP and the Linux bundle as tar.gz so Unix
    executable permissions survive extraction.
-4. Creates `release-manifest.json` and `SHA256SUMS`, binding the artifacts to the
+5. Creates `release-manifest.json` and `SHA256SUMS`, binding the artifacts to the
    source commit, workflow run, build number, Python, Flet, and uv versions.
-5. Creates the version tag and mutable draft from the merged source commit, or
+6. Creates the version tag and mutable draft from the merged source commit, or
    resumes a matching draft, then uploads and checks the complete asset set.
-6. Publishes the draft last. GitHub then makes the release tag and assets
+7. Publishes the draft last. GitHub then makes the release tag and assets
    immutable and generates the release attestation.
 
 The expected release assets are:
@@ -66,11 +71,13 @@ Confirm that `isDraft` is `false`, `isImmutable` is `true`, the expected four
 assets are present, and the downloaded archive digests match both
 `release-manifest.json` and `SHA256SUMS`.
 
-Release automation verifies artifact structure and provenance but does not
-replace target runtime checks. Before announcing a release, launch the Windows
-and Linux bundles on their supported target class and verify first run,
-configuration, tracker connection, archive output, network failure, clean
-shutdown, and retained data after an upgrade.
+Release automation verifies the expected root launcher, license and notices,
+absence of source-control/development content and unsafe paths, Linux executable
+mode, checksums, and provenance. It does not replace target runtime checks.
+Before announcing a release, launch the Windows and Linux bundles on their
+supported target class and verify first run, configuration, tracker connection,
+archive output, network failure, clean shutdown, and retained data after an
+upgrade.
 
 ## Failure and recovery
 

@@ -48,7 +48,7 @@ def package_desktop(
             root_dir=build_directory,
         )
     )
-    if archive_path != expected_path:
+    if archive_path.resolve() != expected_path.resolve():
         msg = f"archive path did not match the requested artifact: {archive_path}"
         raise RuntimeError(msg)
     return archive_path

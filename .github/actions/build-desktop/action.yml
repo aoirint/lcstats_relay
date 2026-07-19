@@ -116,6 +116,8 @@ runs:
     - name: Package desktop artifact
       shell: bash
       run: |
+        cp LICENSE "build/${{ inputs.target }}/LICENSE"
+        cp THIRD_PARTY_NOTICES.md "build/${{ inputs.target }}/THIRD_PARTY_NOTICES.md"
         uv run --locked python scripts/package_desktop.py \
           --build-directory "build/${{ inputs.target }}" \
           --output-directory "${{ inputs.output_directory }}" \
@@ -126,4 +128,14 @@ runs:
       shell: bash
       env:
         ARTIFACT_PATH: ${{ steps.identity.outputs.path }}
-      run: test -f "${ARTIFACT_PATH}"
+        TARGET: ${{ inputs.target }}
+      run: |
+        if [[ "${TARGET}" == "windows" ]]; then
+          launcher="lcstats-relay.exe"
+        else
+          launcher="lcstats-relay"
+        fi
+        uv run --locked python scripts/verify_desktop_archive.py \
+          --archive "${ARTIFACT_PATH}" \
+          --target "${TARGET}" \
+          --launcher "${launcher}"
