@@ -61,3 +61,16 @@ uv run ruff format --check .
 uv run mypy src tests
 uv run pytest
 ```
+
+## Agent Skills
+
+Repository-local Agent Skills are managed with
+[APM](https://github.com/microsoft/apm). Restore and verify the committed Skill
+set with:
+
+```powershell
+apm install --frozen
+apm audit --ci
+```
+
+See [AGENTS.md](AGENTS.md) for maintenance and pull request rules.

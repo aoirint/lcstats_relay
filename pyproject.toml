@@ -36,6 +36,8 @@ dev = [
 ]
 
 [tool.ruff]
+# APM deploys externally maintained Skill helper scripts here.
+extend-exclude = [".agents/skills"]
 line-length = 100
 target-version = "py314"
 

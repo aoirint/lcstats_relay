@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flet Project Quality Check"
+  short_description: "Review Python Flet architecture and quality"
+  default_prompt: "Use $flet-project-quality-check to review and align this Python Flet project with the required architecture, tooling, tests, CI, and documentation baseline."
