@@ -1,4 +1,4 @@
-"""Application composition for standard relay outputs."""
+"""Compose the production relay application from concrete adapters."""
 
 from __future__ import annotations
 

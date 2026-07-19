@@ -1,4 +1,4 @@
-"""Tests for Flet application assembly."""
+"""Tests for the Flet runtime entry point."""
 
 import asyncio
 from typing import cast
@@ -6,9 +6,7 @@ from typing import cast
 import flet as ft
 import pytest
 
-from lcstats_relay.app import main as package_main
-from lcstats_relay.app import run
-from lcstats_relay.app.main import main
+from lcstats_relay.entrypoints.flet_app import main, run
 from lcstats_relay.ui.monitor import MonitorView
 
 _WINDOW_MIN_WIDTH = 420
@@ -57,4 +55,3 @@ def test_run_starts_flet_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
     run()
 
     assert targets == [main]
-    assert package_main is main

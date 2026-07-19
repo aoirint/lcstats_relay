@@ -1,6 +1,6 @@
 """Module entry point for lcstats-relay."""
 
-from lcstats_relay.app.main import run
+from lcstats_relay.entrypoints.flet_app import run
 
 
 def main() -> None:
