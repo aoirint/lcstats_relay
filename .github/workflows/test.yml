@@ -23,8 +23,10 @@ defaults:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Unit tests use the locked Python environment without desktop packaging or
+    # privileged services, so this job fits the slim runner contract.
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
 
     steps:
       - name: Check out repository

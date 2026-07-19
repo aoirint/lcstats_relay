@@ -18,7 +18,9 @@ defaults:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    # Validation only resolves locked metadata and release state; it does not
+    # invoke the native Flet toolchain.
+    runs-on: ubuntu-slim
     timeout-minutes: 10
 
     outputs:
@@ -99,8 +101,10 @@ jobs:
   quality:
     needs: validate
     if: needs.validate.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The release gate repeats locked source checks but performs no native
+    # packaging, so it remains within the slim runner contract.
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
 
     steps:
       - name: Check out release source
@@ -154,7 +158,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: ubuntu-latest
+          # Native Flet packaging installs GTK/GStreamer and needs a full VM;
+          # pin the supported OS instead of following the moving latest label.
+          - runner: ubuntu-24.04
             target: linux
           - runner: windows-latest
             target: windows
@@ -186,7 +192,9 @@ jobs:
       - validate
       - build
     if: needs.validate.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
+    # Publication assembles metadata and uses GitHub APIs after artifacts have
+    # been built; it does not need the native build runner.
+    runs-on: ubuntu-slim
     timeout-minutes: 15
 
     permissions:
