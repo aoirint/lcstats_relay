@@ -1,6 +1,9 @@
 """Tests for release artifact manifests and checksums."""
 
+import io
 import json
+import tarfile
+import zipfile
 from dataclasses import replace
 from pathlib import Path
 
@@ -9,6 +12,7 @@ import pytest
 from scripts.release_manifest import ReleaseArtifact, ReleasePlan, main, write_release_files
 
 _COMMIT = "0123456789abcdef0123456789abcdef01234567"
+_SCHEMA_VERSION = 2
 _WORKFLOW_URL = "https://github.com/aoirint/lcstats_relay/actions/runs/123"
 
 
@@ -28,8 +32,28 @@ def _write_metadata(tmp_path: Path, *, version: str = "1.2.3") -> tuple[Path, Pa
 def _write_artifacts(tmp_path: Path) -> list[ReleaseArtifact]:
     windows_path = tmp_path / "app-windows.zip"
     linux_path = tmp_path / "app-linux.tar.gz"
-    windows_path.write_bytes(b"windows")
-    linux_path.write_bytes(b"linux")
+    with zipfile.ZipFile(windows_path, "w") as archive:
+        for name in (
+            "LICENSE",
+            "THIRD_PARTY_NOTICES.md",
+            "lcstats-relay.exe",
+            "data/flutter_assets/app.so",
+            "python312.dll",
+        ):
+            archive.writestr(name, name.encode())
+    with tarfile.open(linux_path, "w:gz") as archive:
+        for name, mode in (
+            ("LICENSE", 0o644),
+            ("THIRD_PARTY_NOTICES.md", 0o644),
+            ("lcstats-relay", 0o755),
+            ("data/flutter_assets/app.so", 0o644),
+            ("python3.12/__future__.pyc", 0o644),
+        ):
+            value = name.encode()
+            info = tarfile.TarInfo(name)
+            info.mode = mode
+            info.size = len(value)
+            archive.addfile(info, io.BytesIO(value))
     return [
         ReleaseArtifact(target="windows", path=windows_path),
         ReleaseArtifact(target="linux", path=linux_path),
@@ -89,21 +113,29 @@ def _invalid_identity_plan(tmp_path: Path, *, case: str) -> ReleasePlan:
 
 def test_write_release_files_records_sorted_provenance(tmp_path: Path) -> None:
     """Bind every published target to source, tools, sizes, and digests."""
-    manifest_path, checksums_path = _write_release(tmp_path)
+    plan = _build_plan(tmp_path)
+    manifest_path, checksums_path = _write_release(tmp_path, plan=plan)
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert manifest["schema_version"] == 1
+    assert manifest["schema_version"] == _SCHEMA_VERSION
     assert manifest["project"] == {"name": "lcstats-relay", "version": "1.2.3"}
     assert manifest["build"] == {
         "flet_version": "0.85.3",
         "number": 42,
-        "python_version": "3.14",
+        "builder_python_version": "3.14",
         "source_commit": _COMMIT,
         "uv_version": "0.11.21",
         "workflow_url": _WORKFLOW_URL,
     }
     assert [record["target"] for record in manifest["artifacts"]] == ["linux", "windows"]
-    assert [record["size"] for record in manifest["artifacts"]] == [5, 7]
+    assert [record["python_runtime_version"] for record in manifest["artifacts"]] == [
+        "3.12",
+        "3.12",
+    ]
+    assert [record["size"] for record in manifest["artifacts"]] == [
+        artifact.path.stat().st_size
+        for artifact in sorted(plan.artifacts, key=lambda item: item.target)
+    ]
     assert checksums_path.read_text(encoding="utf-8").splitlines() == [
         f"{record['sha256']}  {record['file']}" for record in manifest["artifacts"]
     ]

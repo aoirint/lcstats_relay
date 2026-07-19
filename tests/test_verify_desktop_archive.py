@@ -67,6 +67,7 @@ def _required_windows_members() -> dict[str, bytes]:
         "THIRD_PARTY_NOTICES.md": b"notices",
         "lcstats-relay.exe": b"launcher",
         "data/flutter_assets/app.so": b"payload",
+        "python312.dll": b"packaged runtime",
     }
 
 
@@ -83,28 +84,38 @@ def _required_linux_members(*, launcher_mode: int = 0o755) -> dict[str, tuple[by
 def test_verify_desktop_archive_accepts_windows_bundle(tmp_path: Path) -> None:
     """Accept a ZIP with the launcher, notices, and application payload."""
     archive_path = tmp_path / "desktop.zip"
-    _write_zip(archive_path, members=_required_windows_members())
+    members = _required_windows_members()
+    members["site-packages/colorama/tests/test_ansi.py"] = b"dependency-owned tests"
+    _write_zip(archive_path, members=members)
 
-    verify_desktop_archive(
-        archive_path=archive_path,
-        target="windows",
-        launcher_name="lcstats-relay.exe",
+    assert (
+        verify_desktop_archive(
+            archive_path=archive_path,
+            target="windows",
+            launcher_name="lcstats-relay.exe",
+        )
+        == "3.12"
     )
 
 
 def test_verify_desktop_archive_accepts_linux_bundle_and_safe_link(tmp_path: Path) -> None:
     """Accept an executable Linux launcher and a relative in-bundle symlink."""
     archive_path = tmp_path / "desktop.tar.gz"
+    members = _required_linux_members()
+    members["site-packages/fastapi/.agents/rules.md"] = (b"dependency metadata", 0o644)
     _write_tar(
         archive_path,
-        members=_required_linux_members(),
+        members=members,
         link=("lib/libexample.so", "libexample.so.1"),
     )
 
-    verify_desktop_archive(
-        archive_path=archive_path,
-        target="linux",
-        launcher_name="lcstats-relay",
+    assert (
+        verify_desktop_archive(
+            archive_path=archive_path,
+            target="linux",
+            launcher_name="lcstats-relay",
+        )
+        == "3.12"
     )
 
 
@@ -173,12 +184,28 @@ def test_verify_desktop_archive_does_not_count_symlink_as_payload(tmp_path: Path
         )
 
 
+def test_verify_desktop_archive_rejects_ambiguous_python_runtime(tmp_path: Path) -> None:
+    """Reject a bundle whose packaged Python runtime identity is ambiguous."""
+    archive_path = tmp_path / "desktop.zip"
+    members = _required_windows_members()
+    members["python313.dll"] = b"another runtime"
+    _write_zip(archive_path, members=members)
+
+    with pytest.raises(ValueError, match="exactly one identifiable"):
+        verify_desktop_archive(
+            archive_path=archive_path,
+            target="windows",
+            launcher_name="lcstats-relay.exe",
+        )
+
+
 @pytest.mark.parametrize(
     ("removed", "message"),
     [
         ("LICENSE", "missing required regular files"),
         ("lcstats-relay.exe", "missing required regular files"),
         ("data/flutter_assets/app.so", "no application payload"),
+        ("python312.dll", "exactly one identifiable"),
     ],
 )
 def test_verify_desktop_archive_rejects_incomplete_bundle(

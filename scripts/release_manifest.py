@@ -13,9 +13,11 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from scripts.verify_desktop_archive import verify_desktop_archive
 from scripts.version_metadata import read_version_metadata
 
 _REQUIRED_TARGETS = frozenset({"linux", "windows"})
+_SCHEMA_VERSION = 2
 _SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 
 
@@ -121,8 +123,8 @@ def write_release_files(*, plan: ReleasePlan) -> None:
         uv_version=plan.uv_version,
     )
 
-    python_version = plan.python_version_path.read_text(encoding="utf-8").strip()
-    if not python_version:
+    builder_python_version = plan.python_version_path.read_text(encoding="utf-8").strip()
+    if not builder_python_version:
         msg = "Python version file must not be empty"
         raise ValueError(msg)
 
@@ -140,21 +142,29 @@ def write_release_files(*, plan: ReleasePlan) -> None:
         msg = "every release artifact path must be an existing file"
         raise ValueError(msg)
 
-    artifact_records = [
-        {
-            "file": artifact.path.name,
-            "sha256": _sha256(artifact.path),
-            "size": artifact.path.stat().st_size,
-            "target": artifact.target,
-        }
-        for artifact in sorted(plan.artifacts, key=lambda item: item.target)
-    ]
+    artifact_records = []
+    for artifact in sorted(plan.artifacts, key=lambda item: item.target):
+        launcher_name = "lcstats-relay.exe" if artifact.target == "windows" else "lcstats-relay"
+        runtime_version = verify_desktop_archive(
+            archive_path=artifact.path,
+            target=artifact.target,
+            launcher_name=launcher_name,
+        )
+        artifact_records.append(
+            {
+                "file": artifact.path.name,
+                "python_runtime_version": runtime_version,
+                "sha256": _sha256(artifact.path),
+                "size": artifact.path.stat().st_size,
+                "target": artifact.target,
+            }
+        )
     manifest: dict[str, Any] = {
         "artifacts": artifact_records,
         "build": {
             "flet_version": _read_resolved_package_version(plan.lock_path, package_name="flet"),
             "number": plan.build_number,
-            "python_version": python_version,
+            "builder_python_version": builder_python_version,
             "source_commit": plan.source_commit,
             "uv_version": plan.uv_version,
             "workflow_url": plan.workflow_url,
@@ -163,7 +173,7 @@ def write_release_files(*, plan: ReleasePlan) -> None:
             "name": _read_project_name(plan.pyproject_path),
             "version": metadata.project_version,
         },
-        "schema_version": 1,
+        "schema_version": _SCHEMA_VERSION,
     }
 
     plan.manifest_path.write_text(

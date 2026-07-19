@@ -41,7 +41,8 @@ order:
 4. Packages the Windows bundle as ZIP and the Linux bundle as tar.gz so Unix
    executable permissions survive extraction.
 5. Creates `release-manifest.json` and `SHA256SUMS`, binding the artifacts to the
-   source commit, workflow run, build number, Python, Flet, and uv versions.
+   source commit, workflow run, build number, builder Python, per-target packaged
+   Python runtime, Flet, and uv versions.
 6. Creates the version tag and mutable draft from the merged source commit, or
    resumes a matching draft, then uploads and checks the complete asset set.
 7. Publishes the draft last. GitHub then makes the release tag and assets
