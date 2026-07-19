@@ -13,7 +13,7 @@ DEFAULT_DATA_DIR = Path("data")
 CONFIG_FILENAME = "settings.json"
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, kw_only=True, slots=True)
 class RelaySettings:
     """User-configurable relay settings safe to persist on disk."""
 
@@ -58,9 +58,9 @@ class SettingsStore:
             raise TypeError(msg)
 
         return RelaySettings(
-            tracker_url=_string_value(raw, "tracker_url", DEFAULT_TRACKER_URL),
-            gas_url=_string_value(raw, "gas_url", ""),
-            data_dir=Path(_string_value(raw, "data_dir", str(DEFAULT_DATA_DIR))),
+            tracker_url=_string_value(raw, key="tracker_url", default=DEFAULT_TRACKER_URL),
+            gas_url=_string_value(raw, key="gas_url", default=""),
+            data_dir=Path(_string_value(raw, key="data_dir", default=str(DEFAULT_DATA_DIR))),
         )
 
     def save(self, settings: RelaySettings) -> None:
@@ -76,7 +76,7 @@ class SettingsStore:
         temporary.replace(self.path)
 
 
-def _string_value(raw: dict[str, Any], key: str, default: str) -> str:
+def _string_value(raw: dict[str, Any], *, key: str, default: str) -> str:
     value = raw.get(key, default)
     if not isinstance(value, str):
         msg = f"設定ファイルの{key}は文字列である必要があります"

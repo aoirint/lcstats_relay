@@ -16,6 +16,7 @@ from lcstats_relay.core.storage import ArchiveWriter
 
 
 def create_connection_manager(  # noqa: PLR0913 - UI boundary passes user settings and callbacks.
+    *,
     sse_url: str,
     gas_url: str,
     gas_token: str,
@@ -42,7 +43,11 @@ def create_connection_manager(  # noqa: PLR0913 - UI boundary passes user settin
             OutputRegistration(
                 key="gas",
                 label="Google Sheets",
-                build=lambda client: _build_gas_output(gas_url, client, authenticator),
+                build=lambda client: _build_gas_output(
+                    gas_url,
+                    client=client,
+                    authenticator=authenticator,
+                ),
                 queue_failures=True,
             ),
         )
@@ -57,7 +62,8 @@ def create_connection_manager(  # noqa: PLR0913 - UI boundary passes user settin
 
 def _build_gas_output(
     gas_url: str,
+    *,
     client: httpx.AsyncClient,
     authenticator: RequestAuthenticator,
 ) -> GasOutput:
-    return GasOutput(gas_url, client, authenticator)
+    return GasOutput(gas_url, client=client, authenticator=authenticator)

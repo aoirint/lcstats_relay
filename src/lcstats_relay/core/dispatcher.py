@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
 from lcstats_relay.core.outputs import (
     OutputDeliveryError,
@@ -20,7 +20,11 @@ from lcstats_relay.core.storage import RetryQueue
 type Clock = Callable[[], datetime]
 
 
-@dataclass(frozen=True, slots=True)
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
+@dataclass(frozen=True, kw_only=True, slots=True)
 class BoundOutput:
     """An instantiated sink paired with its registration policy."""
 
@@ -34,10 +38,10 @@ class OutputDispatcher:
     def __init__(
         self,
         outputs: Sequence[BoundOutput],
+        *,
         queue: RetryQueue,
         state: RelayStateStore,
-        *,
-        clock: Clock = datetime.now,
+        clock: Clock = _utc_now,
     ) -> None:
         """Index output bindings and retain generic state and queue collaborators."""
         self._outputs = outputs
@@ -49,7 +53,7 @@ class OutputDispatcher:
     async def dispatch(self, payload: RelayPayload) -> None:
         """Deliver to outputs in registration order, respecting required failures."""
         for output in self._outputs:
-            succeeded = await self._deliver(output, payload, queue_on_failure=True)
+            succeeded = await self._deliver(output, payload=payload, queue_on_failure=True)
             if not succeeded and output.registration.required:
                 break
 
@@ -59,7 +63,7 @@ class OutputDispatcher:
             output = self._by_key.get(item.output_key)
             if output is None:
                 continue
-            succeeded = await self._deliver(output, item.payload, queue_on_failure=False)
+            succeeded = await self._deliver(output, payload=item.payload, queue_on_failure=False)
             if succeeded:
                 self._queue.remove(item)
                 self._refresh_pending(output.registration.key)
@@ -67,8 +71,8 @@ class OutputDispatcher:
     async def _deliver(
         self,
         output: BoundOutput,
-        payload: RelayPayload,
         *,
+        payload: RelayPayload,
         queue_on_failure: bool,
     ) -> bool:
         key = output.registration.key
@@ -78,12 +82,17 @@ class OutputDispatcher:
         except asyncio.CancelledError:
             raise
         except OutputDeliveryError as exc:
-            self._handle_failure(output, payload, exc, queue_on_failure=queue_on_failure)
+            self._handle_failure(
+                output,
+                payload=payload,
+                error=exc,
+                queue_on_failure=queue_on_failure,
+            )
             return False
-        self._handle_success(key, receipt)
+        self._handle_success(key, receipt=receipt)
         return True
 
-    def _handle_success(self, key: str, receipt: OutputReceipt) -> None:
+    def _handle_success(self, key: str, *, receipt: OutputReceipt) -> None:
         self._state.output_succeeded(
             key,
             at=self._clock(),
@@ -94,9 +103,9 @@ class OutputDispatcher:
     def _handle_failure(
         self,
         output: BoundOutput,
+        *,
         payload: RelayPayload,
         error: OutputDeliveryError,
-        *,
         queue_on_failure: bool,
     ) -> None:
         registration = output.registration
@@ -104,7 +113,11 @@ class OutputDispatcher:
         message = error.message
         if queue_on_failure and registration.queue_failures and error.retryable:
             try:
-                self._queue.enqueue(registration.key, payload, queued_at=self._clock())
+                self._queue.enqueue(
+                    registration.key,
+                    payload=payload,
+                    queued_at=self._clock(),
+                )
                 queued = True
             except OSError:
                 message = f"{message} / 再送キューの保存にも失敗しました"

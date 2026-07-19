@@ -6,7 +6,7 @@ import asyncio
 import json
 from collections.abc import Awaitable, Callable, Sequence
 from contextlib import suppress
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -26,6 +26,10 @@ type Sleep = Callable[[float], Awaitable[None]]
 _PREVIEW_LENGTH = 300
 
 
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
 def _make_client(timeout: httpx.Timeout) -> httpx.AsyncClient:
     return httpx.AsyncClient(timeout=timeout, follow_redirects=True)
 
@@ -43,7 +47,7 @@ class ConnectionManager:
         on_payload: PayloadCallback,
         reconnect_delay: float = 3.0,
         retry_interval: float = 30.0,
-        clock: Clock = datetime.now,
+        clock: Clock = _utc_now,
         client_factory: ClientFactory = _make_client,
         reconnect_sleep: Sleep = asyncio.sleep,
     ) -> None:
@@ -61,7 +65,7 @@ class ConnectionManager:
         pending = {output.key: self._queue.count(output.key) for output in self._outputs}
         self._state = RelayStateStore(
             ((output.key, output.label) for output in self._outputs),
-            on_state,
+            on_change=on_state,
             pending_counts=pending,
         )
 
@@ -89,23 +93,24 @@ class ConnectionManager:
     async def _run(self) -> None:
         timeout = httpx.Timeout(30.0, read=None)
         async with self._client_factory(timeout) as client:
-            receiver = StatsReceiver(self._sse_url, client)
+            receiver = StatsReceiver(self._sse_url, client=client)
             dispatcher = OutputDispatcher(
                 [
                     BoundOutput(registration=registration, sink=registration.build(client))
                     for registration in self._outputs
                 ],
-                self._queue,
-                self._state,
+                queue=self._queue,
+                state=self._state,
                 clock=self._clock,
             )
             async with asyncio.TaskGroup() as tasks:
-                tasks.create_task(self._receive_loop(receiver, dispatcher))
+                tasks.create_task(self._receive_loop(receiver, dispatcher=dispatcher))
                 tasks.create_task(self._retry_loop(dispatcher))
 
     async def _receive_loop(
         self,
         receiver: StatsReceiver,
+        *,
         dispatcher: OutputDispatcher,
     ) -> None:
         while True:
@@ -115,7 +120,7 @@ class ConnectionManager:
             except asyncio.CancelledError:
                 raise
             except (httpx.HTTPError, ValueError) as exc:
-                message = self._safe_error("受信", exc)
+                message = self._safe_error("受信", error=exc)
                 self._state.receiver_error(message, retry_after_seconds=self._reconnect_delay)
                 await self._wait_before_reconnect(message)
                 continue
@@ -135,7 +140,7 @@ class ConnectionManager:
             except asyncio.CancelledError:
                 raise
             except (OSError, TypeError, ValueError) as exc:
-                self._state.receiver_error(self._safe_error("再送キュー読込", exc))
+                self._state.receiver_error(self._safe_error("再送キュー読込", error=exc))
 
     async def _wait_before_reconnect(self, message: str) -> None:
         remaining = self._reconnect_delay
@@ -166,7 +171,7 @@ class ConnectionManager:
         return f"{raw_json[:_PREVIEW_LENGTH]}..."
 
     @staticmethod
-    def _safe_error(operation: str, error: Exception) -> str:
+    def _safe_error(operation: str, *, error: Exception) -> str:
         if isinstance(error, httpx.HTTPStatusError):
             return f"{operation}エラー: HTTP {error.response.status_code}"
         return f"{operation}エラー: {type(error).__name__}"

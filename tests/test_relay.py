@@ -3,7 +3,7 @@
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -88,7 +88,7 @@ def _payload(raw_json: str = '{"Seed":42}') -> RelayPayload:
     return RelayPayload(
         raw_json=raw_json,
         payload={"Seed": 42},
-        received_at=datetime(2026, 6, 20, 9, 15, 33),
+        received_at=datetime(2026, 6, 20, 9, 15, 33, tzinfo=UTC),
     )
 
 
@@ -144,8 +144,8 @@ def test_gas_output_sends_authenticated_payload() -> None:
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
             output = GasOutput(
                 "https://script.google.com/macros/s/id/exec",
-                client,
-                QueryTokenAuthentication("secret"),
+                client=client,
+                authenticator=QueryTokenAuthentication("secret"),
             )
             receipt = await output.deliver(_payload())
 
@@ -180,8 +180,8 @@ def test_gas_output_reports_retryable_failures(
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
             output = GasOutput(
                 "https://script.google.com/macros/s/id/exec",
-                client,
-                NoAuthentication(),
+                client=client,
+                authenticator=NoAuthentication(),
             )
             with pytest.raises(OutputDeliveryError, match=message) as error:
                 await output.deliver(_payload())
@@ -199,15 +199,15 @@ def test_gas_output_rejects_unparsed_payload() -> None:
         ) as client:
             output = GasOutput(
                 "https://script.google.com/macros/s/id/exec",
-                client,
-                NoAuthentication(),
+                client=client,
+                authenticator=NoAuthentication(),
             )
             with pytest.raises(OutputDeliveryError, match="JSONを解析"):
                 await output.deliver(
                     RelayPayload(
                         raw_json="not-json",
                         payload=None,
-                        received_at=datetime(2026, 6, 20),
+                        received_at=datetime(2026, 6, 20, tzinfo=UTC),
                         parse_error="JSONDecodeError",
                     ),
                 )
@@ -223,7 +223,7 @@ def test_dispatcher_handles_success_required_failure_and_queue(tmp_path: Path) -
         states: list[ConnectionState] = []
         state = RelayStateStore(
             [("archive", "ローカル保存"), ("gas", "Google Sheets"), ("third", "Third")],
-            states.append,
+            on_change=states.append,
         )
         archive = _Sink(
             "archive",
@@ -234,16 +234,26 @@ def test_dispatcher_handles_success_required_failure_and_queue(tmp_path: Path) -
         dispatcher = OutputDispatcher(
             [
                 BoundOutput(
-                    OutputRegistration(
-                        "archive", "ローカル保存", lambda _client: archive, required=True
+                    registration=OutputRegistration(
+                        key="archive",
+                        label="ローカル保存",
+                        build=lambda _client: archive,
+                        required=True,
                     ),
-                    archive,
+                    sink=archive,
                 ),
-                BoundOutput(OutputRegistration("gas", "Google Sheets", lambda _client: gas), gas),
+                BoundOutput(
+                    registration=OutputRegistration(
+                        key="gas",
+                        label="Google Sheets",
+                        build=lambda _client: gas,
+                    ),
+                    sink=gas,
+                ),
             ],
-            RetryQueue(tmp_path),
-            state,
-            clock=lambda: datetime(2026, 6, 20),
+            queue=RetryQueue(tmp_path),
+            state=state,
+            clock=lambda: datetime(2026, 6, 20, tzinfo=UTC),
         )
 
         await dispatcher.dispatch(_payload())
@@ -270,16 +280,28 @@ def test_dispatcher_retries_known_outputs_and_skips_unknown(tmp_path: Path) -> N
 
     async def scenario() -> None:
         calls: list[str] = []
-        state = RelayStateStore([("gas", "Google Sheets")], lambda _state: None)
+        state = RelayStateStore(
+            [("gas", "Google Sheets")],
+            on_change=lambda _state: None,
+        )
         gas = _Sink("gas", calls)
         queue = RetryQueue(tmp_path)
-        queued_at = datetime(2026, 6, 20)
-        queue.enqueue("gas", _payload(), queued_at=queued_at)
-        queue.enqueue("missing", _payload('{"Seed":43}'), queued_at=queued_at)
+        queued_at = datetime(2026, 6, 20, tzinfo=UTC)
+        queue.enqueue("gas", payload=_payload(), queued_at=queued_at)
+        queue.enqueue("missing", payload=_payload('{"Seed":43}'), queued_at=queued_at)
         dispatcher = OutputDispatcher(
-            [BoundOutput(OutputRegistration("gas", "Google Sheets", lambda _client: gas), gas)],
-            queue,
-            state,
+            [
+                BoundOutput(
+                    registration=OutputRegistration(
+                        key="gas",
+                        label="Google Sheets",
+                        build=lambda _client: gas,
+                    ),
+                    sink=gas,
+                )
+            ],
+            queue=queue,
+            state=state,
             clock=lambda: queued_at,
         )
 
@@ -290,7 +312,7 @@ def test_dispatcher_retries_known_outputs_and_skips_unknown(tmp_path: Path) -> N
         assert queue.count("missing") == 1
 
         gas.fail = OutputDeliveryError("still offline", retryable=True)
-        queue.enqueue("gas", _payload(), queued_at=queued_at)
+        queue.enqueue("gas", payload=_payload(), queued_at=queued_at)
         await dispatcher.retry_pending()
         assert state.state.outputs["gas"].message == "still offline"
 
@@ -305,21 +327,33 @@ def test_dispatcher_reports_queue_write_failure(
 
     async def scenario() -> None:
         calls: list[str] = []
-        state = RelayStateStore([("gas", "Google Sheets")], lambda _state: None)
+        state = RelayStateStore(
+            [("gas", "Google Sheets")],
+            on_change=lambda _state: None,
+        )
         gas = _Sink("gas", calls, fail=OutputDeliveryError("gas offline", retryable=True))
         queue = RetryQueue(tmp_path)
 
-        def fail_enqueue(_output_key: str, _payload: RelayPayload, *, queued_at: datetime) -> Path:
-            del queued_at
+        def fail_enqueue(output_key: str, *, payload: RelayPayload, queued_at: datetime) -> Path:
+            del output_key, payload, queued_at
             msg = "disk full"
             raise OSError(msg)
 
         monkeypatch.setattr(queue, "enqueue", fail_enqueue)
         dispatcher = OutputDispatcher(
-            [BoundOutput(OutputRegistration("gas", "Google Sheets", lambda _client: gas), gas)],
-            queue,
-            state,
-            clock=lambda: datetime(2026, 6, 20),
+            [
+                BoundOutput(
+                    registration=OutputRegistration(
+                        key="gas",
+                        label="Google Sheets",
+                        build=lambda _client: gas,
+                    ),
+                    sink=gas,
+                )
+            ],
+            queue=queue,
+            state=state,
+            clock=lambda: datetime(2026, 6, 20, tzinfo=UTC),
         )
 
         await dispatcher.dispatch(_payload())
@@ -346,15 +380,22 @@ def test_manager_dispatches_received_payload_to_registered_outputs(tmp_path: Pat
             sse_url="http://localhost:2145/",
             outputs=[
                 OutputRegistration(
-                    "archive", "ローカル保存", lambda _client: archive, required=True
+                    key="archive",
+                    label="ローカル保存",
+                    build=lambda _client: archive,
+                    required=True,
                 ),
-                OutputRegistration("gas", "Google Sheets", lambda _client: gas),
+                OutputRegistration(
+                    key="gas",
+                    label="Google Sheets",
+                    build=lambda _client: gas,
+                ),
             ],
             data_dir=tmp_path,
             on_state=states.append,
             on_payload=payloads.append,
             retry_interval=60,
-            clock=lambda: datetime(2026, 6, 20, 9, 15, 33),
+            clock=lambda: datetime(2026, 6, 20, 9, 15, 33, tzinfo=UTC),
             client_factory=_client_factory(handler),
         )
 
@@ -390,9 +431,16 @@ def test_manager_archives_invalid_json_without_payload_callback(tmp_path: Path) 
             sse_url="http://localhost:2145/",
             outputs=[
                 OutputRegistration(
-                    "archive", "ローカル保存", lambda _client: archive, required=True
+                    key="archive",
+                    label="ローカル保存",
+                    build=lambda _client: archive,
+                    required=True,
                 ),
-                OutputRegistration("gas", "Google Sheets", lambda _client: gas),
+                OutputRegistration(
+                    key="gas",
+                    label="Google Sheets",
+                    build=lambda _client: gas,
+                ),
             ],
             data_dir=tmp_path,
             on_state=lambda _state: None,
@@ -477,7 +525,11 @@ def test_retry_loop_reports_queue_read_errors(
         )
 
         async def retry_once() -> None:
-            dispatcher = OutputDispatcher([], manager._queue, manager._state)
+            dispatcher = OutputDispatcher(
+                [],
+                queue=manager._queue,
+                state=manager._state,
+            )
             await manager._retry_loop(dispatcher)
 
         def fail_pending() -> list[object]:
@@ -538,12 +590,19 @@ def test_stop_before_start_and_cancellation_paths(tmp_path: Path) -> None:
         dispatcher = OutputDispatcher(
             [
                 BoundOutput(
-                    OutputRegistration("gas", "Google Sheets", lambda _client: CancelSink()),
-                    CancelSink(),
+                    registration=OutputRegistration(
+                        key="gas",
+                        label="Google Sheets",
+                        build=lambda _client: CancelSink(),
+                    ),
+                    sink=CancelSink(),
                 )
             ],
-            RetryQueue(tmp_path),
-            RelayStateStore([("gas", "Google Sheets")], lambda _state: None),
+            queue=RetryQueue(tmp_path),
+            state=RelayStateStore(
+                [("gas", "Google Sheets")],
+                on_change=lambda _state: None,
+            ),
         )
         with pytest.raises(asyncio.CancelledError):
             await dispatcher.dispatch(_payload())
@@ -571,12 +630,12 @@ def test_default_client_factory_uses_supplied_timeout() -> None:
 def test_app_composition_builds_standard_outputs(tmp_path: Path) -> None:
     """Assemble archive, GAS, and auth without putting those details in the UI."""
     manager = create_connection_manager(
-        "http://localhost:2145/",
-        "https://script.google.com/macros/s/id/exec",
-        "secret",
-        tmp_path,
-        lambda _state: None,
-        lambda _payload: None,
+        sse_url="http://localhost:2145/",
+        gas_url="https://script.google.com/macros/s/id/exec",
+        gas_token="secret",  # noqa: S106 - inert test fixture, not a credential.
+        data_dir=tmp_path,
+        on_state=lambda _state: None,
+        on_payload=lambda _payload: None,
     )
 
     assert isinstance(manager, ConnectionManager)
@@ -595,12 +654,12 @@ def test_app_composition_builds_standard_outputs(tmp_path: Path) -> None:
 def test_app_composition_omits_gas_output_when_url_is_empty(tmp_path: Path) -> None:
     """Keep archive-only connections available without Google Sheets settings."""
     manager = create_connection_manager(
-        "http://localhost:2145/",
-        "",
-        "",
-        tmp_path,
-        lambda _state: None,
-        lambda _payload: None,
+        sse_url="http://localhost:2145/",
+        gas_url="",
+        gas_token="",
+        data_dir=tmp_path,
+        on_state=lambda _state: None,
+        on_payload=lambda _payload: None,
     )
 
     assert isinstance(manager, ConnectionManager)

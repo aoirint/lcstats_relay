@@ -1,7 +1,7 @@
 [project]
 name = "lcstats-relay"
 version = "0.0.0"
-description = "Add your description here"
+description = "Relay local Lethal Company statistics to durable archives and Google Sheets"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -45,38 +45,66 @@ target-version = "py314"
 select = [
     # pycodestyle errors: catch syntax-adjacent style issues and common readability problems.
     "E",
+    # pycodestyle warnings: retain the warning half of the style/correctness baseline.
+    "W",
     # Pyflakes: catch undefined names, unused imports, and suspicious bindings.
     "F",
     # isort: keep imports deterministic and review-friendly.
     "I",
     # flake8-annotations: require explicit public signatures before mypy has to infer them.
     "ANN",
+    # flake8-unused-arguments: keep callback and adapter boundaries intentional.
+    "ARG",
+    # flake8-async: catch blocking and unsafe patterns in asynchronous code.
+    "ASYNC",
     # flake8-bugbear: catch likely bugs and sharp Python edge cases.
     "B",
     # flake8-comprehensions: prefer clearer and faster comprehension forms.
     "C4",
+    # mccabe: surface functions whose control flow needs a clearer owner.
+    "C90",
     # flake8-commas: keep multi-line literals stable under future edits.
     "COM",
     # pydocstyle: keep public API documentation visible as the project grows.
     "D",
+    # flake8-datetimez: require timezone-aware timestamps at persistence boundaries.
+    "DTZ",
     # eradicate: reject commented-out code before it becomes misleading history.
     "ERA",
     # flynt: prefer f-strings over older interpolation styles.
     "FLY",
+    # flake8-boolean-trap: make Boolean policy explicit at definitions and calls.
+    "FBT",
+    # flake8-logging-format: keep diagnostic formatting lazy and structured.
+    "G",
+    # flake8-import-conventions: keep common dependency aliases recognizable.
+    "ICN",
+    # flake8-logging: catch unsafe or ambiguous logging patterns.
+    "LOG",
     # pep8-naming: keep names conventional for Python readers and tools.
     "N",
     # Perflint: flag avoidable performance footguns in ordinary code.
     "PERF",
+    # flake8-pie: catch miscellaneous correctness and maintainability defects.
+    "PIE",
     # Pylint-derived rules: add broad maintainability checks without running Pylint separately.
     "PL",
     # flake8-pytest-style: keep tests idiomatic and easy to scan.
     "PT",
     # flake8-use-pathlib: prefer pathlib for filesystem paths.
     "PTH",
+    # flake8-return: keep return paths explicit and consistent.
+    "RET",
     # Ruff-specific rules: enable extra fixes and checks unique to Ruff.
     "RUF",
+    # flake8-bandit: catch common security mistakes in maintained code.
+    "S",
     # flake8-simplify: reduce unnecessary branching and boolean noise.
     "SIM",
+    # flake8-self: make private-member boundary crossings visible.
+    "SLF",
+    # flake8-print: prevent stray diagnostic output in production code.
+    "T20",
     # tryceratops: keep exception handling specific and maintainable.
     "TRY",
     # pyupgrade: keep syntax modern for the configured Python target.
@@ -91,19 +119,41 @@ ignore = [
     "COM812",
 ]
 
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101", # pytest assertions are the test oracle.
+]
+"tests/test_relay.py" = [
+    # Characterization tests exercise private lifecycle seams until the dedicated boundary refactor.
+    "SLF001",
+]
+
 [tool.mypy]
 files = ["src", "tests"]
 strict = true
+warn_unreachable = true
+warn_unused_configs = true
+show_error_code_links = true
 
 [tool.pytest.ini_options]
 addopts = [
+    "--strict-config",
+    "--strict-markers",
+    "-ra",
     "--cov=lcstats_relay",
+    "--cov-branch",
     "--cov-report=term-missing",
     "--cov-report=xml",
     "--cov-fail-under=100",
 ]
-pythonpath = ["src"]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source_pkgs = ["lcstats_relay"]
 
 [tool.coverage.report]
 exclude_also = ['if __name__ == "__main__":']

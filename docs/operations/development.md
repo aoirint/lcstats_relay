@@ -31,10 +31,10 @@ uv run --locked pytest
 apm audit --ci
 ```
 
-Pytest is configured to fail below 100 percent statement coverage. A passing
-coverage percentage is necessary but not sufficient: tests must still cover
-success, invalid input, expected operational failure, cancellation, and stale
-asynchronous completion where those behaviors apply.
+Pytest is configured to fail below 100 percent statement and branch coverage.
+A passing coverage percentage is necessary but not sufficient: tests must
+still cover success, invalid input, expected operational failure,
+cancellation, and stale asynchronous completion where those behaviors apply.
 
 ## Change procedure
 

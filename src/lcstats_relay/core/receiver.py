@@ -12,7 +12,7 @@ class EmptyPayloadError(ValueError):
 class StatsReceiver:
     """Receive one JSON payload from one SSE response."""
 
-    def __init__(self, url: str, client: httpx.AsyncClient) -> None:
+    def __init__(self, url: str, *, client: httpx.AsyncClient) -> None:
         """Configure the endpoint and shared asynchronous HTTP client."""
         self._url = url
         self._client = client

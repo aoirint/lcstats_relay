@@ -11,7 +11,7 @@ from uuid import uuid4
 from lcstats_relay.core.payload import JSONValue, RelayPayload, parse_json
 
 
-def _write_atomic(path: Path, content: str) -> None:
+def _write_atomic(path: Path, *, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(f"{path.suffix}.tmp")
     temporary.write_text(content, encoding="utf-8")
@@ -30,11 +30,11 @@ class ArchiveWriter:
         date_dir = self._root / received_at.strftime("%Y-%m-%d")
         filename = f"{received_at:%Y-%m-%dT%H-%M-%S-%f}-{uuid4().hex[:8]}.json"
         archive_path = date_dir / filename
-        _write_atomic(archive_path, f"{raw_json}\n")
+        _write_atomic(archive_path, content=f"{raw_json}\n")
         return archive_path
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, kw_only=True, slots=True)
 class RetryItem:
     """One failed output delivery stored for a later retry."""
 
@@ -53,8 +53,8 @@ class RetryQueue:
     def enqueue(
         self,
         output_key: str,
-        payload: RelayPayload,
         *,
+        payload: RelayPayload,
         queued_at: datetime,
     ) -> Path:
         """Persist a failed delivery and return the queue file path."""
@@ -68,7 +68,10 @@ class RetryQueue:
             "payload": payload.payload,
             "parse_error": payload.parse_error,
         }
-        _write_atomic(queue_path, f"{json.dumps(record, ensure_ascii=False, indent=2)}\n")
+        _write_atomic(
+            queue_path,
+            content=f"{json.dumps(record, ensure_ascii=False, indent=2)}\n",
+        )
         return queue_path
 
     def pending(self) -> list[RetryItem]:
@@ -85,7 +88,7 @@ class RetryQueue:
             if "payload" not in record:
                 msg = f"Retry queue record is missing required fields: {path.name}"
                 raise ValueError(msg)
-            items.append(self._load_item(path, record))
+            items.append(self._load_item(path, record=record))
         return items
 
     def remove(self, item: RetryItem) -> None:
@@ -101,7 +104,7 @@ class RetryQueue:
         return sum(item.output_key == output_key for item in self.pending())
 
     @staticmethod
-    def _load_item(path: Path, record: dict[str, JSONValue]) -> RetryItem:
+    def _load_item(path: Path, *, record: dict[str, JSONValue]) -> RetryItem:
         output_key = record.get("output_key", "gas")
         if not isinstance(output_key, str):
             msg = f"Retry queue output key must be a string: {path.name}"
