@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
-from lcstats_relay.core.payload import JSONValue, RelayPayload, parse_json
+from lcstats_relay.application.ports import RetryItem
+from lcstats_relay.domain.payload import JSONValue, RelayPayload, parse_json
 
 
 def _write_atomic(path: Path, *, content: str) -> None:
@@ -32,15 +32,6 @@ class ArchiveWriter:
         archive_path = date_dir / filename
         _write_atomic(archive_path, content=f"{raw_json}\n")
         return archive_path
-
-
-@dataclass(frozen=True, kw_only=True, slots=True)
-class RetryItem:
-    """One failed output delivery stored for a later retry."""
-
-    path: Path
-    output_key: str
-    payload: RelayPayload
 
 
 class RetryQueue:
@@ -93,7 +84,7 @@ class RetryQueue:
 
     def remove(self, item: RetryItem) -> None:
         """Remove a successfully delivered queue item."""
-        item.path.unlink(missing_ok=True)
+        Path(item.storage_key).unlink(missing_ok=True)
 
     def count(self, output_key: str | None = None) -> int:
         """Return all queued deliveries or those belonging to one output."""
@@ -130,7 +121,7 @@ class RetryQueue:
             msg = f"Retry queue parse error must be a string or null: {path.name}"
             raise TypeError(msg)
         return RetryItem(
-            path=path,
+            storage_key=str(path),
             output_key=output_key,
             payload=RelayPayload(
                 raw_json=raw_json,

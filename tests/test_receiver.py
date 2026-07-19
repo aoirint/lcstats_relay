@@ -5,7 +5,8 @@ import asyncio
 import httpx
 import pytest
 
-from lcstats_relay.core.receiver import EmptyPayloadError, StatsReceiver
+from lcstats_relay.application.ports import ReceiverError
+from lcstats_relay.infrastructure.receiver import EmptyPayloadError, StatsReceiver
 
 
 def test_receive_once_returns_data_payload() -> None:
@@ -50,7 +51,24 @@ def test_receive_once_raises_for_http_error() -> None:
         transport = httpx.MockTransport(lambda _request: httpx.Response(503))
         async with httpx.AsyncClient(transport=transport) as client:
             receiver = StatsReceiver("http://localhost:2145/", client=client)
-            with pytest.raises(httpx.HTTPStatusError):
+            with pytest.raises(ReceiverError, match="HTTP 503"):
+                await receiver.receive_once()
+
+    asyncio.run(scenario())
+
+
+def test_receive_once_redacts_transport_error_detail() -> None:
+    """Expose only the transport error type at the application boundary."""
+
+    async def handle(request: httpx.Request) -> httpx.Response:
+        detail = "secret endpoint detail"
+        raise httpx.ConnectError(detail, request=request)
+
+    async def scenario() -> None:
+        transport = httpx.MockTransport(handle)
+        async with httpx.AsyncClient(transport=transport) as client:
+            receiver = StatsReceiver("https://example.com/events", client=client)
+            with pytest.raises(ReceiverError, match=r"^ConnectError$"):
                 await receiver.receive_once()
 
     asyncio.run(scenario())

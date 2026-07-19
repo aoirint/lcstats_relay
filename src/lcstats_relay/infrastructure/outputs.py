@@ -1,54 +1,13 @@
-"""Pluggable output implementations and registration metadata."""
+"""Archive and Google Apps Script output adapters."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Protocol
-
 import httpx
 
-from lcstats_relay.core.auth import RequestAuthenticator
-from lcstats_relay.core.payload import RelayPayload
-from lcstats_relay.core.storage import ArchiveWriter
-
-
-class OutputDeliveryError(Exception):
-    """An output failure carrying safe UI text and retry eligibility."""
-
-    def __init__(self, message: str, *, retryable: bool) -> None:
-        """Retain a user-facing message without sensitive request details."""
-        super().__init__(message)
-        self.message = message
-        self.retryable = retryable
-
-
-@dataclass(frozen=True, kw_only=True, slots=True)
-class OutputReceipt:
-    """Output-specific success details for state and UI presentation."""
-
-    message: str
-
-
-class OutputSink(Protocol):
-    """Deliver one received payload to an output surface."""
-
-    async def deliver(self, payload: RelayPayload) -> OutputReceipt:
-        """Deliver a payload or raise OutputDeliveryError."""
-
-
-type OutputFactory = Callable[[httpx.AsyncClient], OutputSink]
-
-
-@dataclass(frozen=True, kw_only=True, slots=True)
-class OutputRegistration:
-    """Register an output implementation and its orchestration policy."""
-
-    key: str
-    label: str
-    build: OutputFactory
-    required: bool = False
-    queue_failures: bool = True
+from lcstats_relay.application.ports import OutputDeliveryError, OutputReceipt
+from lcstats_relay.domain.payload import RelayPayload
+from lcstats_relay.infrastructure.auth import RequestAuthenticator
+from lcstats_relay.infrastructure.storage import ArchiveWriter
 
 
 class ArchiveOutput:

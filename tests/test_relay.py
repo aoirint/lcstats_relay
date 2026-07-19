@@ -1,7 +1,7 @@
 """Tests for manager, dispatcher, outputs, authentication, and state."""
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -10,24 +10,30 @@ import httpx
 import pytest
 
 from lcstats_relay.app.composition import create_connection_manager
-from lcstats_relay.core.auth import NoAuthentication, QueryTokenAuthentication
-from lcstats_relay.core.dispatcher import BoundOutput, OutputDispatcher
-from lcstats_relay.core.outputs import (
-    ArchiveOutput,
-    GasOutput,
+from lcstats_relay.application.dispatcher import OutputDispatcher
+from lcstats_relay.application.ports import (
+    BoundOutput,
     OutputDeliveryError,
+    OutputPolicy,
     OutputReceipt,
-    OutputRegistration,
+    RelayRuntime,
 )
-from lcstats_relay.core.payload import JSONValue, RelayPayload
-from lcstats_relay.core.relay import ConnectionManager, _make_client
-from lcstats_relay.core.state import (
+from lcstats_relay.application.relay import ConnectionManager, RetryWorker, preview_payload
+from lcstats_relay.application.state import (
     ConnectionState,
     OutputStatus,
     RelayStateStore,
     RelayStatus,
 )
-from lcstats_relay.core.storage import ArchiveWriter, RetryQueue
+from lcstats_relay.domain.payload import JSONValue, RelayPayload
+from lcstats_relay.infrastructure.auth import NoAuthentication, QueryTokenAuthentication
+from lcstats_relay.infrastructure.outputs import ArchiveOutput, GasOutput
+from lcstats_relay.infrastructure.runtime import (
+    HttpOutputBinding,
+    HttpRelayRuntime,
+    make_http_client,
+)
+from lcstats_relay.infrastructure.storage import ArchiveWriter, RetryQueue
 
 _EXPECTED_RETRY_REQUESTS = 2
 
@@ -52,6 +58,14 @@ class _Sink:
         if self.fail is not None:
             raise self.fail
         return OutputReceipt(message=f"{self.name} ok {payload.raw_json}")
+
+
+@dataclass(frozen=True, kw_only=True)
+class _SinkFactory:
+    sink: _Sink
+
+    def __call__(self, _client: httpx.AsyncClient) -> _Sink:
+        return self.sink
 
 
 class _TransportHandler:
@@ -82,6 +96,33 @@ def _client_factory(handler: _TransportHandler) -> Callable[[httpx.Timeout], htt
         return httpx.AsyncClient(transport=httpx.MockTransport(handler))
 
     return create
+
+
+def _runtime_factory(
+    handler: _TransportHandler,
+    outputs: Sequence[tuple[OutputPolicy, _Sink]],
+) -> Callable[[], RelayRuntime]:
+    bindings = tuple(
+        HttpOutputBinding(
+            policy=policy,
+            build=_SinkFactory(sink=sink),
+        )
+        for policy, sink in outputs
+    )
+
+    def create() -> RelayRuntime:
+        return HttpRelayRuntime(
+            sse_url="http://localhost:2145/",
+            outputs=bindings,
+            client_factory=_client_factory(handler),
+        )
+
+    return create
+
+
+def _unused_runtime() -> RelayRuntime:
+    msg = "runtime should not be opened by this test"
+    raise AssertionError(msg)
 
 
 def _payload(raw_json: str = '{"Seed":42}') -> RelayPayload:
@@ -234,19 +275,17 @@ def test_dispatcher_handles_success_required_failure_and_queue(tmp_path: Path) -
         dispatcher = OutputDispatcher(
             [
                 BoundOutput(
-                    registration=OutputRegistration(
+                    policy=OutputPolicy(
                         key="archive",
                         label="ローカル保存",
-                        build=lambda _client: archive,
                         required=True,
                     ),
                     sink=archive,
                 ),
                 BoundOutput(
-                    registration=OutputRegistration(
+                    policy=OutputPolicy(
                         key="gas",
                         label="Google Sheets",
-                        build=lambda _client: gas,
                     ),
                     sink=gas,
                 ),
@@ -292,10 +331,9 @@ def test_dispatcher_retries_known_outputs_and_skips_unknown(tmp_path: Path) -> N
         dispatcher = OutputDispatcher(
             [
                 BoundOutput(
-                    registration=OutputRegistration(
+                    policy=OutputPolicy(
                         key="gas",
                         label="Google Sheets",
-                        build=lambda _client: gas,
                     ),
                     sink=gas,
                 )
@@ -343,10 +381,9 @@ def test_dispatcher_reports_queue_write_failure(
         dispatcher = OutputDispatcher(
             [
                 BoundOutput(
-                    registration=OutputRegistration(
+                    policy=OutputPolicy(
                         key="gas",
                         label="Google Sheets",
-                        build=lambda _client: gas,
                     ),
                     sink=gas,
                 )
@@ -376,27 +413,23 @@ def test_manager_dispatches_received_payload_to_registered_outputs(tmp_path: Pat
         payloads: list[JSONValue] = []
         archive = _Sink("archive", calls)
         gas = _Sink("gas", calls)
+        archive_policy = OutputPolicy(
+            key="archive",
+            label="ローカル保存",
+            required=True,
+        )
+        gas_policy = OutputPolicy(key="gas", label="Google Sheets")
         manager = ConnectionManager(
-            sse_url="http://localhost:2145/",
-            outputs=[
-                OutputRegistration(
-                    key="archive",
-                    label="ローカル保存",
-                    build=lambda _client: archive,
-                    required=True,
-                ),
-                OutputRegistration(
-                    key="gas",
-                    label="Google Sheets",
-                    build=lambda _client: gas,
-                ),
-            ],
-            data_dir=tmp_path,
+            output_policies=[archive_policy, gas_policy],
+            runtime_factory=_runtime_factory(
+                handler,
+                [(archive_policy, archive), (gas_policy, gas)],
+            ),
+            retry_queue=RetryQueue(tmp_path),
             on_state=states.append,
             on_payload=payloads.append,
             retry_interval=60,
             clock=lambda: datetime(2026, 6, 20, 9, 15, 33, tzinfo=UTC),
-            client_factory=_client_factory(handler),
         )
 
         manager.start()
@@ -427,26 +460,22 @@ def test_manager_archives_invalid_json_without_payload_callback(tmp_path: Path) 
                 "JSONを解析できないため送信しません: JSONDecodeError", retryable=False
             ),
         )
+        archive_policy = OutputPolicy(
+            key="archive",
+            label="ローカル保存",
+            required=True,
+        )
+        gas_policy = OutputPolicy(key="gas", label="Google Sheets")
         manager = ConnectionManager(
-            sse_url="http://localhost:2145/",
-            outputs=[
-                OutputRegistration(
-                    key="archive",
-                    label="ローカル保存",
-                    build=lambda _client: archive,
-                    required=True,
-                ),
-                OutputRegistration(
-                    key="gas",
-                    label="Google Sheets",
-                    build=lambda _client: gas,
-                ),
-            ],
-            data_dir=tmp_path,
+            output_policies=[archive_policy, gas_policy],
+            runtime_factory=_runtime_factory(
+                handler,
+                [(archive_policy, archive), (gas_policy, gas)],
+            ),
+            retry_queue=RetryQueue(tmp_path),
             on_state=lambda _state: None,
             on_payload=payloads.append,
             retry_interval=60,
-            client_factory=_client_factory(handler),
         )
 
         manager.start()
@@ -484,16 +513,19 @@ def test_manager_reconnects_after_receive_error(tmp_path: Path) -> None:
             sleeps.append(delay)
 
         manager = ConnectionManager(
-            sse_url="http://localhost:2145/",
-            outputs=[],
-            data_dir=tmp_path,
+            output_policies=[],
+            runtime_factory=lambda: HttpRelayRuntime(
+                sse_url="http://localhost:2145/",
+                outputs=[],
+                client_factory=lambda _timeout: httpx.AsyncClient(
+                    transport=httpx.MockTransport(handler),
+                ),
+            ),
+            retry_queue=RetryQueue(tmp_path),
             on_state=states.append,
             on_payload=lambda _payload: None,
             reconnect_delay=3,
             reconnect_sleep=sleep,
-            client_factory=lambda _timeout: httpx.AsyncClient(
-                transport=httpx.MockTransport(handler),
-            ),
         )
         manager.start()
         await _wait_for(lambda: any(state.status is RelayStatus.ERROR for state in states))
@@ -515,30 +547,25 @@ def test_retry_loop_reports_queue_read_errors(
     """Keep retry queue parsing failures observable outside output states."""
 
     async def scenario() -> None:
-        manager = ConnectionManager(
-            sse_url="http://localhost:2145/",
-            outputs=[],
-            data_dir=tmp_path,
-            on_state=lambda _state: None,
-            on_payload=lambda _payload: None,
-            retry_interval=0.001,
+        queue = RetryQueue(tmp_path)
+        state = RelayStateStore(
+            [],
+            on_change=lambda _state: None,
         )
-
-        async def retry_once() -> None:
-            dispatcher = OutputDispatcher(
-                [],
-                queue=manager._queue,
-                state=manager._state,
-            )
-            await manager._retry_loop(dispatcher)
+        dispatcher = OutputDispatcher([], queue=queue, state=state)
+        worker = RetryWorker(
+            dispatcher=dispatcher,
+            state=state,
+            interval=0.001,
+        )
 
         def fail_pending() -> list[object]:
             msg = "invalid queue"
             raise TypeError(msg)
 
-        monkeypatch.setattr(manager._queue, "pending", fail_pending)
-        task = asyncio.create_task(retry_once())
-        await _wait_for(lambda: manager.state.last_error == "再送キュー読込エラー: TypeError")
+        monkeypatch.setattr(queue, "pending", fail_pending)
+        task = asyncio.create_task(worker.run_forever())
+        await _wait_for(lambda: state.state.last_error == "再送キュー読込エラー: TypeError")
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
@@ -546,7 +573,7 @@ def test_retry_loop_reports_queue_read_errors(
     asyncio.run(scenario())
 
 
-def test_retry_loop_propagates_dispatcher_cancellation(tmp_path: Path) -> None:
+def test_retry_loop_propagates_dispatcher_cancellation() -> None:
     """Let dispatcher cancellation stop the retry loop immediately."""
 
     class CancellingDispatcher:
@@ -554,16 +581,13 @@ def test_retry_loop_propagates_dispatcher_cancellation(tmp_path: Path) -> None:
             raise asyncio.CancelledError
 
     async def scenario() -> None:
-        manager = ConnectionManager(
-            sse_url="http://localhost:2145/",
-            outputs=[],
-            data_dir=tmp_path,
-            on_state=lambda _state: None,
-            on_payload=lambda _payload: None,
-            retry_interval=0,
+        worker = RetryWorker(
+            dispatcher=CancellingDispatcher(),
+            state=RelayStateStore([], on_change=lambda _state: None),
+            interval=0,
         )
         with pytest.raises(asyncio.CancelledError):
-            await manager._retry_loop(CancellingDispatcher())  # type: ignore[arg-type]
+            await worker.run_forever()
 
     asyncio.run(scenario())
 
@@ -574,9 +598,9 @@ def test_stop_before_start_and_cancellation_paths(tmp_path: Path) -> None:
     async def scenario() -> None:
         states: list[ConnectionState] = []
         manager = ConnectionManager(
-            sse_url="http://localhost:2145/",
-            outputs=[],
-            data_dir=tmp_path,
+            output_policies=[],
+            runtime_factory=_unused_runtime,
+            retry_queue=RetryQueue(tmp_path),
             on_state=states.append,
             on_payload=lambda _payload: None,
         )
@@ -590,10 +614,9 @@ def test_stop_before_start_and_cancellation_paths(tmp_path: Path) -> None:
         dispatcher = OutputDispatcher(
             [
                 BoundOutput(
-                    registration=OutputRegistration(
+                    policy=OutputPolicy(
                         key="gas",
                         label="Google Sheets",
-                        build=lambda _client: CancelSink(),
                     ),
                     sink=CancelSink(),
                 )
@@ -612,7 +635,7 @@ def test_stop_before_start_and_cancellation_paths(tmp_path: Path) -> None:
 
 def test_preview_truncates_long_payload() -> None:
     """Keep event log previews bounded."""
-    preview = ConnectionManager._preview("x" * 301)
+    preview = preview_payload("x" * 301)
     assert preview == f"{'x' * 300}..."
 
 
@@ -621,7 +644,7 @@ def test_default_client_factory_uses_supplied_timeout() -> None:
 
     async def scenario() -> None:
         timeout = httpx.Timeout(30)
-        async with _make_client(timeout) as client:
+        async with make_http_client(timeout) as client:
             assert client.timeout == timeout
 
     asyncio.run(scenario())
@@ -629,6 +652,7 @@ def test_default_client_factory_uses_supplied_timeout() -> None:
 
 def test_app_composition_builds_standard_outputs(tmp_path: Path) -> None:
     """Assemble archive, GAS, and auth without putting those details in the UI."""
+    handler = _TransportHandler()
     manager = create_connection_manager(
         sse_url="http://localhost:2145/",
         gas_url="https://script.google.com/macros/s/id/exec",
@@ -636,17 +660,27 @@ def test_app_composition_builds_standard_outputs(tmp_path: Path) -> None:
         data_dir=tmp_path,
         on_state=lambda _state: None,
         on_payload=lambda _payload: None,
+        client_factory=_client_factory(handler),
     )
 
     assert isinstance(manager, ConnectionManager)
     assert list(manager.state.outputs) == ["archive", "gas"]
 
     async def scenario() -> None:
-        async with httpx.AsyncClient(
-            transport=httpx.MockTransport(lambda _request: httpx.Response(200)),
-        ) as client:
-            gas_output = manager._outputs[1].build(client)
-            assert isinstance(gas_output, GasOutput)
+        manager.start()
+        await _wait_for(lambda: manager.state.outputs["gas"].success_count == 1)
+        await manager.stop()
+
+    asyncio.run(scenario())
+    assert handler.post_count == 1
+
+
+def test_http_runtime_exit_before_entry_is_a_noop() -> None:
+    """Keep cleanup safe if an owner unwinds before opening resources."""
+
+    async def scenario() -> None:
+        runtime = HttpRelayRuntime(sse_url="https://example.com/events", outputs=[])
+        await runtime.__aexit__(None, None, None)
 
     asyncio.run(scenario())
 

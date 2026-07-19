@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from lcstats_relay.core.payload import RelayPayload, parse_json
-from lcstats_relay.core.storage import ArchiveWriter, RetryQueue
+from lcstats_relay.domain.payload import RelayPayload, parse_json
+from lcstats_relay.infrastructure.storage import ArchiveWriter, RetryQueue
 
 
 def test_archive_writer_preserves_raw_json(tmp_path: Path) -> None:
@@ -35,7 +35,7 @@ def test_retry_queue_round_trip(tmp_path: Path) -> None:
     assert queue.count("gas") == 1
     assert queue.count("archive") == 0
     [item] = queue.pending()
-    assert item.path == path
+    assert item.storage_key == str(path)
     assert item.output_key == "gas"
     assert item.payload == payload
 
