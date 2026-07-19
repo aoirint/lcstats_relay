@@ -2,7 +2,7 @@
 
 import asyncio
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -13,6 +13,7 @@ from lcstats_relay.core.config import DEFAULT_TRACKER_URL, RelaySettings, Settin
 from lcstats_relay.core.payload import JSONValue
 from lcstats_relay.core.state import ConnectionState, OutputState, OutputStatus, RelayStatus
 from lcstats_relay.ui.monitor import (
+    ManagerFactory,
     MonitorView,
     validate_data_dir,
     validate_gas_url,
@@ -45,25 +46,17 @@ class _FakeManager:
 
 def _factory_for(
     manager: _FakeManager,
-) -> Callable[
-    [
-        str,
-        str,
-        str,
-        Path,
-        Callable[[ConnectionState], None],
-        Callable[[JSONValue], None],
-    ],
-    _FakeManager,
-]:
-    def create(
-        _sse_url: str,
-        _gas_url: str,
-        _gas_token: str,
-        _data_dir: Path,
-        _on_state: Callable[[ConnectionState], None],
-        _on_payload: Callable[[JSONValue], None],
+) -> ManagerFactory:
+    def create(  # noqa: PLR0913 - fake mirrors the complete composition protocol.
+        *,
+        sse_url: str,
+        gas_url: str,
+        gas_token: str,
+        data_dir: Path,
+        on_state: Callable[[ConnectionState], None],
+        on_payload: Callable[[JSONValue], None],
     ) -> _FakeManager:
+        del sse_url, gas_url, gas_token, data_dir, on_state, on_payload
         return manager
 
     return create
@@ -133,7 +126,7 @@ def test_start_allows_connection_without_gas_destination(tmp_path: Path) -> None
         await view.start()
 
         assert view.error.value == ""
-        assert view.start_button.disabled is True
+        assert bool(view.start_button.disabled)
         assert manager.start_count == 1
         assert page.update_count == 1
 
@@ -176,22 +169,27 @@ def test_start_replaces_manager_and_stop_unlocks_settings(tmp_path: Path) -> Non
         managers: list[_FakeManager] = []
         arguments: list[tuple[str, str, str, Path]] = []
 
-        def factory(
+        def factory(  # noqa: PLR0913 - captures every composition argument for assertion.
+            *,
             sse_url: str,
             gas_url: str,
             gas_token: str,
             data_dir: Path,
-            _on_state: Callable[[ConnectionState], None],
-            _on_payload: Callable[[JSONValue], None],
+            on_state: Callable[[ConnectionState], None],
+            on_payload: Callable[[JSONValue], None],
         ) -> _FakeManager:
+            del on_state, on_payload
             arguments.append((sse_url, gas_url, gas_token, data_dir))
             manager = _FakeManager()
             managers.append(manager)
             return manager
 
         view = MonitorView(page, settings_store=_settings_store(tmp_path), manager_factory=factory)
-        view.save_settings(DEFAULT_TRACKER_URL, str(tmp_path))
-        view.save_gas_auth("https://script.google.com/macros/s/id/exec", "secret")
+        view.save_settings(DEFAULT_TRACKER_URL, data_dir=str(tmp_path))
+        view.save_gas_auth(
+            "https://script.google.com/macros/s/id/exec",
+            gas_token="secret",  # noqa: S106 - inert test fixture, not a credential.
+        )
         updates_before_start = page.update_count
 
         await view.start()
@@ -211,19 +209,19 @@ def test_start_replaces_manager_and_stop_unlocks_settings(tmp_path: Path) -> Non
         assert managers[0].stop_count == 1
         assert managers[1].start_count == 1
         assert view.start_button.disabled is True
-        assert view.stop_button.disabled is False
-        assert view.settings_button.disabled is True
-        assert view.gas_auth_button.disabled is True
+        assert not bool(view.stop_button.disabled)
+        assert bool(view.settings_button.disabled)
+        assert bool(view.gas_auth_button.disabled)
         assert page.update_count == updates_before_start + 2
 
         await view.stop()
         await view.stop()
 
         assert managers[1].stop_count == 1
-        assert view.start_button.disabled is False
-        assert view.stop_button.disabled is True
-        assert view.settings_button.disabled is False
-        assert view.gas_auth_button.disabled is False
+        assert not bool(view.start_button.disabled)
+        assert bool(view.stop_button.disabled)
+        assert not bool(view.settings_button.disabled)
+        assert not bool(view.gas_auth_button.disabled)
 
     asyncio.run(scenario())
 
@@ -239,7 +237,7 @@ def test_close_stops_active_manager(tmp_path: Path) -> None:
             settings_store=_settings_store(tmp_path),
             manager_factory=_factory_for(manager),
         )
-        view.save_gas_auth("https://script.google.com/macros/s/id/exec", "")
+        view.save_gas_auth("https://script.google.com/macros/s/id/exec", gas_token="")
         await view.start()
         updates_before_close = page.update_count
 
@@ -266,7 +264,7 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
         status=RelayStatus.DISPATCHING,
         running=True,
         receive_count=4,
-        last_received_at=datetime(2026, 6, 20, 9, 15, 33),
+        last_received_at=datetime(2026, 6, 20, 9, 15, 33, tzinfo=UTC),
         last_error="受信エラー: HTTP 503",
         outputs={
             "archive": OutputState(
@@ -275,7 +273,7 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
                 status=OutputStatus.SUCCESS,
                 success_count=3,
                 message="保存しました",
-                last_success_at=datetime(2026, 6, 20, 9, 15, 34),
+                last_success_at=datetime(2026, 6, 20, 9, 15, 34, tzinfo=UTC),
             ),
             "gas": OutputState(
                 key="gas",
@@ -469,12 +467,12 @@ def test_settings_view_links_to_full_window_gas_auth_view(tmp_path: Path) -> Non
     assert _active_heading(view) == "GAS認証"
     view.gas_url_field.value = "https://script.google.com/macros/s/id/exec"
     view.gas_token_field.value = "secret"
-    view._save_gas_auth_from_view()
+    view.submit_gas_auth()
     assert _active_heading(view) == "設定"
 
     view.tracker_url_field.value = "http://localhost:2145/"
     view.data_dir_field.value = str(tmp_path / "archive-root")
-    view._save_settings_from_view()
+    view.submit_settings()
     assert _active_heading(view) == "LCStats Relay Monitor"
 
     settings = store.load()
@@ -497,17 +495,17 @@ def test_full_window_view_save_errors_keep_active_view(tmp_path: Path) -> None:
 
     view.open_settings()
     view.data_dir_field.value = ""
-    view._save_settings_from_view()
+    view.submit_settings()
     assert _active_heading(view) == "設定"
     assert view.error.value == "ローカル保存先ディレクトリを指定してください"
 
     view.open_gas_auth()
-    view._save_gas_auth_from_view()
+    view.submit_gas_auth()
     assert _active_heading(view) == "設定"
     assert view.error.value == ""
 
     view.open_gas_auth()
     view.gas_url_field.value = "https://example.com/macros/s/id/exec"
-    view._save_gas_auth_from_view()
+    view.submit_gas_auth()
     assert _active_heading(view) == "GAS認証"
     assert view.error.value == "GAS URLにはscript.google.comのHTTPS URLを指定してください"

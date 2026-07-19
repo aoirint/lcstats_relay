@@ -26,7 +26,7 @@ class _FakePage:
         self.title: str | None = None
         self.window = _FakeWindow()
         self.padding: int | None = None
-        self.on_close = None
+        self.on_close: object | None = None
         self.controls: list[ft.Control] = []
 
     def add(self, *controls: ft.Control) -> None:

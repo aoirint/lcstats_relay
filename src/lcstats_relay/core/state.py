@@ -28,7 +28,7 @@ class OutputStatus(StrEnum):
     RETRY_QUEUED = "retry_queued"
 
 
-@dataclass(slots=True)
+@dataclass(kw_only=True, slots=True)
 class OutputState:
     """Observable status and counters for one output."""
 
@@ -43,7 +43,7 @@ class OutputState:
     message: str = "待機中"
 
 
-@dataclass(slots=True)
+@dataclass(kw_only=True, slots=True)
 class ConnectionState:
     """Observable receiver state with independently managed output states."""
 
@@ -66,8 +66,8 @@ class RelayStateStore:
     def __init__(
         self,
         outputs: Iterable[tuple[str, str]],
-        on_change: StateCallback,
         *,
+        on_change: StateCallback,
         pending_counts: Mapping[str, int] | None = None,
     ) -> None:
         """Initialize output state entries and a snapshot callback."""

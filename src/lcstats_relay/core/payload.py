@@ -15,7 +15,7 @@ def parse_json(raw_json: str) -> JSONValue:
     return cast("JSONValue", json.loads(raw_json))
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, kw_only=True, slots=True)
 class RelayPayload:
     """One received payload, including an optional parsing failure."""
 

@@ -23,7 +23,7 @@ class OutputDeliveryError(Exception):
         self.retryable = retryable
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, kw_only=True, slots=True)
 class OutputReceipt:
     """Output-specific success details for state and UI presentation."""
 
@@ -40,7 +40,7 @@ class OutputSink(Protocol):
 type OutputFactory = Callable[[httpx.AsyncClient], OutputSink]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, kw_only=True, slots=True)
 class OutputRegistration:
     """Register an output implementation and its orchestration policy."""
 
@@ -74,6 +74,7 @@ class GasOutput:
     def __init__(
         self,
         url: str,
+        *,
         client: httpx.AsyncClient,
         authenticator: RequestAuthenticator,
     ) -> None:

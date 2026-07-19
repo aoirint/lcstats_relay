@@ -1,7 +1,7 @@
 """Tests for archive and retry queue persistence."""
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -12,7 +12,7 @@ from lcstats_relay.core.storage import ArchiveWriter, RetryQueue
 
 def test_archive_writer_preserves_raw_json(tmp_path: Path) -> None:
     """Store the exact received object in a date-partitioned archive."""
-    received_at = datetime(2026, 6, 20, 9, 15, 33)
+    received_at = datetime(2026, 6, 20, 9, 15, 33, tzinfo=UTC)
     path = ArchiveWriter(tmp_path).write('{"Seed":42}', received_at=received_at)
 
     assert path.parent == tmp_path / "archive" / "2026-06-20"
@@ -22,14 +22,14 @@ def test_archive_writer_preserves_raw_json(tmp_path: Path) -> None:
 def test_retry_queue_round_trip(tmp_path: Path) -> None:
     """Load and remove a queued payload without changing its JSON value."""
     queue = RetryQueue(tmp_path)
-    received_at = datetime(2026, 6, 20, 10, 8, 12)
+    received_at = datetime(2026, 6, 20, 10, 8, 12, tzinfo=UTC)
     payload = RelayPayload(
         raw_json='{"Seed":42,"Players":["player-1"]}',
         payload={"Seed": 42, "Players": ["player-1"]},
         received_at=received_at,
     )
 
-    path = queue.enqueue("gas", payload, queued_at=received_at)
+    path = queue.enqueue("gas", payload=payload, queued_at=received_at)
 
     assert queue.count() == 1
     assert queue.count("gas") == 1
@@ -65,7 +65,7 @@ def test_retry_queue_loads_legacy_record(tmp_path: Path) -> None:
     assert item.output_key == "gas"
     assert item.payload.raw_json == '{"Seed":42}'
     assert item.payload.payload == {"Seed": 42}
-    assert item.payload.received_at == datetime(2026, 6, 20, 10, 8, 12)
+    assert item.payload.received_at == datetime.fromisoformat("2026-06-20T10:08:12")
 
 
 @pytest.mark.parametrize(

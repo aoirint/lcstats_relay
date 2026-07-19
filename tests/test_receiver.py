@@ -16,7 +16,7 @@ def test_receive_once_returns_data_payload() -> None:
             lambda _request: httpx.Response(200, text='data: {"Seed": 42}\n\n'),
         )
         async with httpx.AsyncClient(transport=transport) as client:
-            receiver = StatsReceiver("http://localhost:2145/", client)
+            receiver = StatsReceiver("http://localhost:2145/", client=client)
             assert await receiver.receive_once() == '{"Seed": 42}'
 
     asyncio.run(scenario())
@@ -35,7 +35,7 @@ def test_receive_once_uses_configured_endpoint() -> None:
 
         transport = httpx.MockTransport(handle)
         async with httpx.AsyncClient(transport=transport) as client:
-            receiver = StatsReceiver("http://localhost:2145/", client)
+            receiver = StatsReceiver("http://localhost:2145/", client=client)
             assert await receiver.receive_once() == '{"Seed": 42}'
 
         assert seen_url == "http://localhost:2145/"
@@ -49,7 +49,7 @@ def test_receive_once_raises_for_http_error() -> None:
     async def scenario() -> None:
         transport = httpx.MockTransport(lambda _request: httpx.Response(503))
         async with httpx.AsyncClient(transport=transport) as client:
-            receiver = StatsReceiver("http://localhost:2145/", client)
+            receiver = StatsReceiver("http://localhost:2145/", client=client)
             with pytest.raises(httpx.HTTPStatusError):
                 await receiver.receive_once()
 
@@ -62,7 +62,7 @@ def test_receive_once_rejects_response_without_data() -> None:
     async def scenario() -> None:
         transport = httpx.MockTransport(lambda _request: httpx.Response(200, text=": ping\n\n"))
         async with httpx.AsyncClient(transport=transport) as client:
-            receiver = StatsReceiver("http://localhost:2145/", client)
+            receiver = StatsReceiver("http://localhost:2145/", client=client)
             with pytest.raises(EmptyPayloadError):
                 await receiver.receive_once()
 

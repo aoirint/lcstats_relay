@@ -61,17 +61,20 @@ class ManagerPort(Protocol):
         """Stop receiving payloads."""
 
 
-type ManagerFactory = Callable[
-    [
-        str,
-        str,
-        str,
-        Path,
-        Callable[[ConnectionState], None],
-        Callable[[JSONValue], None],
-    ],
-    ManagerPort,
-]
+class ManagerFactory(Protocol):
+    """Create a connection manager from validated settings and callbacks."""
+
+    def __call__(  # noqa: PLR0913 - the composition boundary receives one complete session.
+        self,
+        *,
+        sse_url: str,
+        gas_url: str,
+        gas_token: str,
+        data_dir: Path,
+        on_state: Callable[[ConnectionState], None],
+        on_payload: Callable[[JSONValue], None],
+    ) -> ManagerPort:
+        """Build one manager for a connection session."""
 
 
 def validate_sse_url(value: str) -> str:
@@ -191,15 +194,15 @@ class MonitorView:
         """Switch to the full-window tracker, storage, and output settings view."""
         self.tracker_url_field.value = self._settings.tracker_url
         self.data_dir_field.value = str(self._settings.data_dir)
-        self._show_settings_view(update=True)
+        self._show_settings_view()
 
     def open_gas_auth(self, _event: object | None = None) -> None:
         """Switch to the full-window Google Apps Script settings view."""
         self.gas_url_field.value = self._settings.gas_url
         self.gas_token_field.value = self._gas_token
-        self._show_gas_auth_view(update=True)
+        self._show_gas_auth_view()
 
-    def save_settings(self, tracker_url: str, data_dir: str) -> None:
+    def save_settings(self, tracker_url: str, *, data_dir: str) -> None:
         """Validate and persist tracker plus local storage settings."""
         self._settings = RelaySettings(
             tracker_url=validate_sse_url(tracker_url),
@@ -211,7 +214,7 @@ class MonitorView:
         self._refresh_settings_summary()
         self._page.update()
 
-    def save_gas_auth(self, gas_url: str, gas_token: str) -> None:
+    def save_gas_auth(self, gas_url: str, *, gas_token: str) -> None:
         """Validate and persist the GAS destination while keeping the token in memory."""
         normalized_gas_url = validate_gas_url(gas_url) if gas_url.strip() else ""
         self._settings = RelaySettings(
@@ -241,12 +244,12 @@ class MonitorView:
         if self._manager is not None:
             await self._manager.stop()
         self._manager = self._manager_factory(
-            tracker_url,
-            gas_url,
-            self._gas_token,
-            data_dir,
-            self.update_state,
-            self.add_payload,
+            sse_url=tracker_url,
+            gas_url=gas_url,
+            gas_token=self._gas_token,
+            data_dir=data_dir,
+            on_state=self.update_state,
+            on_payload=self.add_payload,
         )
         self.error.value = ""
         self.start_button.disabled = True
@@ -319,7 +322,7 @@ class MonitorView:
         if update:
             self._page.update()
 
-    def _show_settings_view(self, *, update: bool) -> None:
+    def _show_settings_view(self) -> None:
         self.root_view.controls = [
             self._full_view_title("設定"),
             ft.Column(
@@ -327,13 +330,13 @@ class MonitorView:
                     self.error,
                     self._settings_section(
                         "接続元",
-                        [
+                        controls=[
                             self.tracker_url_field,
                         ],
                     ),
                     self._settings_section(
                         "出力先",
-                        [
+                        controls=[
                             self.data_dir_field,
                             self._gas_output_setting_row(),
                         ],
@@ -347,17 +350,16 @@ class MonitorView:
                     ft.FilledButton(
                         "保存",
                         icon=ft.Icons.SAVE,
-                        on_click=self._save_settings_from_view,
+                        on_click=self.submit_settings,
                     ),
                 ],
                 alignment=ft.MainAxisAlignment.END,
             ),
         ]
-        if update:
-            self._page.update()
+        self._page.update()
 
     @staticmethod
-    def _settings_section(title: str, controls: list[ft.Control]) -> ft.Column:
+    def _settings_section(title: str, *, controls: list[ft.Control]) -> ft.Column:
         return ft.Column(
             [
                 ft.Text(title, size=13, weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_700),
@@ -382,7 +384,7 @@ class MonitorView:
             padding=2,
         )
 
-    def _show_gas_auth_view(self, *, update: bool) -> None:
+    def _show_gas_auth_view(self) -> None:
         self.root_view.controls = [
             self._full_view_title("GAS認証"),
             self.gas_url_field,
@@ -392,14 +394,13 @@ class MonitorView:
                     ft.FilledButton(
                         "保存",
                         icon=ft.Icons.SAVE,
-                        on_click=self._save_gas_auth_from_view,
+                        on_click=self.submit_gas_auth,
                     ),
                 ],
                 wrap=True,
             ),
         ]
-        if update:
-            self._page.update()
+        self._page.update()
 
     def _full_view_title(self, title: str) -> ft.Row:
         return ft.Row(
@@ -417,11 +418,12 @@ class MonitorView:
     def _open_gas_auth_from_settings(self, _event: object | None = None) -> None:
         self.open_gas_auth()
 
-    def _save_settings_from_view(self, _event: object | None = None) -> None:
+    def submit_settings(self, _event: object | None = None) -> None:
+        """Validate the visible settings fields and return to the monitor on success."""
         try:
             self.save_settings(
                 self.tracker_url_field.value or "",
-                self.data_dir_field.value or "",
+                data_dir=self.data_dir_field.value or "",
             )
         except ValueError as exc:
             self.error.value = str(exc)
@@ -429,11 +431,12 @@ class MonitorView:
             return
         self._show_monitor_view(update=True)
 
-    def _save_gas_auth_from_view(self, _event: object | None = None) -> None:
+    def submit_gas_auth(self, _event: object | None = None) -> None:
+        """Validate the visible GAS fields and return to settings on success."""
         try:
             self.save_gas_auth(
                 self.gas_url_field.value or "",
-                self.gas_token_field.value or "",
+                gas_token=self.gas_token_field.value or "",
             )
         except ValueError as exc:
             self.error.value = str(exc)
