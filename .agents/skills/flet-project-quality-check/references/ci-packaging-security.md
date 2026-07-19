@@ -34,6 +34,11 @@ Use `github-actions-quality-check` and `security-check` while implementing this 
   credentials in separately triggered, protected jobs/environments.
 - Keep CI commands equal to the documented local commands. CI-only hidden flags and local-only
   shortcuts are findings.
+- Select runners per job with `github-actions-quality-check`. Prefer `ubuntu-slim` for Flet project
+  lint, type-check, and unit-test jobs only after a representative run shows they fit its
+  unprivileged container, minimal tool set, single CPU, 5 GB RAM, and 15-minute limit. Keep Flet or
+  Flutter desktop/mobile builds on a full platform runner; their native toolchains and resource use
+  are not lightweight automation.
 - Extract repeated, repository-owned setup into a local Composite Action when multiple workflows
   need the exact same lock verification, sync, or tool installation. Keep behavior-changing checks
   in the workflows that own their result. The bundled checker follows reachable local Composite
@@ -65,7 +70,9 @@ concurrency:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    # Start on an explicit full VM until a representative run proves that the
+    # complete job fits ubuntu-slim's environment and 15-minute hard limit.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Check out repository
@@ -109,6 +116,10 @@ jobs:
       - name: Test with full coverage
         run: uv run --locked pytest
 ```
+
+After a representative slim run proves compatibility and sufficient duration/resource headroom,
+change that job to `runs-on: ubuntu-slim` and set `timeout-minutes` to at most `15`. Do not infer
+slim suitability from the same commands running quickly on a multi-CPU full VM.
 
 Use one job when duplicate environment setup provides no isolation value. Split workflows or jobs
 only for a real platform/matrix boundary or when independent failure reporting justifies the cost.

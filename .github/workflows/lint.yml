@@ -23,8 +23,10 @@ defaults:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Lint installs its reviewed tools explicitly and performs no native build,
+    # so it fits the lightweight, unprivileged runner contract.
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
 
     steps:
       - name: Check out repository

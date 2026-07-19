@@ -14,6 +14,11 @@ description: Quality-check GitHub Actions workflows and composite actions. Use w
 3. Check workflow and job `permissions`. Start from `contents: read`, grant only required access, and document unusual write access.
 4. Check concurrency groups and cancellation rules for PRs, pushes, releases, merge queues, and publishing.
 5. Check runner labels, local composite actions, expressions, comments, cache paths, and suppressions.
+   Read [runner-selection.md](references/runner-selection.md) when selecting or changing a
+   GitHub-hosted Linux runner. Prefer `ubuntu-slim` for measured lightweight jobs that fit its
+   container, resource, software, and 15-minute limits. Use a full VM image for heavyweight builds
+   or unsupported operations, and use `ubuntu-latest` only when following GitHub's moving stable
+   image is intentional rather than incidental.
    Validate every action input against the documentation or metadata for the exact pinned action
    version; do not infer an input name from a different action, tool, or release. Add
    `.github/actionlint.yaml` only for deliberate labels or variables that actionlint cannot infer.
