@@ -11,9 +11,9 @@ directly.
 - `apm.yml` pins the selected public
   [aoirint/skills](https://github.com/aoirint/skills); `apm.lock.yaml` records
   their resolved commits and content hashes.
-- The initial pin is an explicit maintainer-directed exception to the normal
-  seven-day dependency cooldown so this repository can adopt the current Flet
-  quality baseline immediately.
+- A maintainer may explicitly direct this repository to use the current
+  `aoirint/skills` main commit before the normal seven-day cooldown. Record the
+  exception in the pull request and retain an exact full commit pin.
 - To restore the committed Skill set, run `apm install --frozen` from the
   repository root, then run `apm audit --ci`.
 - Make all Skill changes in the public
