@@ -30,3 +30,20 @@ directly.
 - Before confirming the merge, set the squash commit title to
   `<pull request title> (#<number>)`, including the pull request number as in
   GitHub's default squash-merge title.
+
+## Documentation
+
+- Use `docs/README.md` as the developer documentation index.
+- Put external systems, protocols, and behavioral contracts in `docs/domain/`.
+- Put component boundaries, dependency direction, state ownership, and design
+  decisions in `docs/architecture/`.
+- Put reproducible development, verification, recovery, and release procedures
+  in `docs/operations/`.
+- Keep the fixed directories above even when one is temporarily small. New
+  subdirectories are allowed when a topic outgrows a single document.
+- Update the owning document in the same change as the behavior it describes.
+  Do not copy one fact into several documents; link to its canonical owner.
+- Record current behavior as current behavior. Label proposed designs, known
+  limitations, and unverified release assumptions explicitly.
+- Use `software-documentation-maintenance` for documentation-system changes and
+  `prose-quality-check` for wording review.
