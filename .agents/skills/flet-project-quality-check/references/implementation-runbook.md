@@ -23,7 +23,9 @@ lower the baseline.
 3. List source modules with line counts and import edges. Identify entry points, composition roots,
    state owners, Flet imports, external adapters, task creation, update calls, private-member access,
    suppressions, broad exceptions, settings/secrets, and generated output.
-4. Run `uv run --locked --script <skill-root>/scripts/check_project.py <root>`. Record its findings
+4. Run
+   `uv run --no-project --no-config --locked --script <skill-root>/scripts/check_project.py <root>`.
+   Record its findings
    as `mechanical`; do not mix them with semantic findings or edit before the evidence ledger
    exists.
 5. For `plan-only`, complete the same inventory but label uninspected runtime/settings evidence
@@ -177,7 +179,7 @@ Run applicable rows and record exact commands/results.
 
 | Surface | Required verification |
 | --- | --- |
-| Mechanical baseline | `uv run --locked --script <skill-root>/scripts/check_project.py .` and finding review |
+| Mechanical baseline | `uv run --no-project --no-config --locked --script <skill-root>/scripts/check_project.py .` and finding review |
 | Lock/dependencies | `uv lock --check`; reviewed lock delta; `uv sync --locked --all-groups` |
 | Python lint | `uv run --locked ruff check .` with no warnings/errors |
 | Python formatting | `uv run --locked ruff format --check .` |

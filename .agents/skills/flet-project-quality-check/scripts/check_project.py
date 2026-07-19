@@ -54,6 +54,7 @@ REQUIRED_CI_COMMANDS = (
     "uv run --locked mypy",
     "uv run --locked pytest",
 )
+USES_PATTERN = re.compile(r"""\buses:\s*["']?([^\s#"']+)""")
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,9 +97,7 @@ class Checker:
             self._check_pyproject(pyproject_path)
         self._check_python_layout()
         self._check_workflows()
-        return sorted(
-            self.findings, key=lambda item: (item.path, item.code, item.message)
-        )
+        return sorted(self.findings, key=lambda item: (item.path, item.code, item.message))
 
     def _check_pyproject(self, path: Path) -> None:
         try:
@@ -128,10 +127,7 @@ class Checker:
             "project.requires-python must define the supported range",
         )
 
-        runtime = {
-            _dependency_name(value)
-            for value in _string_list(project.get("dependencies"))
-        }
+        runtime = {_dependency_name(value) for value in _string_list(project.get("dependencies"))}
         self.require(
             "flet" in runtime,
             "flet-dependency",
@@ -300,7 +296,7 @@ class Checker:
         try:
             text = file.read_text(encoding="utf-8")
             tree = ast.parse(text, filename=relative)
-        except (OSError, UnicodeError, SyntaxError):
+        except OSError, UnicodeError, SyntaxError:
             return
         lines = text.splitlines()
         for node in ast.walk(tree):
@@ -309,13 +305,9 @@ class Checker:
             positional = [*node.args.posonlyargs, *node.args.args]
             if positional and positional[0].arg in {"self", "cls"}:
                 positional = positional[1:]
-            if len(positional) <= 1 or (
-                node.name.startswith("__") and node.name.endswith("__")
-            ):
+            if len(positional) <= 1 or (node.name.startswith("__") and node.name.endswith("__")):
                 continue
-            decorator_names = {
-                _decorator_name(decorator) for decorator in node.decorator_list
-            }
+            decorator_names = {_decorator_name(decorator) for decorator in node.decorator_list}
             if "override" in decorator_names:
                 continue
             first_line = min(
@@ -346,7 +338,9 @@ class Checker:
         )
         if not workflows:
             return
-        combined = "\n".join(path.read_text(encoding="utf-8") for path in workflows)
+        workflow_text = "\n".join(path.read_text(encoding="utf-8") for path in workflows)
+        ci_files = self._collect_ci_files(workflows)
+        combined = "\n".join(path.read_text(encoding="utf-8") for path in ci_files)
         for command in REQUIRED_CI_COMMANDS:
             self.require(
                 command in combined,
@@ -355,29 +349,26 @@ class Checker:
                 f"workflow must run: {command}",
             )
         self.require(
-            re.search(r"(?m)^permissions:\s*\n\s+contents:\s*read\s*$", combined)
-            is not None,
+            re.search(r"(?m)^permissions:\s*\n\s+contents:\s*read\s*$", workflow_text) is not None,
             "ci-permissions",
             ".github/workflows",
             "workflow permissions must include contents: read",
         )
         self.require(
-            "persist-credentials: false" in combined,
+            "persist-credentials: false" in workflow_text,
             "checkout-credentials",
             ".github/workflows",
             "checkout must disable persisted credentials",
         )
         self.require(
-            "timeout-minutes:" in combined,
+            "timeout-minutes:" in workflow_text,
             "ci-timeout",
             ".github/workflows",
             "jobs must have an explicit timeout",
         )
-        for path in workflows:
-            for line_number, line in enumerate(
-                path.read_text(encoding="utf-8").splitlines(), 1
-            ):
-                match = re.search(r"\buses:\s*([^\s#]+)", line)
+        for path in ci_files:
+            for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                match = USES_PATTERN.search(line)
                 if match is None or match.group(1).startswith("./"):
                     continue
                 value = match.group(1)
@@ -388,10 +379,67 @@ class Checker:
                         "external action/reusable workflow must use a full commit SHA",
                     )
 
+    def _collect_ci_files(self, workflows: list[Path]) -> list[Path]:
+        """Follow repository-local actions and reusable workflows from CI roots."""
+        repository_root = self.root.resolve()
+        pending = list(reversed(workflows))
+        collected: list[Path] = []
+        seen: set[Path] = set()
+        while pending:
+            path = pending.pop().resolve()
+            if path in seen:
+                continue
+            seen.add(path)
+            collected.append(path)
+            for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                match = USES_PATTERN.search(line)
+                if match is None or not match.group(1).startswith("./"):
+                    continue
+                referenced = (repository_root / match.group(1)[2:]).resolve()
+                relative_source = path.relative_to(repository_root).as_posix()
+                if not referenced.is_relative_to(repository_root):
+                    self.add(
+                        "local-action-path",
+                        f"{relative_source}:{line_number}",
+                        "repository-local action/workflow reference escapes the repository",
+                    )
+                    continue
+                target = _resolve_local_ci_file(referenced)
+                if target is None:
+                    self.add(
+                        "local-action-missing",
+                        f"{relative_source}:{line_number}",
+                        f"repository-local action/workflow does not resolve: {match.group(1)}",
+                    )
+                    continue
+                target = target.resolve()
+                if not target.is_relative_to(repository_root):
+                    self.add(
+                        "local-action-path",
+                        f"{relative_source}:{line_number}",
+                        "repository-local action/workflow resolves outside the repository",
+                    )
+                    continue
+                if target not in seen:
+                    pending.append(target)
+        return collected
+
 
 def _table(value: dict[str, Any], key: str) -> dict[str, Any]:
     child = value.get(key)
     return child if isinstance(child, dict) else {}
+
+
+def _resolve_local_ci_file(path: Path) -> Path | None:
+    if path.is_file() and path.suffix in {".yaml", ".yml"}:
+        return path
+    if not path.is_dir():
+        return None
+    for name in ("action.yml", "action.yaml"):
+        candidate = path / name
+        if candidate.is_file():
+            return candidate
+    return None
 
 
 def _string_list(value: object) -> list[str]:
@@ -421,9 +469,7 @@ def main() -> int:
     """Run the command-line checker."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", type=Path, help="Python Flet repository root")
-    parser.add_argument(
-        "--json", action="store_true", help="emit machine-readable JSON"
-    )
+    parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     args = parser.parse_args()
     root = args.root.resolve()
     if not root.is_dir():
