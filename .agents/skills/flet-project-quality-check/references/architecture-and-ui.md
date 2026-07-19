@@ -127,6 +127,10 @@ Model UI behavior as a deterministic transition wherever possible:
 
 - Use async handlers for async work and non-blocking APIs inside the Flet event loop. Never call
   `time.sleep`, blocking HTTP, or unbounded filesystem work from an async UI path.
+- When a required adapter exposes only synchronous filesystem or library calls, offload it at the
+  infrastructure boundary with `asyncio.to_thread` or an owned executor. Cancellation does not stop
+  an already-running worker function, so make its write/result safe to finish late and prevent that
+  late completion from publishing stale UI state.
 - Give every task a named owner and lifetime: application, page session, route/view, or component.
   Record where it starts, how repeated starts behave, how cancellation is requested, which cleanup
   is awaited, and when the reference is cleared.
@@ -166,16 +170,28 @@ Model UI behavior as a deterministic transition wherever possible:
 ## Persistence, I/O, and errors
 
 - Use platform-supported application data/config/cache locations. Do not depend on the current
-  working directory in a packaged app.
+  working directory in a packaged app. Apply a stable platform default to new or incomplete
+  settings; preserve an explicitly saved legacy path unless the product defines and tests a visible
+  migration.
 - Keep secrets out of ordinary settings JSON, URLs, logs, exceptions, screenshots, and crash data.
   Use an OS credential store or a documented ephemeral entry policy; `security-check` owns the
   concrete choice.
 - Validate external URLs, paths, payloads, and schemas at the adapter boundary. Preserve raw input
   only when the product needs it and storage/logging policy permits it.
-- Write durable files atomically: create a same-filesystem temporary file with restrictive access,
-  flush as required, replace, and define recovery for partial/corrupt state.
-- Give network calls connect/read/write/total timeouts as applicable. Bound response size and retry
-  behavior, and never retry non-idempotent work without an idempotency/deduplication contract.
+- Write durable files atomically: create a unique same-directory temporary file with restrictive
+  access, flush and `fsync` file contents as required, replace the final path, clean up the temporary
+  file on failure, and define recovery for corrupt state. Do not use one fixed sibling `.tmp` name
+  that concurrent writers can collide on. Do not claim power-loss durability unless directory
+  metadata persistence is also addressed on the supported filesystems.
+- Give network calls connect/read/write/total timeouts as applicable. A long-lived stream may need an
+  unlimited read deadline; if it shares a client with ordinary requests, enforce a separate total
+  deadline around each ordinary operation. Bound decompressed response bytes and the actual framing
+  unit the parser buffers (line, event, message, or document), and reject invalid encoding/schema at
+  that boundary.
+- Do not add automatic retry for non-idempotent work without an idempotency or deduplication
+  contract. In brownfield code, preserve an existing at-least-once queue only when compatibility or
+  recovery requirements justify it: model the guarantee explicitly, retain a durable recovery
+  source, document duplicate risk and operator handling, and never describe it as exactly-once.
 - Translate low-level failures into typed application errors. Log diagnostic context separately from
   a stable, actionable user message. Preserve exception causality without leaking secrets.
 - Make shutdown close clients, files, task owners, and subscriptions exactly once. Test partial
@@ -192,9 +208,10 @@ Require tests that prove:
 - Flet adapters emit the intended intent and render semantic properties without positional tree
   traversal;
 - mount/unmount, route replacement, repeated actions, and window close leave no live tasks;
-- persistence round-trips, corrupt/truncated input, atomic replacement, and platform paths behave as
-  documented;
-- external adapters enforce timeouts, validation, authentication, redaction, and failure mapping;
+- persistence round-trips, corrupt/truncated input, unique temporary cleanup, replacement failure,
+  concurrent writers, and new/legacy platform paths behave as documented;
+- external adapters enforce operation-specific timeouts, framing and size limits, encoding/schema
+  validation, authentication, redaction, retry guarantees, and failure mapping;
 - supported window sizes, navigation paths, keyboard/focus behavior, and accessibility semantics
   receive a targeted manual or automated UI check.
 

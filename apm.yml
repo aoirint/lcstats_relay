@@ -11,20 +11,20 @@ targets:
 - codex
 dependencies:
   apm:
-  - aoirint/skills/.apm/skills/apm-usage#aad2db0b6608c422db960013061654d1f02d9eeb
-  - aoirint/skills/.apm/skills/changelog-workflow#aad2db0b6608c422db960013061654d1f02d9eeb
-  - aoirint/skills/.apm/skills/code-quality-check#aad2db0b6608c422db960013061654d1f02d9eeb
-  - aoirint/skills/.apm/skills/commit-message-quality-check#aad2db0b6608c422db960013061654d1f02d9eeb
-  - aoirint/skills/.apm/skills/flet-project-quality-check#aad2db0b6608c422db960013061654d1f02d9eeb
-  - aoirint/skills/.apm/skills/git-worktree-workflow#aad2db0b6608c422db960013061654d1f02d9eeb
-  - aoirint/skills/.apm/skills/github-actions-quality-check#aad2db0b6608c422db960013061654d1f02d9eeb
-  - aoirint/skills/.apm/skills/gitignore-workflow#aad2db0b6608c422db960013061654d1f02d9eeb
-  - aoirint/skills/.apm/skills/issue-quality-check#aad2db0b6608c422db960013061654d1f02d9eeb
-  - aoirint/skills/.apm/skills/prose-quality-check#aad2db0b6608c422db960013061654d1f02d9eeb
-  - aoirint/skills/.apm/skills/pull-request-quality-check#aad2db0b6608c422db960013061654d1f02d9eeb
-  - aoirint/skills/.apm/skills/release-note-workflow#aad2db0b6608c422db960013061654d1f02d9eeb
-  - aoirint/skills/.apm/skills/security-check#aad2db0b6608c422db960013061654d1f02d9eeb
-  - aoirint/skills/.apm/skills/software-documentation-maintenance#aad2db0b6608c422db960013061654d1f02d9eeb
+  - aoirint/skills/.apm/skills/apm-usage#f44dff25f3fa0fec3240448642bcb5590e384c55
+  - aoirint/skills/.apm/skills/changelog-workflow#f44dff25f3fa0fec3240448642bcb5590e384c55
+  - aoirint/skills/.apm/skills/code-quality-check#f44dff25f3fa0fec3240448642bcb5590e384c55
+  - aoirint/skills/.apm/skills/commit-message-quality-check#f44dff25f3fa0fec3240448642bcb5590e384c55
+  - aoirint/skills/.apm/skills/flet-project-quality-check#f44dff25f3fa0fec3240448642bcb5590e384c55
+  - aoirint/skills/.apm/skills/git-worktree-workflow#f44dff25f3fa0fec3240448642bcb5590e384c55
+  - aoirint/skills/.apm/skills/github-actions-quality-check#f44dff25f3fa0fec3240448642bcb5590e384c55
+  - aoirint/skills/.apm/skills/gitignore-workflow#f44dff25f3fa0fec3240448642bcb5590e384c55
+  - aoirint/skills/.apm/skills/issue-quality-check#f44dff25f3fa0fec3240448642bcb5590e384c55
+  - aoirint/skills/.apm/skills/prose-quality-check#f44dff25f3fa0fec3240448642bcb5590e384c55
+  - aoirint/skills/.apm/skills/pull-request-quality-check#f44dff25f3fa0fec3240448642bcb5590e384c55
+  - aoirint/skills/.apm/skills/release-note-workflow#f44dff25f3fa0fec3240448642bcb5590e384c55
+  - aoirint/skills/.apm/skills/security-check#f44dff25f3fa0fec3240448642bcb5590e384c55
+  - aoirint/skills/.apm/skills/software-documentation-maintenance#f44dff25f3fa0fec3240448642bcb5590e384c55
   mcp: []
 includes: auto
 scripts: {}
