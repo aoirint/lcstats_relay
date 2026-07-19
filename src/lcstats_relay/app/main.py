@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import flet as ft
 
-from lcstats_relay.app.composition import create_connection_manager
+from lcstats_relay.app.composition import create_monitor_controller
 from lcstats_relay.ui.monitor import MonitorView
 
 
@@ -15,7 +15,7 @@ async def main(page: ft.Page) -> None:
     page.window.min_height = 300
     page.padding = 8
 
-    view = MonitorView(page, manager_factory=create_connection_manager)
+    view = MonitorView(page, controller=create_monitor_controller())
     page.on_close = view.close
     page.add(view.build())
 

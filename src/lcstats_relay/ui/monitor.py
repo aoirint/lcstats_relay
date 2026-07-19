@@ -2,23 +2,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from pathlib import Path
 from typing import Protocol
 
 import flet as ft
 
-from lcstats_relay.application.settings import RelaySettings
 from lcstats_relay.application.state import ConnectionState
 from lcstats_relay.domain.payload import JSONValue
-from lcstats_relay.infrastructure.config import SettingsStore
+from lcstats_relay.presentation.controller import MonitorController
 from lcstats_relay.presentation.models import OutputViewState, StatusGlyph, Tone
 from lcstats_relay.presentation.presenters import present_relay, settings_summaries
-from lcstats_relay.presentation.validation import (
-    validate_data_dir,
-    validate_gas_url,
-    validate_sse_url,
-)
 
 _TONE_COLORS = {
     Tone.NEUTRAL: ft.Colors.GREY_700,
@@ -39,36 +31,10 @@ _STATUS_ICONS = {
 
 
 class PagePort(Protocol):
-    """Page operations used by the view."""
+    """Page operation required by the monitor adapter."""
 
     def update(self) -> None:
         """Push changed controls to the client."""
-
-
-class ManagerPort(Protocol):
-    """Connection manager operations used by the view."""
-
-    def start(self) -> None:
-        """Start receiving payloads."""
-
-    async def stop(self) -> None:
-        """Stop receiving payloads."""
-
-
-class ManagerFactory(Protocol):
-    """Create a connection manager from validated settings and callbacks."""
-
-    def __call__(  # noqa: PLR0913 - the composition boundary receives one complete session.
-        self,
-        *,
-        sse_url: str,
-        gas_url: str,
-        gas_token: str,
-        data_dir: Path,
-        on_state: Callable[[ConnectionState], None],
-        on_payload: Callable[[JSONValue], None],
-    ) -> ManagerPort:
-        """Build one manager for a connection session."""
 
 
 class MonitorView:
@@ -78,16 +44,11 @@ class MonitorView:
         self,
         page: PagePort,
         *,
-        settings_store: SettingsStore | None = None,
-        manager_factory: ManagerFactory,
+        controller: MonitorController,
     ) -> None:
-        """Create controls and retain injected application boundaries."""
+        """Create controls and bind them to a Flet-free controller."""
         self._page = page
-        self._settings_store = settings_store or SettingsStore()
-        self._settings = self._settings_store.load()
-        self._manager_factory = manager_factory
-        self._manager: ManagerPort | None = None
-        self._gas_token = ""
+        self._controller = controller
 
         self.settings_summary = ft.Text(selectable=True)
         self.gas_summary = ft.Text(selectable=True)
@@ -138,8 +99,9 @@ class MonitorView:
             padding=8,
             border_radius=6,
         )
+        self._controller.bind(on_change=self._controller_changed, on_payload=self.add_payload)
         self._refresh_settings_summary()
-        self._refresh_health(ConnectionState())
+        self._apply_relay(self._controller.relay_state)
 
     def build(self) -> ft.Container:
         """Build the complete monitor control tree."""
@@ -148,95 +110,46 @@ class MonitorView:
 
     def open_settings(self, _event: object | None = None) -> None:
         """Switch to the full-window tracker, storage, and output settings view."""
-        self.tracker_url_field.value = self._settings.tracker_url
-        self.data_dir_field.value = str(self._settings.data_dir)
+        self.tracker_url_field.value = self._controller.settings.tracker_url
+        self.data_dir_field.value = str(self._controller.settings.data_dir)
         self._show_settings_view()
 
     def open_gas_auth(self, _event: object | None = None) -> None:
         """Switch to the full-window Google Apps Script settings view."""
-        self.gas_url_field.value = self._settings.gas_url
-        self.gas_token_field.value = self._gas_token
+        self.gas_url_field.value = self._controller.settings.gas_url
+        self.gas_token_field.value = ""
         self._show_gas_auth_view()
 
-    def save_settings(self, tracker_url: str, *, data_dir: str) -> None:
+    def save_settings(self, tracker_url: str, *, data_dir: str) -> bool:
         """Validate and persist tracker plus local storage settings."""
-        self._settings = RelaySettings(
-            tracker_url=validate_sse_url(tracker_url),
-            gas_url=self._settings.gas_url,
-            data_dir=validate_data_dir(data_dir),
-        )
-        self._settings_store.save(self._settings)
-        self.error.value = ""
-        self._refresh_settings_summary()
-        self._page.update()
+        return self._controller.save_settings(tracker_url, data_dir=data_dir)
 
-    def save_gas_auth(self, gas_url: str, *, gas_token: str) -> None:
+    def save_gas_auth(self, gas_url: str, *, gas_token: str) -> bool:
         """Validate and persist the GAS destination while keeping the token in memory."""
-        normalized_gas_url = validate_gas_url(gas_url) if gas_url.strip() else ""
-        self._settings = RelaySettings(
-            tracker_url=self._settings.tracker_url,
-            gas_url=normalized_gas_url,
-            data_dir=self._settings.data_dir,
-        )
-        self._gas_token = gas_token.strip() if normalized_gas_url else ""
-        self._settings_store.save(self._settings)
-        self.error.value = ""
-        self._refresh_settings_summary()
-        self._page.update()
+        return self._controller.save_gas_auth(gas_url, gas_token=gas_token)
 
     async def start(self, _event: object | None = None) -> None:
         """Validate settings and start a new connection manager."""
-        try:
-            tracker_url = validate_sse_url(self._settings.tracker_url)
-            gas_url = (
-                validate_gas_url(self._settings.gas_url) if self._settings.gas_url.strip() else ""
-            )
-            data_dir = validate_data_dir(str(self._settings.data_dir))
-        except ValueError as exc:
-            self.error.value = str(exc)
-            self._page.update()
+        if not await self._controller.start():
             return
-
-        if self._manager is not None:
-            await self._manager.stop()
-        self._manager = self._manager_factory(
-            sse_url=tracker_url,
-            gas_url=gas_url,
-            gas_token=self._gas_token,
-            data_dir=data_dir,
-            on_state=self.update_state,
-            on_payload=self.add_payload,
-        )
-        self.error.value = ""
-        self.start_button.disabled = True
-        self.stop_button.disabled = False
-        self.settings_button.disabled = True
-        self.gas_auth_button.disabled = True
         self._show_monitor_view(update=False)
-        self._manager.start()
-        self._page.update()
 
     async def stop(self, _event: object | None = None) -> None:
         """Stop the active manager and unlock connection settings."""
-        if self._manager is not None:
-            await self._manager.stop()
-            self._manager = None
-        self.start_button.disabled = False
-        self.stop_button.disabled = True
-        self.settings_button.disabled = False
-        self.gas_auth_button.disabled = False
+        await self._controller.stop()
         self._show_monitor_view(update=False)
-        self._page.update()
 
     async def close(self, _event: object | None = None) -> None:
         """Stop background work when the desktop window closes."""
-        if self._manager is not None:
-            await self._manager.stop()
-            self._manager = None
+        await self._controller.close()
 
     def update_state(self, state: ConnectionState) -> None:
         """Apply a manager state snapshot to visible controls."""
-        relay = present_relay(state, gas_enabled=bool(self._settings.gas_url))
+        self._apply_relay(state)
+        self._page.update()
+
+    def _apply_relay(self, state: ConnectionState) -> None:
+        relay = present_relay(state, gas_enabled=bool(self._controller.settings.gas_url))
         self.status.value = relay.status_label
         self.receive_count.value = relay.receive_count
         self.last_received.value = relay.last_received
@@ -249,7 +162,6 @@ class MonitorView:
         self.output_destinations.controls = [
             self._output_destination(output) for output in relay.outputs
         ]
-        self._page.update()
 
     def add_payload(self, payload: JSONValue) -> None:
         """Accept payload callbacks without rendering raw details in the monitor."""
@@ -384,50 +296,41 @@ class MonitorView:
 
     def submit_settings(self, _event: object | None = None) -> None:
         """Validate the visible settings fields and return to the monitor on success."""
-        try:
-            self.save_settings(
-                self.tracker_url_field.value or "",
-                data_dir=self.data_dir_field.value or "",
-            )
-        except ValueError as exc:
-            self.error.value = str(exc)
-            self._page.update()
+        if not self.save_settings(
+            self.tracker_url_field.value or "",
+            data_dir=self.data_dir_field.value or "",
+        ):
             return
         self._show_monitor_view(update=True)
 
     def submit_gas_auth(self, _event: object | None = None) -> None:
         """Validate the visible GAS fields and return to settings on success."""
-        try:
-            self.save_gas_auth(
-                self.gas_url_field.value or "",
-                gas_token=self.gas_token_field.value or "",
-            )
-        except ValueError as exc:
-            self.error.value = str(exc)
-            self._page.update()
+        if not self.save_gas_auth(
+            self.gas_url_field.value or "",
+            gas_token=self.gas_token_field.value or "",
+        ):
             return
         self.open_settings()
 
     def _refresh_settings_summary(self) -> None:
         settings, gas = settings_summaries(
-            tracker_url=self._settings.tracker_url,
-            data_dir=str(self._settings.data_dir),
-            gas_url=self._settings.gas_url,
-            has_gas_token=bool(self._gas_token),
+            tracker_url=self._controller.settings.tracker_url,
+            data_dir=str(self._controller.settings.data_dir),
+            gas_url=self._controller.settings.gas_url,
+            has_gas_token=self._controller.gas_token_configured,
         )
         self.settings_summary.value = settings
         self.gas_summary.value = gas
 
-    def _refresh_health(self, state: ConnectionState) -> None:
-        relay = present_relay(state, gas_enabled=bool(self._settings.gas_url))
-        self.health.value = relay.health.label
-        self.health.color = _TONE_COLORS[relay.health.tone]
-        self.health_icon.icon = _STATUS_ICONS[relay.health.glyph]
-        self.health_icon.color = _TONE_COLORS[relay.health.glyph_tone]
-        self.health_detail.value = relay.health.detail
-        self.output_destinations.controls = [
-            self._output_destination(output) for output in relay.outputs
-        ]
+    def _controller_changed(self) -> None:
+        self._apply_relay(self._controller.relay_state)
+        self.error.value = self._controller.error
+        self.start_button.disabled = self._controller.active
+        self.stop_button.disabled = not self._controller.active
+        self.settings_button.disabled = self._controller.active
+        self.gas_auth_button.disabled = self._controller.active
+        self._refresh_settings_summary()
+        self._page.update()
 
     def _global_alert_panel(self) -> ft.Container:
         return ft.Container(
