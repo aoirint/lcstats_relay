@@ -1,0 +1,129 @@
+name: Build Flet desktop artifact
+description: Build, verify, and package one locked Flet desktop target.
+
+inputs:
+  target:
+    description: Flet desktop target to build (linux or windows).
+    required: true
+  build_number:
+    description: Monotonic build number passed to Flet.
+    required: true
+  output_directory:
+    description: Directory that receives the packaged desktop artifact.
+    required: false
+    default: dist
+
+outputs:
+  project_version:
+    description: Normalized PEP 440 project version.
+    value: ${{ steps.version.outputs.project_version }}
+  git_version:
+    description: Git tag derived from the canonical project version.
+    value: ${{ steps.version.outputs.git_version }}
+  release_mode:
+    description: latest, prerelease, or edge.
+    value: ${{ steps.version.outputs.release_mode }}
+  artifact_name:
+    description: File name of the packaged desktop artifact.
+    value: ${{ steps.identity.outputs.name }}
+  artifact_path:
+    description: Repository-relative path of the packaged desktop artifact.
+    value: ${{ steps.identity.outputs.path }}
+
+runs:
+  using: composite
+
+  steps:
+    - name: Validate target runner and archive format
+      id: artifact
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+      run: |
+        case "${TARGET}:${RUNNER_OS}" in
+          linux:Linux)
+            archive_format="gztar"
+            archive_suffix=".tar.gz"
+            ;;
+          windows:Windows)
+            archive_format="zip"
+            archive_suffix=".zip"
+            ;;
+          *)
+            echo "Unsupported target/runner pair: ${TARGET}/${RUNNER_OS}" >&2
+            exit 1
+            ;;
+        esac
+        echo "format=${archive_format}" >> "${GITHUB_OUTPUT}"
+        echo "suffix=${archive_suffix}" >> "${GITHUB_OUTPUT}"
+
+    - name: Set up locked Python environment
+      uses: ./.github/actions/setup-python
+
+    - name: Generate version metadata
+      id: version
+      uses: ./.github/actions/generate-version
+
+    - name: Complete artifact identity
+      id: identity
+      shell: bash
+      env:
+        OUTPUT_DIRECTORY: ${{ inputs.output_directory }}
+        PROJECT_VERSION: ${{ steps.version.outputs.project_version }}
+        SUFFIX: ${{ steps.artifact.outputs.suffix }}
+        TARGET: ${{ inputs.target }}
+      run: |
+        name="lcstats-relay-${PROJECT_VERSION}-${TARGET}${SUFFIX}"
+        echo "name=${name}" >> "${GITHUB_OUTPUT}"
+        echo "path=${OUTPUT_DIRECTORY}/${name}" >> "${GITHUB_OUTPUT}"
+
+    - name: Install Linux desktop build dependencies
+      if: inputs.target == 'linux'
+      shell: bash
+      run: |
+        # Flet's all-extension dependency set can link GTK, secret storage,
+        # audio, and video plugins even when a particular screen is simple.
+        sudo apt-get update
+        sudo apt-get install --yes \
+          binutils clang cmake llvm lld ninja-build pkg-config \
+          libgtk-3-dev libsecret-1-0 libsecret-1-dev libunwind-dev \
+          gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-libav \
+          gstreamer1.0-plugins-bad gstreamer1.0-plugins-base \
+          gstreamer1.0-plugins-good gstreamer1.0-plugins-ugly \
+          gstreamer1.0-pulseaudio gstreamer1.0-qt5 gstreamer1.0-tools \
+          gstreamer1.0-x libasound2-dev libgstreamer1.0-dev \
+          libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev \
+          libmpv-dev mpv
+
+    - name: Build Flet desktop bundle
+      shell: bash
+      env:
+        FLET_CLI_NO_RICH_OUTPUT: "1"
+      run: |
+        # Use the canonical PEP 440 version for artifact identity while
+        # passing Flet the required three-segment Flutter build version.
+        uv run --locked flet build "${{ inputs.target }}" \
+          --build-number "${{ inputs.build_number }}" \
+          --build-version "${{ steps.version.outputs.build_version }}" \
+          --yes
+
+    - name: Verify build output
+      shell: bash
+      run: |
+        test -d "build/${{ inputs.target }}"
+        test -n "$(find "build/${{ inputs.target }}" -type f -print -quit)"
+
+    - name: Package desktop artifact
+      shell: bash
+      run: |
+        uv run --locked python scripts/package_desktop.py \
+          --build-directory "build/${{ inputs.target }}" \
+          --output-directory "${{ inputs.output_directory }}" \
+          --artifact-name "lcstats-relay-${{ steps.version.outputs.project_version }}-${{ inputs.target }}" \
+          --format "${{ steps.artifact.outputs.format }}"
+
+    - name: Verify packaged artifact
+      shell: bash
+      env:
+        ARTIFACT_PATH: ${{ steps.identity.outputs.path }}
+      run: test -f "${ARTIFACT_PATH}"
