@@ -24,8 +24,10 @@ application architecture, and maintenance procedures.
 
 ## Install and run
 
-No packaged release has been published yet. Run the current source with Python
-3.14 and [uv](https://docs.astral.sh/uv/):
+No packaged release has been published yet. When a release is available, its
+Windows and Linux archives, checksums, manifest, and immutable-release
+attestation will appear on the repository's Releases page. Until then, run the
+current source with Python 3.14 and [uv](https://docs.astral.sh/uv/):
 
 ```powershell
 uv sync --locked --all-groups

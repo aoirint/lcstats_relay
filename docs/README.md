@@ -31,8 +31,10 @@ The root [README](../README.md) remains the concise user entry point.
   setup, dependency restoration, checks, and change validation.
 - [Data and recovery](operations/data-and-recovery.md) identifies settings,
   archives, retry records, secrets, and safe recovery actions.
+- [Release desktop artifacts](operations/release.md) defines version and tag
+  identity, immutable publication, artifact provenance, verification, and
+  failure recovery.
 
-Windows and Linux desktop bundles are validated in CI, but no packaged release
-has been published and there is not yet an automated publication procedure.
-Release automation must add its artifact and operator contracts under
-`operations/` before the first tag is published.
+Windows and Linux desktop bundles are validated in CI. A matching version tag
+starts the automated draft-first publication procedure, although no packaged
+release has been published yet.

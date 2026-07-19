@@ -1,16 +1,26 @@
 name: Set up locked Python environment
 description: Install the reviewed uv version, selected Python, and the exact locked dependency graph.
 
+outputs:
+  uv_version:
+    description: Reviewed uv version used for the locked environment.
+    value: ${{ steps.toolchain.outputs.uv_version }}
+
 runs:
   using: composite
 
   steps:
+    - name: Select reviewed toolchain
+      id: toolchain
+      shell: bash
+      run: echo "uv_version=0.11.21" >> "${GITHUB_OUTPUT}"
+
     - name: Install uv and Python
       uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
       with:
         enable-cache: true
         python-version-file: .python-version
-        version: "0.11.21"
+        version: ${{ steps.toolchain.outputs.uv_version }}
 
     - name: Verify lockfile
       shell: bash
