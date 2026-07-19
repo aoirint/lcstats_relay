@@ -9,9 +9,9 @@ from typing import Any, cast
 import flet as ft
 import pytest
 
-from lcstats_relay.core.config import DEFAULT_TRACKER_URL, RelaySettings, SettingsStore
-from lcstats_relay.core.payload import JSONValue
-from lcstats_relay.core.state import ConnectionState, OutputState, OutputStatus, RelayStatus
+from lcstats_relay.application.state import ConnectionState, OutputState, OutputStatus, RelayStatus
+from lcstats_relay.domain.payload import JSONValue
+from lcstats_relay.infrastructure.config import DEFAULT_TRACKER_URL, RelaySettings, SettingsStore
 from lcstats_relay.ui.monitor import (
     ManagerFactory,
     MonitorView,

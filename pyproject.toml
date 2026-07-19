@@ -126,10 +126,6 @@ max-complexity = 10
 "tests/**/*.py" = [
     "S101", # pytest assertions are the test oracle.
 ]
-"tests/test_relay.py" = [
-    # Characterization tests exercise private lifecycle seams until the dedicated boundary refactor.
-    "SLF001",
-]
 
 [tool.mypy]
 files = ["src", "tests"]

@@ -7,20 +7,21 @@ import json
 from collections.abc import Awaitable, Callable, Sequence
 from contextlib import suppress
 from datetime import UTC, datetime
-from pathlib import Path
+from typing import Protocol
 
-import httpx
-
-from lcstats_relay.core.dispatcher import BoundOutput, OutputDispatcher
-from lcstats_relay.core.outputs import OutputRegistration
-from lcstats_relay.core.payload import JSONValue, RelayPayload, parse_json
-from lcstats_relay.core.receiver import StatsReceiver
-from lcstats_relay.core.state import ConnectionState, RelayStateStore, StateCallback
-from lcstats_relay.core.storage import RetryQueue
+from lcstats_relay.application.dispatcher import OutputDispatcher
+from lcstats_relay.application.ports import (
+    OutputPolicy,
+    ReceiverError,
+    ReceiverPort,
+    RetryQueuePort,
+    RuntimeFactory,
+)
+from lcstats_relay.application.state import ConnectionState, RelayStateStore, StateCallback
+from lcstats_relay.domain.payload import JSONValue, RelayPayload, parse_json
 
 type PayloadCallback = Callable[[JSONValue], None]
 type Clock = Callable[[], datetime]
-type ClientFactory = Callable[[httpx.Timeout], httpx.AsyncClient]
 type Sleep = Callable[[float], Awaitable[None]]
 
 _PREVIEW_LENGTH = 300
@@ -30,8 +31,47 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-def _make_client(timeout: httpx.Timeout) -> httpx.AsyncClient:
-    return httpx.AsyncClient(timeout=timeout, follow_redirects=True)
+def preview_payload(raw_json: str) -> str:
+    """Return a bounded payload preview suitable for presentation state."""
+    if len(raw_json) <= _PREVIEW_LENGTH:
+        return raw_json
+    return f"{raw_json[:_PREVIEW_LENGTH]}..."
+
+
+class RetryDispatcher(Protocol):
+    """Retry queued output deliveries."""
+
+    async def retry_pending(self) -> None:
+        """Attempt all currently queued deliveries."""
+
+
+class RetryWorker:
+    """Periodically retry persisted output deliveries."""
+
+    def __init__(
+        self,
+        *,
+        dispatcher: RetryDispatcher,
+        state: RelayStateStore,
+        interval: float,
+        sleep: Sleep = asyncio.sleep,
+    ) -> None:
+        """Configure the dispatcher, observable state, and scheduling seam."""
+        self._dispatcher = dispatcher
+        self._state = state
+        self._interval = interval
+        self._sleep = sleep
+
+    async def run_forever(self) -> None:
+        """Retry until cancellation, keeping queue read failures observable."""
+        while True:
+            await self._sleep(self._interval)
+            try:
+                await self._dispatcher.retry_pending()
+            except asyncio.CancelledError:
+                raise
+            except (OSError, TypeError, ValueError) as exc:
+                self._state.receiver_error(_safe_error("再送キュー読込", error=exc))
 
 
 class ConnectionManager:
@@ -40,31 +80,29 @@ class ConnectionManager:
     def __init__(  # noqa: PLR0913 - callbacks and timing seams keep layers decoupled.
         self,
         *,
-        sse_url: str,
-        outputs: Sequence[OutputRegistration],
-        data_dir: Path,
+        output_policies: Sequence[OutputPolicy],
+        runtime_factory: RuntimeFactory,
+        retry_queue: RetryQueuePort,
         on_state: StateCallback,
         on_payload: PayloadCallback,
         reconnect_delay: float = 3.0,
         retry_interval: float = 30.0,
         clock: Clock = _utc_now,
-        client_factory: ClientFactory = _make_client,
         reconnect_sleep: Sleep = asyncio.sleep,
     ) -> None:
-        """Configure input, output registrations, state, persistence, and timing."""
-        self._sse_url = sse_url
-        self._outputs = tuple(outputs)
-        self._queue = RetryQueue(data_dir)
+        """Configure application ports, state, and timing policy."""
+        self._output_policies = tuple(output_policies)
+        self._runtime_factory = runtime_factory
+        self._queue = retry_queue
         self._on_payload = on_payload
         self._reconnect_delay = reconnect_delay
         self._retry_interval = retry_interval
         self._clock = clock
-        self._client_factory = client_factory
         self._reconnect_sleep = reconnect_sleep
         self._task: asyncio.Task[None] | None = None
-        pending = {output.key: self._queue.count(output.key) for output in self._outputs}
+        pending = {output.key: self._queue.count(output.key) for output in self._output_policies}
         self._state = RelayStateStore(
-            ((output.key, output.label) for output in self._outputs),
+            ((output.key, output.label) for output in self._output_policies),
             on_change=on_state,
             pending_counts=pending,
         )
@@ -91,25 +129,26 @@ class ConnectionManager:
         self._state.stop()
 
     async def _run(self) -> None:
-        timeout = httpx.Timeout(30.0, read=None)
-        async with self._client_factory(timeout) as client:
-            receiver = StatsReceiver(self._sse_url, client=client)
+        async with self._runtime_factory() as session:
             dispatcher = OutputDispatcher(
-                [
-                    BoundOutput(registration=registration, sink=registration.build(client))
-                    for registration in self._outputs
-                ],
+                session.outputs,
                 queue=self._queue,
                 state=self._state,
                 clock=self._clock,
             )
             async with asyncio.TaskGroup() as tasks:
-                tasks.create_task(self._receive_loop(receiver, dispatcher=dispatcher))
-                tasks.create_task(self._retry_loop(dispatcher))
+                tasks.create_task(self._receive_loop(session.receiver, dispatcher=dispatcher))
+                tasks.create_task(
+                    RetryWorker(
+                        dispatcher=dispatcher,
+                        state=self._state,
+                        interval=self._retry_interval,
+                    ).run_forever()
+                )
 
     async def _receive_loop(
         self,
-        receiver: StatsReceiver,
+        receiver: ReceiverPort,
         *,
         dispatcher: OutputDispatcher,
     ) -> None:
@@ -119,28 +158,18 @@ class ConnectionManager:
                 raw_json = await receiver.receive_once()
             except asyncio.CancelledError:
                 raise
-            except (httpx.HTTPError, ValueError) as exc:
-                message = self._safe_error("受信", error=exc)
+            except ReceiverError as exc:
+                message = _safe_error("受信", error=exc)
                 self._state.receiver_error(message, retry_after_seconds=self._reconnect_delay)
                 await self._wait_before_reconnect(message)
                 continue
 
             now = self._clock()
-            self._state.received(at=now, preview=self._preview(raw_json))
+            self._state.received(at=now, preview=preview_payload(raw_json))
             payload = self._build_payload(raw_json, received_at=now)
             if payload.parse_error is None:
                 self._on_payload(payload.payload)
             await dispatcher.dispatch(payload)
-
-    async def _retry_loop(self, dispatcher: OutputDispatcher) -> None:
-        while True:
-            await asyncio.sleep(self._retry_interval)
-            try:
-                await dispatcher.retry_pending()
-            except asyncio.CancelledError:
-                raise
-            except (OSError, TypeError, ValueError) as exc:
-                self._state.receiver_error(self._safe_error("再送キュー読込", error=exc))
 
     async def _wait_before_reconnect(self, message: str) -> None:
         remaining = self._reconnect_delay
@@ -164,14 +193,8 @@ class ConnectionManager:
             )
         return RelayPayload(raw_json=raw_json, payload=payload, received_at=received_at)
 
-    @staticmethod
-    def _preview(raw_json: str) -> str:
-        if len(raw_json) <= _PREVIEW_LENGTH:
-            return raw_json
-        return f"{raw_json[:_PREVIEW_LENGTH]}..."
 
-    @staticmethod
-    def _safe_error(operation: str, *, error: Exception) -> str:
-        if isinstance(error, httpx.HTTPStatusError):
-            return f"{operation}エラー: HTTP {error.response.status_code}"
-        return f"{operation}エラー: {type(error).__name__}"
+def _safe_error(operation: str, *, error: Exception) -> str:
+    if isinstance(error, ReceiverError):
+        return f"{operation}エラー: {error.detail}"
+    return f"{operation}エラー: {type(error).__name__}"
