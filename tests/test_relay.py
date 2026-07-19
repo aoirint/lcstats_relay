@@ -9,7 +9,6 @@ from pathlib import Path
 import httpx
 import pytest
 
-from lcstats_relay.app.composition import create_connection_manager
 from lcstats_relay.application.dispatcher import OutputDispatcher
 from lcstats_relay.application.ports import (
     BoundOutput,
@@ -26,6 +25,7 @@ from lcstats_relay.application.state import (
     RelayStateStore,
     RelayStatus,
 )
+from lcstats_relay.composition.application import create_connection_manager
 from lcstats_relay.domain.payload import JSONValue, RelayPayload
 from lcstats_relay.infrastructure.auth import NoAuthentication, QueryTokenAuthentication
 from lcstats_relay.infrastructure.outputs import ArchiveOutput, GasOutput

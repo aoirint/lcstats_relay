@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import flet as ft
 
-from lcstats_relay.app.composition import create_monitor_controller
+from lcstats_relay.composition.application import create_monitor_controller
 from lcstats_relay.ui.monitor import MonitorView
 
 

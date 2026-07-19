@@ -8,7 +8,7 @@ the parsed value to a Google Apps Script Web App.
 
 ## Current module map
 
-The executable entry point is `lcstats_relay.__main__`. The source tree has six
+The executable entry point is `lcstats_relay.__main__`. The source tree has seven
 current responsibility groups:
 
 - `domain/` owns relay payload values and JSON parsing without Flet or concrete
@@ -21,10 +21,10 @@ current responsibility groups:
   presentation state.
 - `infrastructure/` implements HTTP, authentication, settings, atomic files,
   archives, and the retry queue.
-- `app/main.py` configures the Flet page and mounts the monitor, while
-  `app/composition.py` is the production composition root. It selects outputs,
-  authentication policy, persistence implementations, and the connection
-  manager without requiring the UI to construct those details.
+- `entrypoints/flet_app.py` configures the Flet page and mounts the monitor.
+- `composition/application.py` is the production composition root. It selects
+  outputs, authentication policy, persistence implementations, and the
+  connection manager without requiring the UI to construct those details.
 
 Dependencies point inward from the entry point and composition root through UI
 and presentation to application/domain policy. Infrastructure implements
@@ -33,11 +33,12 @@ application, and presentation modules do not import Flet.
 
 ## Runtime flow
 
-1. `app/main.py` creates `MonitorView` with a production `MonitorController`.
+1. `entrypoints/flet_app.py` creates `MonitorView` with a production
+   `MonitorController`.
 2. The user supplies a loopback tracker URL, a data directory, and optionally a
    GAS destination and token.
-3. `app/composition.py` builds a required archive output and, when configured,
-   a retryable GAS output.
+3. `composition/application.py` builds a required archive output and, when
+   configured, a retryable GAS output.
 4. `ConnectionManager` opens one runtime-owned `httpx.AsyncClient`, a
    `StatsReceiver`, registered output adapters, and concurrent receive/retry
    loops. Blocking archive and queue operations are offloaded from the event
@@ -61,9 +62,9 @@ Output guarantees are canonical in [`relay-output.md`](relay-output.md).
 - Preserve the local archive as the required first output unless a deliberate
   architecture change updates `relay-output.md` and its tests.
 - Extend the fixed `domain/`, `application/`, `presentation/`, `ui/`,
-  `infrastructure/`, and `app/` packages by cohesive ownership. Do not collapse
-  policy, presentation, controls, and adapters into one view or generic helper
-  module.
+  `infrastructure/`, `entrypoints/`, and `composition/` packages by cohesive
+  ownership. Do not collapse policy, presentation, controls, adapters, or
+  startup wiring into one view or generic helper module.
 - Introduce ports at I/O boundaries when replacing or testing concrete HTTP,
   filesystem, clock, sleep, or UI behavior.
 

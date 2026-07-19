@@ -106,6 +106,9 @@ description: >-
 - For tool-specific fixed-install and execution patterns, consult
   [external-code-execution.md](references/external-code-execution.md) when the
   listed tool applies.
+- For archives, installers, bundles, release assets, or packaged applications,
+  apply [artifact-inspection.md](references/artifact-inspection.md) to the final
+  artifact rather than trusting the staging directory or build log.
 - Treat new or updated third-party packages, package-runner invocations,
   downloaded CLI tools, GitHub Actions, containers, vendored artifacts,
   generated code from external tools, copied files, and dependency lockfile
@@ -197,6 +200,9 @@ description: >-
 - Stricter external requirements were followed when applicable.
 - Supply-chain-sensitive artifacts satisfied cooldown, pinning, provenance, and
   runtime-behavior checks, or blockers/residual risk were recorded.
+- Distributed artifacts were inspected as final containers, with unsafe member
+  types and paths rejected and payload/provenance checked against an explicit
+  contract, or the unverified scope was recorded.
 - Every third-party resolution, download, build, load, or execution path passed
   the mechanism-neutral execution gate; tool names and delivery channels were
   treated as examples, not exemptions.
