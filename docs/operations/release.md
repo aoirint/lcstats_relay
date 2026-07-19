@@ -18,9 +18,9 @@ creates the exact `v<project-version>` Git tag from the merged `main` commit.
   and required-check process.
 - Set `[project].version` to the intended non-`0.0.0` release version in that
   reviewed commit. Do not create the release tag manually.
-- Confirm that the Build, Lint, and Test pull request checks pass before merge.
-  The Release workflow repeats their quality gates against the exact merged
-  source commit before publication.
+- Confirm that the Lint and Test pull request checks pass before merge. The
+  Build workflow runs only after a push to `main` and repeats their quality
+  gates against the exact merged source commit before publication.
 - Confirm that immutable releases remain enabled in the GitHub repository
   settings. The workflow checks this again before creating or publishing a
   release.
@@ -28,16 +28,16 @@ creates the exact `v<project-version>` Git tag from the merged `main` commit.
 ## Publish
 
 Merge the version change and intended release contents into `main`. The push to
-`main` starts the Release workflow. It performs these state-changing actions in
-order:
+`main` starts the Build workflow, which owns the complete build-and-release
+sequence. It performs these state-changing actions in order:
 
 1. Reads the normalized project version from `pyproject.toml`. Version `0.0.0`
    completes without release work. An already-published immutable version does
    so only after its exact asset set and attestation pass again.
 2. Runs workflow lint, pin cooldown, Markdown lint, Ruff, strict mypy, and the
    full-coverage test suite against the resolved merged source commit.
-3. Builds Windows and Linux from that same commit through the
-   same local Composite Action used by the Build workflow.
+3. Builds Windows and Linux from that same commit through the local desktop
+   build Composite Action.
 4. Packages the Windows bundle as ZIP and the Linux bundle as tar.gz so Unix
    executable permissions survive extraction.
 5. Creates `release-manifest.json` and `SHA256SUMS`, binding the artifacts to the
@@ -57,7 +57,7 @@ The expected release assets are:
 
 ## Verify
 
-Wait for the Release workflow to pass, then verify the release and each
+Wait for the Build workflow to pass, then verify the release and each
 downloaded artifact:
 
 ```powershell
