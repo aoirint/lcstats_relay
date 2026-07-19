@@ -153,6 +153,25 @@ def test_verify_desktop_archive_rejects_unsafe_zip_link(tmp_path: Path) -> None:
         )
 
 
+def test_verify_desktop_archive_does_not_count_symlink_as_payload(tmp_path: Path) -> None:
+    """Require real application payload beyond a safe but dangling link."""
+    archive_path = tmp_path / "desktop.zip"
+    members = _required_windows_members()
+    members.pop("data/flutter_assets/app.so")
+    _write_zip(
+        archive_path,
+        members=members,
+        symlink=("data/current", "payload.bin"),
+    )
+
+    with pytest.raises(ValueError, match="no application payload"):
+        verify_desktop_archive(
+            archive_path=archive_path,
+            target="windows",
+            launcher_name="lcstats-relay.exe",
+        )
+
+
 @pytest.mark.parametrize(
     ("removed", "message"),
     [

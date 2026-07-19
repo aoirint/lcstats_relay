@@ -17,8 +17,9 @@ runs:
       id: toolchain
       shell: bash
       run: |
-        python_version="$(tr -d '\r\n' < .python-version)"
-        if [[ -z "${python_version}" ]]; then
+        mapfile -t python_versions < .python-version
+        python_version="${python_versions[0]%$'\r'}"
+        if [[ "${#python_versions[@]}" -ne 1 || -z "${python_version}" ]]; then
           echo ".python-version must select one Python version." >&2
           exit 1
         fi

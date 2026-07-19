@@ -50,7 +50,6 @@ def _record_path(*, path: PurePosixPath, paths: set[PurePosixPath]) -> None:
 
 def _verify_required_files(
     *,
-    paths: set[PurePosixPath],
     regular_files: set[PurePosixPath],
     launcher: PurePosixPath,
 ) -> None:
@@ -59,7 +58,8 @@ def _verify_required_files(
         names = ", ".join(sorted(path.as_posix() for path in missing))
         msg = f"archive is missing required regular files: {names}"
         raise ValueError(msg)
-    if len(paths) == len(_REQUIRED_FILES) + 1:
+    payload_files = regular_files - _REQUIRED_FILES - {launcher}
+    if not payload_files:
         msg = "archive contains no application payload beyond required files"
         raise ValueError(msg)
 
@@ -79,7 +79,7 @@ def _verify_zip(*, archive_path: Path, launcher: PurePosixPath) -> None:
                 _validate_path(target, label=f"ZIP link {path}")
             else:
                 regular_files.add(path)
-    _verify_required_files(paths=paths, regular_files=regular_files, launcher=launcher)
+    _verify_required_files(regular_files=regular_files, launcher=launcher)
 
 
 def _verify_tar(*, archive_path: Path, launcher: PurePosixPath) -> None:
@@ -101,7 +101,7 @@ def _verify_tar(*, archive_path: Path, launcher: PurePosixPath) -> None:
             else:
                 msg = f"tar contains unsupported special file: {path}"
                 raise ValueError(msg)
-    _verify_required_files(paths=paths, regular_files=regular_files, launcher=launcher)
+    _verify_required_files(regular_files=regular_files, launcher=launcher)
     if launcher_mode is None or launcher_mode & 0o111 == 0:
         msg = f"Linux launcher is not executable: {launcher}"
         raise ValueError(msg)
