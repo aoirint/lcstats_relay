@@ -30,6 +30,10 @@ Use `github-actions-quality-check` and `security-check` while implementing this 
   credentials in separately triggered, protected jobs/environments.
 - Keep CI commands equal to the documented local commands. CI-only hidden flags and local-only
   shortcuts are findings.
+- Extract repeated, repository-owned setup into a local Composite Action when multiple workflows
+  need the exact same lock verification, sync, or tool installation. Keep behavior-changing checks
+  in the workflows that own their result. The bundled checker follows reachable local Composite
+  Actions and reusable workflows when it verifies required commands and immutable external pins.
 
 ## Minimum workflow shape
 
@@ -91,9 +95,10 @@ jobs:
         run: uv run --locked pytest
 ```
 
-Use one job when duplicate environment setup provides no isolation value. Split jobs only for a
-real platform/matrix boundary or when independent failure reporting justifies the cost. Every split
-job must still use the reviewed lock and matching Python environment.
+Use one job when duplicate environment setup provides no isolation value. Split workflows or jobs
+only for a real platform/matrix boundary or when independent failure reporting justifies the cost.
+Every split job must still use the reviewed lock and matching Python environment, directly or
+through the same repository-local Composite Action.
 
 Also run the repository's Markdown/link checks, `actionlint`, ShellCheck for maintained shell, and
 `pinact run --check --min-age 7`. If a check is unavailable, report that gap; do not silently label

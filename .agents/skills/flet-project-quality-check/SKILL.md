@@ -81,7 +81,7 @@ informal list.
    - Inspect repository guidance, Python/Flet metadata, source/tests, workflows, docs, build assets,
      generated files, and repository settings before proposing a target-specific value.
    - Run
-     `uv run --locked --script <skill-root>/scripts/check_project.py <repository-root>` for the
+     `uv run --no-project --no-config --locked --script <skill-root>/scripts/check_project.py <repository-root>` for the
      mechanical floor. Treat every finding as evidence to inspect; a pass does not approve
      architecture, UI behavior, tests, security, or release readiness.
 2. Establish the target and contracts.
