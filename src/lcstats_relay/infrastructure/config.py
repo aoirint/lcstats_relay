@@ -4,22 +4,17 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-DEFAULT_TRACKER_URL = "http://127.0.0.1:2145/"
-DEFAULT_DATA_DIR = Path("data")
+from lcstats_relay.application.settings import (
+    DEFAULT_DATA_DIR,
+    DEFAULT_TRACKER_URL,
+    RelaySettings,
+)
+
 CONFIG_FILENAME = "settings.json"
-
-
-@dataclass(frozen=True, kw_only=True, slots=True)
-class RelaySettings:
-    """User-configurable relay settings safe to persist on disk."""
-
-    tracker_url: str = DEFAULT_TRACKER_URL
-    gas_url: str = ""
-    data_dir: Path = DEFAULT_DATA_DIR
 
 
 def default_config_path() -> Path:
