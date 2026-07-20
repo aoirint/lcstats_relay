@@ -1,14 +1,10 @@
-name: Test
+name: Pull Request
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
   merge_group:
     types:
       - checks_requested
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -22,6 +18,21 @@ defaults:
     shell: bash
 
 jobs:
+  lint:
+    # Source checks run on the lightweight, unprivileged runner and remain
+    # separate from the test job for a focused PR failure signal.
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Lint source
+        uses: ./.github/actions/lint-source
+
   test:
     # Unit tests use the locked Python environment without desktop packaging or
     # privileged services, so this job fits the slim runner contract.
@@ -34,8 +45,5 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up locked Python environment
-        uses: ./.github/actions/setup-python
-
-      - name: Run tests with full coverage
-        run: uv run --locked pytest
+      - name: Test source
+        uses: ./.github/actions/test-source

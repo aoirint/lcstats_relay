@@ -1,4 +1,4 @@
-name: Build
+name: Main
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: build-${{ github.ref }}
+  group: main-${{ github.ref }}
   cancel-in-progress: false
 
 defaults:
@@ -17,9 +17,38 @@ defaults:
     shell: bash
 
 jobs:
-  validate:
-    # Validation only resolves locked metadata and release state; it does not
-    # invoke the native Flet toolchain.
+  lint:
+    # Main re-runs the source checks for the exact commit that can produce a
+    # release. Native packaging remains outside this lightweight job.
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out main source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Lint source
+        uses: ./.github/actions/lint-source
+
+  test:
+    # Main re-runs the complete test suite for the exact release candidate.
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out main source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Test source
+        uses: ./.github/actions/test-source
+
+  plan:
+    # Planning resolves locked metadata and release state without invoking the
+    # native Flet toolchain, so it can run beside the source-quality jobs.
     runs-on: ubuntu-slim
     timeout-minutes: 10
 
@@ -99,10 +128,13 @@ jobs:
           echo "should_release=true" >> "${GITHUB_OUTPUT}"
 
   build:
-    needs: validate
-    if: needs.validate.outputs.should_release == 'true'
-    # Lint and Test own source-quality checks. This job verifies only the
-    # native release artifacts that are produced from the validated main SHA.
+    needs:
+      - lint
+      - test
+      - plan
+    if: needs.plan.outputs.should_release == 'true'
+    # Native artifact verification begins only after the exact main commit has
+    # passed source checks and release planning.
     name: Build release (${{ matrix.target }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
@@ -123,7 +155,7 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
-          ref: ${{ needs.validate.outputs.source_commit }}
+          ref: ${{ needs.plan.outputs.source_commit }}
 
       - name: Build packaged desktop artifact
         id: build
@@ -142,9 +174,9 @@ jobs:
 
   release:
     needs:
-      - validate
+      - plan
       - build
-    if: needs.validate.outputs.should_release == 'true'
+    if: needs.plan.outputs.should_release == 'true'
     # Publication assembles metadata and uses GitHub APIs after artifacts have
     # been built; it does not need the native build runner.
     runs-on: ubuntu-slim
@@ -158,7 +190,7 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
-          ref: ${{ needs.validate.outputs.source_commit }}
+          ref: ${{ needs.plan.outputs.source_commit }}
 
       - name: Set up locked Python environment
         id: setup
@@ -174,8 +206,8 @@ jobs:
       - name: Generate release manifest and checksums
         env:
           BUILD_NUMBER: ${{ github.run_number }}
-          PROJECT_VERSION: ${{ needs.validate.outputs.project_version }}
-          SOURCE_COMMIT: ${{ needs.validate.outputs.source_commit }}
+          PROJECT_VERSION: ${{ needs.plan.outputs.project_version }}
+          SOURCE_COMMIT: ${{ needs.plan.outputs.source_commit }}
           UV_VERSION: ${{ steps.setup.outputs.uv_version }}
           WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -206,9 +238,9 @@ jobs:
         id: draft
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_MODE: ${{ needs.validate.outputs.release_mode }}
-          SOURCE_COMMIT: ${{ needs.validate.outputs.source_commit }}
-          TAG: ${{ needs.validate.outputs.git_version }}
+          RELEASE_MODE: ${{ needs.plan.outputs.release_mode }}
+          SOURCE_COMMIT: ${{ needs.plan.outputs.source_commit }}
+          TAG: ${{ needs.plan.outputs.git_version }}
         run: |
           if release_json="$(gh release view "${TAG}" --json isDraft,isImmutable 2>/dev/null)"; then
             is_draft="$(jq -r '.isDraft' <<< "${release_json}")"
@@ -258,14 +290,14 @@ jobs:
         if: steps.draft.outputs.already_published != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.validate.outputs.git_version }}
+          TAG: ${{ needs.plan.outputs.git_version }}
         run: gh release upload "${TAG}" artifacts/* --clobber
 
       - name: Verify draft asset set
         if: steps.draft.outputs.already_published != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.validate.outputs.git_version }}
+          TAG: ${{ needs.plan.outputs.git_version }}
         run: |
           find artifacts -maxdepth 1 -type f -printf '%f\n' | sort > expected-assets.txt
           gh release view "${TAG}" --json assets --jq '.assets[].name' \
@@ -276,9 +308,9 @@ jobs:
         if: steps.draft.outputs.already_published != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_MODE: ${{ needs.validate.outputs.release_mode }}
-          SOURCE_COMMIT: ${{ needs.validate.outputs.source_commit }}
-          TAG: ${{ needs.validate.outputs.git_version }}
+          RELEASE_MODE: ${{ needs.plan.outputs.release_mode }}
+          SOURCE_COMMIT: ${{ needs.plan.outputs.source_commit }}
+          TAG: ${{ needs.plan.outputs.git_version }}
         run: |
           remote_commit="$(gh api \
             "repos/${GITHUB_REPOSITORY}/commits/${TAG}" \
@@ -297,7 +329,7 @@ jobs:
       - name: Verify immutable release attestation
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.validate.outputs.git_version }}
+          TAG: ${{ needs.plan.outputs.git_version }}
         run: |
           for attempt in {1..10}; do
             immutable="$(gh release view "${TAG}" --json isImmutable --jq '.isImmutable')"
