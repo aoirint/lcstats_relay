@@ -54,7 +54,7 @@ def package_desktop(
     return archive_path
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(*, argv: Sequence[str] | None = None) -> int:
     """Package a desktop build from command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--build-directory", type=Path, required=True)

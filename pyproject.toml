@@ -53,6 +53,8 @@ line-length = 100
 target-version = "py314"
 
 [tool.ruff.lint]
+preview = true
+explicit-preview-rules = true
 select = [
     # pycodestyle errors: catch syntax-adjacent style issues and common readability problems.
     "E",
@@ -100,6 +102,8 @@ select = [
     "PIE",
     # Pylint-derived rules: add broad maintainability checks without running Pylint separately.
     "PL",
+    # Preview rule selected explicitly: require keywords from the first project-owned parameter.
+    "PLR0917",
     # flake8-pytest-style: keep tests idiomatic and easy to scan.
     "PT",
     # flake8-use-pathlib: prefer pathlib for filesystem paths.
@@ -132,6 +136,9 @@ ignore = [
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-positional-args = 0
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = [

@@ -10,7 +10,7 @@ from typing import cast
 type JSONValue = None | bool | int | float | str | list[JSONValue] | dict[str, JSONValue]
 
 
-def parse_json(raw_json: str) -> JSONValue:
+def parse_json(*, raw_json: str) -> JSONValue:
     """Parse a JSON value without leaking an untyped result."""
     return cast("JSONValue", json.loads(raw_json))
 

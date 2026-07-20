@@ -15,6 +15,7 @@ from scripts.package_desktop import main, package_desktop
     [("zip", ".zip"), ("gztar", ".tar.gz")],
 )
 def test_package_desktop_archives_complete_build(
+    *,
     tmp_path: Path,
     archive_format: str,
     suffix: str,
@@ -55,6 +56,7 @@ def test_package_desktop_archives_complete_build(
     ],
 )
 def test_package_desktop_rejects_invalid_input(
+    *,
     tmp_path: Path,
     build_state: str,
     artifact_name: str,
@@ -77,7 +79,7 @@ def test_package_desktop_rejects_invalid_input(
         )
 
 
-def test_package_desktop_rejects_unexpected_archive_path(tmp_path: Path) -> None:
+def test_package_desktop_rejects_unexpected_archive_path(*, tmp_path: Path) -> None:
     """Fail closed if the archive implementation returns another output path."""
     build_directory = tmp_path / "build"
     build_directory.mkdir()
@@ -95,7 +97,7 @@ def test_package_desktop_rejects_unexpected_archive_path(tmp_path: Path) -> None
         )
 
 
-def test_main_packages_archive(tmp_path: Path) -> None:
+def test_main_packages_archive(*, tmp_path: Path) -> None:
     """Create the requested archive from command-line arguments."""
     build_directory = tmp_path / "build"
     build_directory.mkdir()
@@ -103,7 +105,7 @@ def test_main_packages_archive(tmp_path: Path) -> None:
 
     assert (
         main(
-            [
+            argv=[
                 "--build-directory",
                 str(build_directory),
                 "--output-directory",

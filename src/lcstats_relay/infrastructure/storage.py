@@ -15,30 +15,30 @@ from lcstats_relay.infrastructure.filesystem import write_text_atomic
 class ArchiveWriter:
     """Persist each received JSON payload before downstream processing."""
 
-    def __init__(self, data_dir: Path) -> None:
+    def __init__(self, *, data_dir: Path) -> None:
         """Use the archive directory beneath the supplied application data root."""
         self._root = data_dir / "archive"
 
-    def write(self, raw_json: str, *, received_at: datetime) -> Path:
+    def write(self, *, raw_json: str, received_at: datetime) -> Path:
         """Write the exact received JSON and return its archive path."""
         date_dir = self._root / received_at.strftime("%Y-%m-%d")
         filename = f"{received_at:%Y-%m-%dT%H-%M-%S-%f}-{uuid4().hex[:8]}.json"
         archive_path = date_dir / filename
-        write_text_atomic(archive_path, content=f"{raw_json}\n")
+        write_text_atomic(path=archive_path, content=f"{raw_json}\n")
         return archive_path
 
 
 class RetryQueue:
     """Store failed payloads as individual JSON files."""
 
-    def __init__(self, data_dir: Path) -> None:
+    def __init__(self, *, data_dir: Path) -> None:
         """Use the queue directory beneath the supplied application data root."""
         self._root = data_dir / "queue"
 
     def enqueue(
         self,
-        output_key: str,
         *,
+        output_key: str,
         payload: RelayPayload,
         queued_at: datetime,
     ) -> Path:
@@ -54,7 +54,7 @@ class RetryQueue:
             "parse_error": payload.parse_error,
         }
         write_text_atomic(
-            queue_path,
+            path=queue_path,
             content=f"{json.dumps(record, ensure_ascii=False, indent=2)}\n",
         )
         return queue_path
@@ -66,21 +66,21 @@ class RetryQueue:
 
         items: list[RetryItem] = []
         for path in sorted(self._root.glob("*.json")):
-            record = parse_json(path.read_text(encoding="utf-8"))
+            record = parse_json(raw_json=path.read_text(encoding="utf-8"))
             if not isinstance(record, dict):
                 msg = f"Retry queue record must be an object: {path.name}"
                 raise TypeError(msg)
             if "payload" not in record:
                 msg = f"Retry queue record is missing required fields: {path.name}"
                 raise ValueError(msg)
-            items.append(self._load_item(path, record=record))
+            items.append(self._load_item(path=path, record=record))
         return items
 
-    def remove(self, item: RetryItem) -> None:
+    def remove(self, *, item: RetryItem) -> None:
         """Remove a successfully delivered queue item."""
         Path(item.storage_key).unlink(missing_ok=True)
 
-    def count(self, output_key: str | None = None) -> int:
+    def count(self, *, output_key: str | None = None) -> int:
         """Return all queued deliveries or those belonging to one output."""
         if not self._root.exists():
             return 0
@@ -89,7 +89,7 @@ class RetryQueue:
         return sum(item.output_key == output_key for item in self.pending())
 
     @staticmethod
-    def _load_item(path: Path, *, record: dict[str, JSONValue]) -> RetryItem:
+    def _load_item(*, path: Path, record: dict[str, JSONValue]) -> RetryItem:
         output_key = record.get("output_key", "gas")
         if not isinstance(output_key, str):
             msg = f"Retry queue output key must be a string: {path.name}"

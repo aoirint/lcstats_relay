@@ -27,16 +27,23 @@ class _FakePage:
         self.on_close: object | None = None
         self.controls: list[ft.Control] = []
 
-    def add(self, *controls: ft.Control) -> None:
+    def add(  # keyword-only-exception: Flet Page ABI
+        self, *controls: ft.Control
+    ) -> None:
         self.controls.extend(controls)
 
 
-def test_main_configures_and_mounts_monitor(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_configures_and_mounts_monitor(*, monkeypatch: pytest.MonkeyPatch) -> None:
     """Configure the window, close handler, and root monitor control."""
     page = _FakePage()
     root = ft.Column()
 
-    monkeypatch.setattr(MonitorView, "build", lambda _self: root)
+    def build(  # keyword-only-exception: monkeypatched Flet control method ABI
+        _self: MonitorView,
+    ) -> ft.Control:
+        return root
+
+    monkeypatch.setattr(MonitorView, "build", build)
     asyncio.run(main(cast("ft.Page", page)))
 
     assert page.title == "LCStats Relay"
@@ -47,7 +54,7 @@ def test_main_configures_and_mounts_monitor(monkeypatch: pytest.MonkeyPatch) -> 
     assert page.controls == [root]
 
 
-def test_run_starts_flet_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_starts_flet_runtime(*, monkeypatch: pytest.MonkeyPatch) -> None:
     """Pass the async page target to the Flet runtime."""
     targets: list[object] = []
     monkeypatch.setattr(ft, "run", targets.append)

@@ -6,7 +6,7 @@ from urllib.parse import parse_qsl, urlparse
 _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
 
-def validate_sse_url(value: str) -> str:
+def validate_sse_url(*, value: str) -> str:
     """Validate and normalize the local stats endpoint URL."""
     url = value.strip()
     parsed = urlparse(url)
@@ -19,7 +19,7 @@ def validate_sse_url(value: str) -> str:
     return url
 
 
-def validate_gas_url(value: str) -> str:
+def validate_gas_url(*, value: str) -> str:
     """Validate and normalize a Google Apps Script Web App URL."""
     url = value.strip()
     parsed = urlparse(url)
@@ -35,7 +35,7 @@ def validate_gas_url(value: str) -> str:
     return url
 
 
-def validate_data_dir(value: str) -> Path:
+def validate_data_dir(*, value: str) -> Path:
     """Validate and normalize the local archive root directory."""
     raw_path = value.strip()
     if not raw_path:

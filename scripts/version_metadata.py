@@ -23,7 +23,7 @@ class VersionMetadata:
     release_mode: str
 
 
-def read_version_metadata(pyproject_path: Path) -> VersionMetadata:
+def read_version_metadata(*, pyproject_path: Path) -> VersionMetadata:
     """Read and validate one normalized PEP 440 project version."""
     data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
     project = data.get("project")
@@ -62,7 +62,7 @@ def read_version_metadata(pyproject_path: Path) -> VersionMetadata:
     )
 
 
-def _write_github_output(path: Path, metadata: VersionMetadata) -> None:
+def _write_github_output(*, path: Path, metadata: VersionMetadata) -> None:
     values = {
         "project_version": metadata.project_version,
         "build_version": metadata.build_version,
@@ -74,14 +74,14 @@ def _write_github_output(path: Path, metadata: VersionMetadata) -> None:
             output.write(f"{key}={value}\n")
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(*, argv: Sequence[str] | None = None) -> int:
     """Write validated metadata to the GitHub Actions output file."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--pyproject", type=Path, default=Path("pyproject.toml"))
     parser.add_argument("--github-output", type=Path, required=True)
     args = parser.parse_args(argv)
-    metadata = read_version_metadata(args.pyproject)
-    _write_github_output(args.github_output, metadata)
+    metadata = read_version_metadata(pyproject_path=args.pyproject)
+    _write_github_output(path=args.github_output, metadata=metadata)
     return 0
 
 

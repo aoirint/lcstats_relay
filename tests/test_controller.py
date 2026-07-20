@@ -1,11 +1,11 @@
 """Tests for the Flet-free monitor controller."""
 
 import asyncio
-from collections.abc import Callable
 from pathlib import Path
 
+from lcstats_relay.application.relay import PayloadCallback
 from lcstats_relay.application.settings import RelaySettings
-from lcstats_relay.application.state import ConnectionState, RelayStatus
+from lcstats_relay.application.state import ConnectionState, RelayStatus, StateCallback
 from lcstats_relay.domain.payload import JSONValue
 from lcstats_relay.presentation.controller import MonitorController
 
@@ -17,7 +17,7 @@ class _MemorySettings:
     def load(self) -> RelaySettings:
         return self.settings
 
-    def save(self, settings: RelaySettings) -> None:
+    def save(self, *, settings: RelaySettings) -> None:
         self.settings = settings
 
 
@@ -25,23 +25,23 @@ class _ObservableManager:
     def __init__(
         self,
         *,
-        on_state: Callable[[ConnectionState], None],
-        on_payload: Callable[[JSONValue], None],
+        on_state: StateCallback,
+        on_payload: PayloadCallback,
     ) -> None:
         self._on_state = on_state
         self._on_payload = on_payload
         self.stop_count = 0
 
     def start(self) -> None:
-        self._on_state(ConnectionState(status=RelayStatus.WAITING, running=True))
-        self._on_payload({"Seed": 42})
+        self._on_state(state=ConnectionState(status=RelayStatus.WAITING, running=True))
+        self._on_payload(payload={"Seed": 42})
 
     async def stop(self) -> None:
         self.stop_count += 1
-        self._on_state(ConnectionState(status=RelayStatus.STOPPED))
+        self._on_state(state=ConnectionState(status=RelayStatus.STOPPED))
 
 
-def test_controller_forwards_manager_state_payload_and_cleanup(tmp_path: Path) -> None:
+def test_controller_forwards_manager_state_payload_and_cleanup(*, tmp_path: Path) -> None:
     """Own one observable manager and publish each semantic transition once."""
 
     async def scenario() -> None:
@@ -56,8 +56,8 @@ def test_controller_forwards_manager_state_payload_and_cleanup(tmp_path: Path) -
             gas_url: str,
             gas_token: str,
             data_dir: Path,
-            on_state: Callable[[ConnectionState], None],
-            on_payload: Callable[[JSONValue], None],
+            on_state: StateCallback,
+            on_payload: PayloadCallback,
         ) -> _ObservableManager:
             del sse_url, gas_url, gas_token, data_dir
             manager = _ObservableManager(on_state=on_state, on_payload=on_payload)
@@ -70,10 +70,10 @@ def test_controller_forwards_manager_state_payload_and_cleanup(tmp_path: Path) -
         )
         controller.bind(
             on_change=lambda: changes.append(controller.relay_state),
-            on_payload=payloads.append,
+            on_payload=lambda *, payload: payloads.append(payload),
         )
         assert controller.save_settings(
-            "http://localhost:2145/",
+            tracker_url="http://localhost:2145/",
             data_dir=str(tmp_path),
         )
         assert await controller.start()
