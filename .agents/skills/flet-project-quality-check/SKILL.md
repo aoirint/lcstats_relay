@@ -59,8 +59,8 @@ duplicate weaker substitutes here.
 - Commit `pyproject.toml`, `.python-version`, and `uv.lock`. Set
   `[tool.uv] exclude-newer = "P7D"` and keep runtime and development dependencies declared.
 - Put `ruff`, `mypy`, `pytest`, and `pytest-cov` in a development dependency group.
-- Prefer keyword arguments and make project-owned parameters keyword-only after at most one primary
-  input; retain positional compatibility only for a documented external signature.
+- Require keyword arguments from the first project-owned parameter at definitions and call sites;
+  retain positional compatibility only for a documented external signature.
 - Configure Ruff lint and format checks, `mypy` with `strict = true` plus
   `warn_unreachable = true`, and pytest-cov with both branch and statement coverage at 100%.
 - Run checks through the locked uv environment. A passing test command that mutates the lockfile is
@@ -138,7 +138,7 @@ informal list.
 - Flet controls render state and emit intents; they do not own business workflows or hidden task state.
 - Every background task has an owner, cancellation path, stale-result policy, and shutdown test.
 - uv lock/cooldown, Ruff, strict mypy, pytest, branch coverage, and 100% threshold are enforced.
-- First-party API definitions and calls make argument meaning explicit with keyword-only boundaries.
+- First-party API definitions and calls require keywords from the first project-owned argument.
 - CI is least-privilege, SHA-pinned, lock-preserving, and equivalent to documented local checks.
 - Persistence, secrets, logs, external input, and packaged artifacts have explicit safety contracts.
 - Required documentation indexes exist and current implementation facts have canonical owners.

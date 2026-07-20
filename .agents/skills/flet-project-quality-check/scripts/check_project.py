@@ -10,13 +10,16 @@ from __future__ import annotations
 
 import argparse
 import ast
+import io
 import json
 import re
 import sys
-import tomllib
+import tokenize
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
+import tomllib
 
 REQUIRED_FILES = (
     "pyproject.toml",
@@ -39,6 +42,7 @@ REQUIRED_RUFF_FAMILIES = {
     "FBT",
     "I",
     "PL",
+    "PLR0917",
     "PT",
     "RUF",
     "S",
@@ -54,7 +58,56 @@ REQUIRED_CI_COMMANDS = (
     "uv run --locked mypy",
     "uv run --locked pytest",
 )
+TOP_LEVEL_EXCLUDED_PYTHON_PARTS = {
+    ".agents",
+    ".git",
+    "apm_modules",
+}
+NESTED_EXCLUDED_PYTHON_PARTS = {
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".tox",
+    ".venv",
+    "__pycache__",
+    "site-packages",
+}
+ALLOWED_RUFF_EXCLUDE_PATHS = {
+    ".agents/skills",
+    ".agents/worktrees",
+    "apm_modules",
+}
+RECEIVER_PRESERVING_DECORATOR_PATHS = {
+    "abc.abstractmethod",
+    "builtins.property",
+    "functools.cache",
+    "functools.cached_property",
+    "functools.lru_cache",
+    "property",
+    "typing.override",
+    "typing_extensions.override",
+}
+IMPLICIT_CLASS_RECEIVER_METHODS = {
+    "__class_getitem__",
+    "__init_subclass__",
+    "__new__",
+}
+PROTECTED_POSITIONAL_POLICY_PATHS = RECEIVER_PRESERVING_DECORATOR_PATHS | {
+    "builtins.classmethod",
+    "builtins.staticmethod",
+    "classmethod",
+    "collections.namedtuple",
+    "dataclasses.dataclass",
+    "dataclasses.field",
+    "dataclasses.make_dataclass",
+    "staticmethod",
+    "typing.NamedTuple",
+}
 USES_PATTERN = re.compile(r"""\buses:\s*["']?([^\s#"']+)""")
+KEYWORD_ONLY_EXCEPTION_PATTERN = re.compile(
+    r"^#\s*(?:noqa:\s*PLR0917\s*--\s*)?keyword-only-exception:\s*"
+    r"(?P<reason>\S(?:.*\S)?)\s*$"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,6 +238,62 @@ class Checker:
             "pyproject.toml",
             f"Ruff minimum families are missing: {', '.join(missing_families)}",
         )
+        self.require(
+            ruff_lint.get("preview") is True,
+            "ruff-preview",
+            "pyproject.toml",
+            "tool.ruff.lint.preview must be true for PLR0917",
+        )
+        self.require(
+            ruff_lint.get("explicit-preview-rules") is True,
+            "ruff-explicit-preview",
+            "pyproject.toml",
+            "tool.ruff.lint.explicit-preview-rules must be true",
+        )
+        ruff_pylint = _table(ruff_lint, "pylint")
+        max_positional_args = ruff_pylint.get("max-positional-args")
+        self.require(
+            type(max_positional_args) is int and max_positional_args == 0,
+            "ruff-positional-arguments",
+            "pyproject.toml",
+            "tool.ruff.lint.pylint.max-positional-args must equal 0",
+        )
+        ignored_selectors = {
+            selector.upper()
+            for key in ("ignore", "extend-ignore")
+            for selector in _string_list(ruff_lint.get(key))
+        }
+        for key in ("per-file-ignores", "extend-per-file-ignores"):
+            per_file_ignores = _table(ruff_lint, key)
+            ignored_selectors.update(
+                selector.upper()
+                for selectors in per_file_ignores.values()
+                for selector in _string_list(selectors)
+            )
+        self.require(
+            not any(
+                selector == "ALL" or "PLR0917".startswith(selector)
+                for selector in ignored_selectors
+            ),
+            "ruff-positional-arguments-suppression",
+            "pyproject.toml",
+            "PLR0917 must not be suppressed globally or through per-file ignores",
+        )
+        ruff_excludes = {
+            _normalize_ruff_exclude(pattern)
+            for value in (
+                ruff.get("exclude"),
+                ruff.get("extend-exclude"),
+                ruff_lint.get("exclude"),
+            )
+            for pattern in _string_list(value)
+        }
+        self.require(
+            ruff_excludes <= ALLOWED_RUFF_EXCLUDE_PATHS,
+            "ruff-owned-source-exclusion",
+            "pyproject.toml",
+            "Ruff exclusions may contain only generated APM or agent-worktree paths",
+        )
 
         mypy = _table(tool, "mypy")
         self.require(
@@ -288,39 +397,117 @@ class Checker:
                         f"{layer} layer must not import Flet",
                     )
 
-        for file in src.rglob("*.py") if src.is_dir() else ():
-            self._check_keyword_only_definitions(file)
+        for file in self.root.rglob("*.py"):
+            relative_parts = file.relative_to(self.root).parts
+            if not _python_file_is_excluded(relative_parts):
+                self._check_keyword_only_definitions(file)
 
     def _check_keyword_only_definitions(self, file: Path) -> None:
         relative = file.relative_to(self.root).as_posix()
         try:
             text = file.read_text(encoding="utf-8")
             tree = ast.parse(text, filename=relative)
-        except OSError, UnicodeError, SyntaxError:
+        except (OSError, UnicodeError, SyntaxError):
             return
-        lines = text.splitlines()
+        parents = {
+            child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)
+        }
+        comments = _comments_by_line(text)
+        import_aliases = _import_aliases(tree)
         for node in ast.walk(tree):
+            alias_value = _assignment_value(node)
+            if (
+                alias_value is not None
+                and _resolved_path(
+                    alias_value,
+                    import_aliases=import_aliases,
+                )
+                in PROTECTED_POSITIONAL_POLICY_PATHS
+            ):
+                self.add(
+                    "keyword-only-callable-alias",
+                    f"{relative}:{node.lineno}",
+                    "use the standard decorator or constructor directly instead of an "
+                    "assignment alias",
+                )
+                continue
+            if isinstance(node, ast.Lambda):
+                if node.args.posonlyargs or node.args.args or node.args.vararg is not None:
+                    self.add(
+                        "keyword-only-lambda",
+                        f"{relative}:{node.lineno}",
+                        "make lambda parameters keyword-only with 'lambda *, ...' or use a "
+                        "named definition for an external-signature exception",
+                    )
+                continue
+            if isinstance(node, ast.ClassDef):
+                dataclass_decorator = _dataclass_decorator(
+                    node=node,
+                    import_aliases=import_aliases,
+                )
+                if dataclass_decorator is not None and not _dataclass_is_keyword_only(
+                    dataclass_decorator
+                ):
+                    self.add(
+                        "keyword-only-dataclass",
+                        f"{relative}:{node.lineno}",
+                        "define project-owned dataclasses with dataclass(kw_only=True)",
+                    )
+                if dataclass_decorator is not None and _dataclass_has_positional_field(
+                    node=node,
+                    import_aliases=import_aliases,
+                ):
+                    self.add(
+                        "keyword-only-dataclass-field",
+                        f"{relative}:{node.lineno}",
+                        "remove field(kw_only=False) from keyword-only dataclasses",
+                    )
+                if any(
+                    _resolved_path(base, import_aliases=import_aliases) == "typing.NamedTuple"
+                    for base in node.bases
+                ):
+                    self.add(
+                        "keyword-only-generated-constructor",
+                        f"{relative}:{node.lineno}",
+                        "replace project-owned NamedTuple positional construction with a "
+                        "keyword-only value type",
+                    )
+                continue
+            if isinstance(node, ast.Call) and _resolved_path(
+                node.func,
+                import_aliases=import_aliases,
+            ) in {
+                "collections.namedtuple",
+                "dataclasses.make_dataclass",
+                "typing.NamedTuple",
+            }:
+                self.add(
+                    "keyword-only-generated-constructor",
+                    f"{relative}:{node.lineno}",
+                    "replace generated project-owned positional construction with a "
+                    "keyword-only value type",
+                )
+                continue
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
             positional = [*node.args.posonlyargs, *node.args.args]
-            if positional and positional[0].arg in {"self", "cls"}:
+            if positional and _is_implicit_receiver(
+                node=node,
+                parent=parents.get(node),
+                parameter=positional[0],
+                import_aliases=import_aliases,
+            ):
                 positional = positional[1:]
-            if len(positional) <= 1 or (node.name.startswith("__") and node.name.endswith("__")):
+            if not positional and node.args.vararg is None:
                 continue
-            decorator_names = {_decorator_name(decorator) for decorator in node.decorator_list}
-            if "override" in decorator_names:
-                continue
-            first_line = min(
-                [node.lineno, *(decorator.lineno for decorator in node.decorator_list)]
-            )
-            preceding = lines[max(0, first_line - 4) : first_line - 1]
-            if any("# keyword-only-exception:" in line for line in preceding):
+            exception = KEYWORD_ONLY_EXCEPTION_PATTERN.fullmatch(comments.get(node.lineno, ""))
+            if exception is not None and len(exception.group("reason")) >= 8:
                 continue
             self.add(
                 "keyword-only-definition",
                 f"{relative}:{node.lineno}",
-                "keep at most one project-owned input positional; add '*' before the rest or "
-                "document an external-signature exception",
+                "make the first project-owned parameter keyword-only with '*' or document a "
+                "narrow external-signature exception",
             )
 
     def _check_workflows(self) -> None:
@@ -455,14 +642,213 @@ def _dependency_name(requirement: str) -> str:
     return match.group(0).lower().replace("_", "-") if match else ""
 
 
-def _decorator_name(decorator: ast.expr) -> str:
+def _comments_by_line(text: str) -> dict[int, str]:
+    return {
+        token.start[0]: token.string
+        for token in tokenize.generate_tokens(io.StringIO(text).readline)
+        if token.type == tokenize.COMMENT
+    }
+
+
+def _is_implicit_receiver(
+    *,
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+    parent: ast.AST | None,
+    parameter: ast.arg,
+    import_aliases: dict[str, str],
+) -> bool:
+    if not isinstance(parent, ast.ClassDef):
+        return False
+    decorator_paths = {
+        _resolved_path(decorator, import_aliases=import_aliases)
+        for decorator in node.decorator_list
+    }
+    staticmethod_paths = {"staticmethod", "builtins.staticmethod"}
+    classmethod_paths = {"classmethod", "builtins.classmethod"}
+    property_decorators = {
+        f"{node.name}.deleter",
+        f"{node.name}.getter",
+        f"{node.name}.setter",
+    }
+    class_bound_names = {
+        name
+        for statement in parent.body
+        if statement is not node
+        for name in _bound_names(statement)
+    }
+    if any(
+        path not in property_decorators and path.partition(".")[0] in class_bound_names
+        for path in decorator_paths
+    ):
+        return False
+    known_decorators = (
+        RECEIVER_PRESERVING_DECORATOR_PATHS
+        | property_decorators
+        | staticmethod_paths
+        | classmethod_paths
+    )
+    if not decorator_paths <= known_decorators:
+        return False
+    if decorator_paths & staticmethod_paths:
+        return False
+    if node.name in IMPLICIT_CLASS_RECEIVER_METHODS:
+        return parameter.arg == "cls"
+    if decorator_paths & classmethod_paths:
+        return parameter.arg == "cls"
+    if parameter.arg != "self":
+        return False
+    return decorator_paths <= RECEIVER_PRESERVING_DECORATOR_PATHS | property_decorators
+
+
+def _decorator_path(decorator: ast.expr) -> str:
+    if isinstance(decorator, ast.Call):
+        return _decorator_path(decorator.func)
     if isinstance(decorator, ast.Name):
         return decorator.id
     if isinstance(decorator, ast.Attribute):
-        return decorator.attr
-    if isinstance(decorator, ast.Call):
-        return _decorator_name(decorator.func)
+        prefix = _decorator_path(decorator.value)
+        return f"{prefix}.{decorator.attr}" if prefix else decorator.attr
     return ""
+
+
+def _dataclass_decorator(
+    *,
+    node: ast.ClassDef,
+    import_aliases: dict[str, str],
+) -> ast.expr | None:
+    for decorator in node.decorator_list:
+        target = decorator.func if isinstance(decorator, ast.Call) else decorator
+        if _resolved_path(target, import_aliases=import_aliases) == "dataclasses.dataclass":
+            return decorator
+    return None
+
+
+def _dataclass_is_keyword_only(decorator: ast.expr) -> bool:
+    if not isinstance(decorator, ast.Call):
+        return False
+    return any(
+        keyword.arg == "kw_only"
+        and isinstance(keyword.value, ast.Constant)
+        and keyword.value.value is True
+        for keyword in decorator.keywords
+    )
+
+
+def _dataclass_has_positional_field(
+    *,
+    node: ast.ClassDef,
+    import_aliases: dict[str, str],
+) -> bool:
+    for statement in node.body:
+        if not isinstance(statement, ast.AnnAssign) or not isinstance(statement.value, ast.Call):
+            continue
+        if (
+            _resolved_path(statement.value.func, import_aliases=import_aliases)
+            != "dataclasses.field"
+        ):
+            continue
+        if any(
+            keyword.arg == "kw_only"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value is False
+            for keyword in statement.value.keywords
+        ):
+            return True
+    return False
+
+
+def _import_aliases(tree: ast.Module) -> dict[str, str]:
+    candidates: dict[str, set[str]] = {}
+    for statement in _module_scope_statements(tree):
+        if isinstance(statement, ast.ImportFrom) and statement.module is not None:
+            for imported in statement.names:
+                candidates.setdefault(imported.asname or imported.name, set()).add(
+                    f"{statement.module}.{imported.name}"
+                )
+        elif isinstance(statement, ast.Import):
+            for imported in statement.names:
+                candidates.setdefault(imported.asname or imported.name, set()).add(imported.name)
+        else:
+            for name in _bound_names(statement):
+                candidates.setdefault(name, set()).add("<shadowed>")
+    return {
+        name: next(iter(paths)) if len(paths) == 1 else "<shadowed>"
+        for name, paths in candidates.items()
+    }
+
+
+def _module_scope_statements(tree: ast.Module) -> list[ast.stmt]:
+    statements: list[ast.stmt] = []
+    pending = list(reversed(tree.body))
+    while pending:
+        statement = pending.pop()
+        statements.append(statement)
+        if isinstance(statement, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        children = [
+            child for child in ast.iter_child_nodes(statement) if isinstance(child, ast.stmt)
+        ]
+        pending.extend(reversed(children))
+    return statements
+
+
+def _bound_names(statement: ast.stmt) -> set[str]:
+    if isinstance(statement, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+        return {statement.name}
+    if isinstance(statement, ast.ImportFrom):
+        return {imported.asname or imported.name for imported in statement.names}
+    if isinstance(statement, ast.Import):
+        return {imported.asname or imported.name.partition(".")[0] for imported in statement.names}
+    targets: list[ast.expr] = []
+    if isinstance(statement, ast.Assign):
+        targets.extend(statement.targets)
+    elif isinstance(statement, (ast.AnnAssign, ast.AugAssign)):
+        targets.append(statement.target)
+    elif isinstance(statement, (ast.For, ast.AsyncFor)):
+        targets.append(statement.target)
+    elif isinstance(statement, (ast.With, ast.AsyncWith)):
+        targets.extend(item.optional_vars for item in statement.items if item.optional_vars)
+    return {
+        node.id for target in targets for node in ast.walk(target) if isinstance(node, ast.Name)
+    }
+
+
+def _resolved_path(expression: ast.expr, *, import_aliases: dict[str, str]) -> str:
+    path = _decorator_path(expression)
+    first, separator, remainder = path.partition(".")
+    resolved_first = import_aliases.get(first, first)
+    return f"{resolved_first}.{remainder}" if separator else resolved_first
+
+
+def _python_file_is_excluded(relative_parts: tuple[str, ...]) -> bool:
+    if relative_parts[0] in TOP_LEVEL_EXCLUDED_PYTHON_PARTS:
+        return True
+    if not NESTED_EXCLUDED_PYTHON_PARTS.isdisjoint(relative_parts):
+        return True
+    return relative_parts[0] != "src" and any(
+        part in {"build", "dist"} for part in relative_parts[:-1]
+    )
+
+
+def _normalize_ruff_exclude(pattern: str) -> str:
+    normalized = pattern.replace("\\", "/").strip("/")
+    return normalized.removesuffix("/**").rstrip("/")
+
+
+def _assignment_value(node: ast.AST) -> ast.expr | None:
+    if (
+        isinstance(node, ast.Assign)
+        and all(isinstance(target, ast.Name) for target in node.targets)
+        and isinstance(node.value, (ast.Name, ast.Attribute))
+    ):
+        return node.value
+    if (
+        isinstance(node, ast.AnnAssign)
+        and isinstance(node.target, ast.Name)
+        and isinstance(node.value, (ast.Name, ast.Attribute))
+    ):
+        return node.value
+    return None
 
 
 def main() -> int:

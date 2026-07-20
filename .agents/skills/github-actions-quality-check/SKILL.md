@@ -15,10 +15,12 @@ description: Quality-check GitHub Actions workflows and composite actions. Use w
 4. Check concurrency groups and cancellation rules for PRs, pushes, releases, merge queues, and publishing.
 5. Check runner labels, local composite actions, expressions, comments, cache paths, and suppressions.
    Read [runner-selection.md](references/runner-selection.md) when selecting or changing a
-   GitHub-hosted Linux runner. Prefer `ubuntu-slim` for measured lightweight jobs that fit its
-   container, resource, software, and 15-minute limits. Use a full VM image for heavyweight builds
-   or unsupported operations, and use `ubuntu-latest` only when following GitHub's moving stable
-   image is intentional rather than incidental.
+   GitHub-hosted runner. For compatibility-bearing jobs, use a versioned label for the oldest
+   GitHub-supported GA image in the required OS/architecture family. Prefer `ubuntu-slim` only for
+   measured lightweight jobs that have no native compatibility contract and fit its container,
+   resource, software, and 15-minute limits. Use `*-latest` only when following GitHub's moving
+   stable image is intentional rather than incidental. Record a recurring image-support review and
+   migrate before a dated deprecation reaches its brownout or phased withdrawal period.
    Validate every action input against the documentation or metadata for the exact pinned action
    version; do not infer an input name from a different action, tool, or release. Add
    `.github/actionlint.yaml` only for deliberate labels or variables that actionlint cannot infer.

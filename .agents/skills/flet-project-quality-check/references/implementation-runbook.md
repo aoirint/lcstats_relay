@@ -176,6 +176,10 @@ exist. Required documentation indexes may explicitly state that a section has no
 
 ## 5. Review semantic quality
 
+Inspect every first-party call to a definition marked `keyword-only-exception:`. Record the external
+contract, whether keyword invocation is supported, and whether all project-owned call sites use it;
+the definition checker cannot reject positional calls that the compatibility signature must accept.
+
 The mechanical checker cannot decide these. Review them explicitly:
 
 - one clear owner for each state, effect, task, route, and canonical fact;
