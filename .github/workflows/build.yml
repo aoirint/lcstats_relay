@@ -98,58 +98,11 @@ jobs:
           fi
           echo "should_release=true" >> "${GITHUB_OUTPUT}"
 
-  quality:
+  build:
     needs: validate
     if: needs.validate.outputs.should_release == 'true'
-    # The release gate repeats locked source checks but performs no native
-    # packaging, so it remains within the slim runner contract.
-    runs-on: ubuntu-slim
-    timeout-minutes: 15
-
-    steps:
-      - name: Check out release source
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          persist-credentials: false
-          ref: ${{ needs.validate.outputs.source_commit }}
-
-      - name: Install workflow lint tools
-        uses: ./.github/actions/install-workflow-tools
-
-      - name: Lint workflows and inline shell
-        run: actionlint -color
-
-      - name: Verify immutable action pins
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: pinact run --check --min-age 7
-
-      - name: Set up locked Python environment
-        uses: ./.github/actions/setup-python
-
-      - name: Check Python formatting
-        run: uv run --locked ruff format --check .
-
-      - name: Lint Python
-        run: uv run --locked ruff check .
-
-      - name: Type-check Python
-        run: uv run --locked mypy src tests scripts
-
-      - name: Test with full coverage
-        run: uv run --locked pytest
-
-      - name: Lint Markdown
-        uses: DavidAnson/markdownlint-cli2-action@ce4853d43830c74c1753b39f3cf40f71c2031eb9 # v23.0.0
-        with:
-          config: .markdownlint-cli2.yaml
-          globs: "**/*.md"
-
-  build:
-    needs:
-      - validate
-      - quality
-    if: needs.validate.outputs.should_release == 'true'
+    # Lint and Test own source-quality checks. This job verifies only the
+    # native release artifacts that are produced from the validated main SHA.
     name: Build release (${{ matrix.target }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
