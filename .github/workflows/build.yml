@@ -158,11 +158,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Native Flet packaging installs GTK/GStreamer and needs a full VM;
-          # pin the supported OS instead of following the moving latest label.
-          - runner: ubuntu-24.04
+          # Native artifacts use the oldest GitHub-supported GA image in each
+          # OS family to preserve the broadest supported runtime compatibility.
+          - runner: ubuntu-22.04
             target: linux
-          - runner: windows-latest
+          - runner: windows-2022
             target: windows
 
     steps:
