@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 
 
-def write_text_atomic(path: Path, *, content: str) -> None:
+def write_text_atomic(*, path: Path, content: str) -> None:
     """Replace a text file from a unique sibling after flushing its contents."""
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(

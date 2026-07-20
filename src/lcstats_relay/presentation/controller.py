@@ -6,8 +6,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
+from lcstats_relay.application.relay import PayloadCallback
 from lcstats_relay.application.settings import RelaySettings
-from lcstats_relay.application.state import ConnectionState
+from lcstats_relay.application.state import ConnectionState, StateCallback
 from lcstats_relay.domain.payload import JSONValue
 from lcstats_relay.presentation.validation import (
     validate_data_dir,
@@ -22,7 +23,7 @@ class SettingsGateway(Protocol):
     def load(self) -> RelaySettings:
         """Load the current settings snapshot."""
 
-    def save(self, settings: RelaySettings) -> None:
+    def save(self, *, settings: RelaySettings) -> None:
         """Persist one validated settings snapshot."""
 
 
@@ -46,14 +47,13 @@ class ManagerFactory(Protocol):
         gas_url: str,
         gas_token: str,
         data_dir: Path,
-        on_state: Callable[[ConnectionState], None],
-        on_payload: Callable[[JSONValue], None],
+        on_state: StateCallback,
+        on_payload: PayloadCallback,
     ) -> ManagerPort:
         """Build one manager for a connection session."""
 
 
 type ChangeCallback = Callable[[], None]
-type PayloadCallback = Callable[[JSONValue], None]
 
 
 class MonitorController:
@@ -74,7 +74,7 @@ class MonitorController:
         self._form_error = ""
         self._relay_state = ConnectionState()
         self._on_change: ChangeCallback = lambda: None
-        self._on_payload: PayloadCallback = lambda _payload: None
+        self._on_payload: PayloadCallback = lambda *, payload: None  # noqa: ARG005 - no-op default callback.
 
     @property
     def settings(self) -> RelaySettings:
@@ -106,28 +106,28 @@ class MonitorController:
         self._on_change = on_change
         self._on_payload = on_payload
 
-    def save_settings(self, tracker_url: str, *, data_dir: str) -> bool:
+    def save_settings(self, *, tracker_url: str, data_dir: str) -> bool:
         """Validate and persist tracker plus local storage settings."""
         try:
             settings = RelaySettings(
-                tracker_url=validate_sse_url(tracker_url),
+                tracker_url=validate_sse_url(value=tracker_url),
                 gas_url=self._settings.gas_url,
-                data_dir=validate_data_dir(data_dir),
+                data_dir=validate_data_dir(value=data_dir),
             )
         except ValueError as exc:
             self._form_error = str(exc)
             self._notify()
             return False
-        self._settings_gateway.save(settings)
+        self._settings_gateway.save(settings=settings)
         self._settings = settings
         self._form_error = ""
         self._notify()
         return True
 
-    def save_gas_auth(self, gas_url: str, *, gas_token: str) -> bool:
+    def save_gas_auth(self, *, gas_url: str, gas_token: str) -> bool:
         """Persist the GAS URL while retaining its token only in memory."""
         try:
-            normalized_url = validate_gas_url(gas_url) if gas_url.strip() else ""
+            normalized_url = validate_gas_url(value=gas_url) if gas_url.strip() else ""
         except ValueError as exc:
             self._form_error = str(exc)
             self._notify()
@@ -137,7 +137,7 @@ class MonitorController:
             gas_url=normalized_url,
             data_dir=self._settings.data_dir,
         )
-        self._settings_gateway.save(settings)
+        self._settings_gateway.save(settings=settings)
         self._settings = settings
         self._gas_token = gas_token.strip() if normalized_url else ""
         self._form_error = ""
@@ -147,11 +147,13 @@ class MonitorController:
     async def start(self) -> bool:
         """Validate settings and replace the owned manager session."""
         try:
-            tracker_url = validate_sse_url(self._settings.tracker_url)
+            tracker_url = validate_sse_url(value=self._settings.tracker_url)
             gas_url = (
-                validate_gas_url(self._settings.gas_url) if self._settings.gas_url.strip() else ""
+                validate_gas_url(value=self._settings.gas_url)
+                if self._settings.gas_url.strip()
+                else ""
             )
-            data_dir = validate_data_dir(str(self._settings.data_dir))
+            data_dir = validate_data_dir(value=str(self._settings.data_dir))
         except ValueError as exc:
             self._form_error = str(exc)
             self._notify()
@@ -193,12 +195,12 @@ class MonitorController:
             self._manager = None
         self._relay_state = ConnectionState()
 
-    def _receive_state(self, state: ConnectionState) -> None:
+    def _receive_state(self, *, state: ConnectionState) -> None:
         self._relay_state = state
         self._notify()
 
-    def _receive_payload(self, payload: JSONValue) -> None:
-        self._on_payload(payload)
+    def _receive_payload(self, *, payload: JSONValue) -> None:
+        self._on_payload(payload=payload)
 
     def _notify(self) -> None:
         self._on_change()

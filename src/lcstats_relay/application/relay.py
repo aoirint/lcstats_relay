@@ -20,9 +20,22 @@ from lcstats_relay.application.ports import (
 from lcstats_relay.application.state import ConnectionState, RelayStateStore, StateCallback
 from lcstats_relay.domain.payload import JSONValue, RelayPayload, parse_json
 
-type PayloadCallback = Callable[[JSONValue], None]
 type Clock = Callable[[], datetime]
-type Sleep = Callable[[float], Awaitable[None]]
+
+
+class PayloadCallback(Protocol):
+    """Receive one parsed payload with an explicit argument name."""
+
+    def __call__(self, *, payload: JSONValue) -> None:
+        """Consume one parsed payload."""
+
+
+class Sleep(Protocol):
+    """Await a reconnect or retry delay with an explicit argument name."""
+
+    def __call__(self, *, delay: float) -> Awaitable[None]:
+        """Wait for the requested delay."""
+
 
 _PREVIEW_LENGTH = 300
 
@@ -31,7 +44,11 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-def preview_payload(raw_json: str) -> str:
+async def _sleep(*, delay: float) -> None:
+    await asyncio.sleep(delay)
+
+
+def preview_payload(*, raw_json: str) -> str:
     """Return a bounded payload preview suitable for presentation state."""
     if len(raw_json) <= _PREVIEW_LENGTH:
         return raw_json
@@ -54,7 +71,7 @@ class RetryWorker:
         dispatcher: RetryDispatcher,
         state: RelayStateStore,
         interval: float,
-        sleep: Sleep = asyncio.sleep,
+        sleep: Sleep = _sleep,
     ) -> None:
         """Configure the dispatcher, observable state, and scheduling seam."""
         self._dispatcher = dispatcher
@@ -65,13 +82,15 @@ class RetryWorker:
     async def run_forever(self) -> None:
         """Retry until cancellation, keeping queue read failures observable."""
         while True:
-            await self._sleep(self._interval)
+            await self._sleep(delay=self._interval)
             try:
                 await self._dispatcher.retry_pending()
             except asyncio.CancelledError:
                 raise
             except (OSError, TypeError, ValueError) as exc:
-                self._state.receiver_error(_safe_error("再送キュー読込", error=exc))
+                self._state.receiver_error(
+                    message=_safe_error(operation="再送キュー読込", error=exc)
+                )
 
 
 class ConnectionManager:
@@ -88,7 +107,7 @@ class ConnectionManager:
         reconnect_delay: float = 3.0,
         retry_interval: float = 30.0,
         clock: Clock = _utc_now,
-        reconnect_sleep: Sleep = asyncio.sleep,
+        reconnect_sleep: Sleep = _sleep,
     ) -> None:
         """Configure application ports, state, and timing policy."""
         self._output_policies = tuple(output_policies)
@@ -101,7 +120,7 @@ class ConnectionManager:
         self._reconnect_sleep = reconnect_sleep
         self._task: asyncio.Task[None] | None = None
         self._state = RelayStateStore(
-            ((output.key, output.label) for output in self._output_policies),
+            outputs=((output.key, output.label) for output in self._output_policies),
             on_change=on_state,
         )
 
@@ -129,7 +148,7 @@ class ConnectionManager:
     async def _run(self) -> None:
         async with self._runtime_factory() as session:
             dispatcher = OutputDispatcher(
-                session.outputs,
+                outputs=session.outputs,
                 queue=self._queue,
                 state=self._state,
                 clock=self._clock,
@@ -137,9 +156,13 @@ class ConnectionManager:
             try:
                 await dispatcher.load_pending_counts()
             except (OSError, TypeError, ValueError) as exc:
-                self._state.receiver_error(_safe_error("再送キュー読込", error=exc))
+                self._state.receiver_error(
+                    message=_safe_error(operation="再送キュー読込", error=exc)
+                )
             async with asyncio.TaskGroup() as tasks:
-                tasks.create_task(self._receive_loop(session.receiver, dispatcher=dispatcher))
+                tasks.create_task(
+                    self._receive_loop(receiver=session.receiver, dispatcher=dispatcher)
+                )
                 tasks.create_task(
                     RetryWorker(
                         dispatcher=dispatcher,
@@ -150,8 +173,8 @@ class ConnectionManager:
 
     async def _receive_loop(
         self,
-        receiver: ReceiverPort,
         *,
+        receiver: ReceiverPort,
         dispatcher: OutputDispatcher,
     ) -> None:
         while True:
@@ -161,31 +184,33 @@ class ConnectionManager:
             except asyncio.CancelledError:
                 raise
             except ReceiverError as exc:
-                message = _safe_error("受信", error=exc)
-                self._state.receiver_error(message, retry_after_seconds=self._reconnect_delay)
-                await self._wait_before_reconnect(message)
+                message = _safe_error(operation="受信", error=exc)
+                self._state.receiver_error(
+                    message=message, retry_after_seconds=self._reconnect_delay
+                )
+                await self._wait_before_reconnect(message=message)
                 continue
 
             now = self._clock()
-            self._state.received(at=now, preview=preview_payload(raw_json))
-            payload = self._build_payload(raw_json, received_at=now)
+            self._state.received(at=now, preview=preview_payload(raw_json=raw_json))
+            payload = self._build_payload(raw_json=raw_json, received_at=now)
             if payload.parse_error is None:
-                self._on_payload(payload.payload)
-            await dispatcher.dispatch(payload)
+                self._on_payload(payload=payload.payload)
+            await dispatcher.dispatch(payload=payload)
 
-    async def _wait_before_reconnect(self, message: str) -> None:
+    async def _wait_before_reconnect(self, *, message: str) -> None:
         remaining = self._reconnect_delay
         while remaining > 0:
             step = min(1.0, remaining)
-            await self._reconnect_sleep(step)
+            await self._reconnect_sleep(delay=step)
             remaining = max(0.0, remaining - step)
             if remaining > 0:
-                self._state.receiver_error(message, retry_after_seconds=remaining)
+                self._state.receiver_error(message=message, retry_after_seconds=remaining)
 
     @staticmethod
-    def _build_payload(raw_json: str, *, received_at: datetime) -> RelayPayload:
+    def _build_payload(*, raw_json: str, received_at: datetime) -> RelayPayload:
         try:
-            payload = parse_json(raw_json)
+            payload = parse_json(raw_json=raw_json)
         except json.JSONDecodeError as exc:
             return RelayPayload(
                 raw_json=raw_json,
@@ -196,7 +221,7 @@ class ConnectionManager:
         return RelayPayload(raw_json=raw_json, payload=payload, received_at=received_at)
 
 
-def _safe_error(operation: str, *, error: Exception) -> str:
+def _safe_error(*, operation: str, error: Exception) -> str:
     if isinstance(error, ReceiverError):
         return f"{operation}エラー: {error.detail}"
     return f"{operation}エラー: {type(error).__name__}"

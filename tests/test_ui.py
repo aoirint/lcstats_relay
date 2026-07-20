@@ -1,7 +1,6 @@
 """Tests for monitor control state and async actions."""
 
 import asyncio
-from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -9,9 +8,15 @@ from typing import Any, cast
 import flet as ft
 import pytest
 
+from lcstats_relay.application.relay import PayloadCallback
 from lcstats_relay.application.settings import DEFAULT_TRACKER_URL, RelaySettings
-from lcstats_relay.application.state import ConnectionState, OutputState, OutputStatus, RelayStatus
-from lcstats_relay.domain.payload import JSONValue
+from lcstats_relay.application.state import (
+    ConnectionState,
+    OutputState,
+    OutputStatus,
+    RelayStatus,
+    StateCallback,
+)
 from lcstats_relay.infrastructure.config import SettingsStore
 from lcstats_relay.presentation.controller import (
     ManagerFactory,
@@ -49,6 +54,7 @@ class _FakeManager:
 
 
 def _factory_for(
+    *,
     manager: _FakeManager,
 ) -> ManagerFactory:
     def create(  # noqa: PLR0913 - fake mirrors the complete composition protocol.
@@ -57,8 +63,8 @@ def _factory_for(
         gas_url: str,
         gas_token: str,
         data_dir: Path,
-        on_state: Callable[[ConnectionState], None],
-        on_payload: Callable[[JSONValue], None],
+        on_state: StateCallback,
+        on_payload: PayloadCallback,
     ) -> _FakeManager:
         del sse_url, gas_url, gas_token, data_dir, on_state, on_payload
         return manager
@@ -66,18 +72,18 @@ def _factory_for(
     return create
 
 
-def _settings_store(tmp_path: Path) -> SettingsStore:
-    return SettingsStore(tmp_path / "settings.json")
+def _settings_store(*, tmp_path: Path) -> SettingsStore:
+    return SettingsStore(path=tmp_path / "settings.json")
 
 
-def _controller_for(manager: _FakeManager, *, store: SettingsStore) -> MonitorController:
+def _controller_for(*, manager: _FakeManager, store: SettingsStore) -> MonitorController:
     return MonitorController(
         settings_gateway=store,
-        manager_factory=_factory_for(manager),
+        manager_factory=_factory_for(manager=manager),
     )
 
 
-def _active_heading(view: MonitorView) -> str | None:
+def _active_heading(*, view: MonitorView) -> str | None:
     header = cast("ft.Row", view.root_view.controls[0])
     heading = cast("ft.Text", header.controls[0])
     return heading.value
@@ -85,12 +91,12 @@ def _active_heading(view: MonitorView) -> str | None:
 
 def test_url_validation_accepts_expected_endpoints() -> None:
     """Accept the local source and deployed Apps Script endpoint shapes."""
-    assert validate_sse_url(" http://localhost:2145/ ") == "http://localhost:2145/"
-    assert validate_sse_url("http://127.0.0.1:2145/") == "http://127.0.0.1:2145/"
-    assert validate_sse_url("http://[::1]:2145/") == "http://[::1]:2145/"
-    assert validate_data_dir(" ~/lcstats-data ") == Path("~/lcstats-data").expanduser()
+    assert validate_sse_url(value=" http://localhost:2145/ ") == "http://localhost:2145/"
+    assert validate_sse_url(value="http://127.0.0.1:2145/") == "http://127.0.0.1:2145/"
+    assert validate_sse_url(value="http://[::1]:2145/") == "http://[::1]:2145/"
+    assert validate_data_dir(value=" ~/lcstats-data ") == Path("~/lcstats-data").expanduser()
     gas_url = "https://script.google.com/macros/s/deployment-id/exec"
-    assert validate_gas_url(gas_url) == gas_url
+    assert validate_gas_url(value=gas_url) == gas_url
 
 
 @pytest.mark.parametrize(
@@ -101,10 +107,10 @@ def test_url_validation_accepts_expected_endpoints() -> None:
         ("http://user:password@localhost:2145/", "認証情報"),
     ],
 )
-def test_sse_url_validation_rejects_unsafe_endpoint(value: str, message: str) -> None:
+def test_sse_url_validation_rejects_unsafe_endpoint(*, value: str, message: str) -> None:
     """Restrict the receiver to an unauthenticated local HTTP endpoint."""
     with pytest.raises(ValueError, match=message):
-        validate_sse_url(value)
+        validate_sse_url(value=value)
 
 
 @pytest.mark.parametrize(
@@ -116,21 +122,21 @@ def test_sse_url_validation_rejects_unsafe_endpoint(value: str, message: str) ->
         ("https://script.google.com/macros/s/id/exec?token=secret", "Token"),
     ],
 )
-def test_gas_url_validation_rejects_unexpected_endpoint(value: str, message: str) -> None:
+def test_gas_url_validation_rejects_unexpected_endpoint(*, value: str, message: str) -> None:
     """Prevent forwarding archived stats to an unintended host or URL credential."""
     with pytest.raises(ValueError, match=message):
-        validate_gas_url(value)
+        validate_gas_url(value=value)
 
 
-def test_start_allows_connection_without_gas_destination(tmp_path: Path) -> None:
+def test_start_allows_connection_without_gas_destination(*, tmp_path: Path) -> None:
     """Allow local archive-only connections when GAS is not configured."""
 
     async def scenario() -> None:
         page = _FakePage()
         manager = _FakeManager()
         view = MonitorView(
-            page,
-            controller=_controller_for(manager, store=_settings_store(tmp_path)),
+            page=page,
+            controller=_controller_for(manager=manager, store=_settings_store(tmp_path=tmp_path)),
         )
 
         await view.start()
@@ -143,22 +149,22 @@ def test_start_allows_connection_without_gas_destination(tmp_path: Path) -> None
     asyncio.run(scenario())
 
 
-def test_start_rejects_invalid_configured_gas_destination(tmp_path: Path) -> None:
+def test_start_rejects_invalid_configured_gas_destination(*, tmp_path: Path) -> None:
     """Validate a configured GAS destination before creating the manager."""
 
     async def scenario() -> None:
         page = _FakePage()
-        store = _settings_store(tmp_path)
+        store = _settings_store(tmp_path=tmp_path)
         store.save(
-            RelaySettings(
+            settings=RelaySettings(
                 tracker_url=DEFAULT_TRACKER_URL,
                 gas_url="https://example.com/macros/s/id/exec",
                 data_dir=tmp_path,
             ),
         )
         view = MonitorView(
-            page,
-            controller=_controller_for(_FakeManager(), store=store),
+            page=page,
+            controller=_controller_for(manager=_FakeManager(), store=store),
         )
 
         await view.start()
@@ -170,7 +176,7 @@ def test_start_rejects_invalid_configured_gas_destination(tmp_path: Path) -> Non
     asyncio.run(scenario())
 
 
-def test_start_replaces_manager_and_stop_unlocks_settings(tmp_path: Path) -> None:
+def test_start_replaces_manager_and_stop_unlocks_settings(*, tmp_path: Path) -> None:
     """Wire validated controls to one manager and replace an earlier instance safely."""
 
     async def scenario() -> None:
@@ -184,8 +190,8 @@ def test_start_replaces_manager_and_stop_unlocks_settings(tmp_path: Path) -> Non
             gas_url: str,
             gas_token: str,
             data_dir: Path,
-            on_state: Callable[[ConnectionState], None],
-            on_payload: Callable[[JSONValue], None],
+            on_state: StateCallback,
+            on_payload: PayloadCallback,
         ) -> _FakeManager:
             del on_state, on_payload
             arguments.append((sse_url, gas_url, gas_token, data_dir))
@@ -194,15 +200,15 @@ def test_start_replaces_manager_and_stop_unlocks_settings(tmp_path: Path) -> Non
             return manager
 
         view = MonitorView(
-            page,
+            page=page,
             controller=MonitorController(
-                settings_gateway=_settings_store(tmp_path),
+                settings_gateway=_settings_store(tmp_path=tmp_path),
                 manager_factory=factory,
             ),
         )
-        view.save_settings(DEFAULT_TRACKER_URL, data_dir=str(tmp_path))
+        view.save_settings(tracker_url=DEFAULT_TRACKER_URL, data_dir=str(tmp_path))
         view.save_gas_auth(
-            "https://script.google.com/macros/s/id/exec",
+            gas_url="https://script.google.com/macros/s/id/exec",
             gas_token="secret",  # noqa: S106 - inert test fixture, not a credential.
         )
         updates_before_start = page.update_count
@@ -241,17 +247,17 @@ def test_start_replaces_manager_and_stop_unlocks_settings(tmp_path: Path) -> Non
     asyncio.run(scenario())
 
 
-def test_close_stops_active_manager(tmp_path: Path) -> None:
+def test_close_stops_active_manager(*, tmp_path: Path) -> None:
     """Stop background work without issuing a page update during window shutdown."""
 
     async def scenario() -> None:
         page = _FakePage()
         manager = _FakeManager()
         view = MonitorView(
-            page,
-            controller=_controller_for(manager, store=_settings_store(tmp_path)),
+            page=page,
+            controller=_controller_for(manager=manager, store=_settings_store(tmp_path=tmp_path)),
         )
-        view.save_gas_auth("https://script.google.com/macros/s/id/exec", gas_token="")
+        view.save_gas_auth(gas_url="https://script.google.com/macros/s/id/exec", gas_token="")
         await view.start()
         updates_before_close = page.update_count
 
@@ -264,12 +270,14 @@ def test_close_stops_active_manager(tmp_path: Path) -> None:
     asyncio.run(scenario())
 
 
-def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
+def test_build_and_state_update_render_monitor(*, tmp_path: Path) -> None:
     """Build the page and format receiver plus output state fields."""
     page = _FakePage()
     view = MonitorView(
-        page,
-        controller=_controller_for(_FakeManager(), store=_settings_store(tmp_path)),
+        page=page,
+        controller=_controller_for(
+            manager=_FakeManager(), store=_settings_store(tmp_path=tmp_path)
+        ),
     )
 
     control = view.build()
@@ -298,7 +306,7 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
             ),
         },
     )
-    view.update_state(state)
+    view.update_state(state=state)
 
     assert isinstance(control, ft.Container)
     monitor_row = cast("ft.Row", view.root_view.controls[4])
@@ -316,7 +324,7 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
     first = view.output_destinations.controls[0]
     assert isinstance(first, ft.Container)
 
-    view.update_state(ConnectionState())
+    view.update_state(state=ConnectionState())
     assert view.last_received.value == "-"
     assert view.error.value == ""
     assert view.health.value == "停止中"
@@ -331,16 +339,18 @@ def test_build_and_state_update_render_monitor(tmp_path: Path) -> None:
     assert disconnected_status.value == "未接続"
 
 
-def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> None:
+def test_monitor_health_focuses_on_normal_and_output_alerts(*, tmp_path: Path) -> None:
     """Summarize normal operation and surface only abnormal outputs."""
     page = _FakePage()
     view = MonitorView(
-        page,
-        controller=_controller_for(_FakeManager(), store=_settings_store(tmp_path)),
+        page=page,
+        controller=_controller_for(
+            manager=_FakeManager(), store=_settings_store(tmp_path=tmp_path)
+        ),
     )
     view.build()
 
-    view.update_state(ConnectionState(status=RelayStatus.WAITING, running=True))
+    view.update_state(state=ConnectionState(status=RelayStatus.WAITING, running=True))
 
     assert view.health.value == "接続試行中"
     assert view.health.color == ft.Colors.ORANGE_800
@@ -350,7 +360,7 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
     assert len(view.output_destinations.controls) == 1
 
     view.update_state(
-        ConnectionState(
+        state=ConnectionState(
             status=RelayStatus.ERROR,
             running=True,
             last_error="受信エラー: ConnectError",
@@ -363,7 +373,7 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
     assert view.health_icon.icon == ft.Icons.WARNING_AMBER
 
     view.update_state(
-        ConnectionState(status=RelayStatus.WAITING, running=True, receive_count=1),
+        state=ConnectionState(status=RelayStatus.WAITING, running=True, receive_count=1),
     )
 
     assert view.health.value == "異常なし"
@@ -372,7 +382,7 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
     assert len(view.output_destinations.controls) == 1
 
     view.update_state(
-        ConnectionState(
+        state=ConnectionState(
             status=RelayStatus.DISPATCHING,
             running=True,
             outputs={
@@ -400,31 +410,35 @@ def test_monitor_health_focuses_on_normal_and_output_alerts(tmp_path: Path) -> N
     assert len(view.output_destinations.controls) == _OUTPUT_DESTINATION_COUNT
 
 
-def test_payload_callback_does_not_render_raw_payloads(tmp_path: Path) -> None:
+def test_payload_callback_does_not_render_raw_payloads(*, tmp_path: Path) -> None:
     """Avoid raw payload logs on the abnormality-focused monitor."""
     page = _FakePage()
     view = MonitorView(
-        page,
-        controller=_controller_for(_FakeManager(), store=_settings_store(tmp_path)),
+        page=page,
+        controller=_controller_for(
+            manager=_FakeManager(), store=_settings_store(tmp_path=tmp_path)
+        ),
     )
 
     for seed in range(_PAYLOAD_CALLS):
-        view.add_payload({"Seed": seed})
+        view.add_payload(payload={"Seed": seed})
 
     assert page.update_count == 0
 
 
-def test_output_destination_icons_reflect_each_output_state(tmp_path: Path) -> None:
+def test_output_destination_icons_reflect_each_output_state(*, tmp_path: Path) -> None:
     """Show a compact status icon for each configured destination."""
     page = _FakePage()
     view = MonitorView(
-        page,
-        controller=_controller_for(_FakeManager(), store=_settings_store(tmp_path)),
+        page=page,
+        controller=_controller_for(
+            manager=_FakeManager(), store=_settings_store(tmp_path=tmp_path)
+        ),
     )
     view.build()
 
     view.update_state(
-        ConnectionState(
+        state=ConnectionState(
             running=True,
             outputs={
                 "idle": OutputState(key="idle", label="待機", status=OutputStatus.IDLE),
@@ -455,18 +469,25 @@ def test_output_destination_icons_reflect_each_output_state(tmp_path: Path) -> N
     ]
 
 
-def test_settings_view_links_to_full_window_gas_auth_view(tmp_path: Path) -> None:
+def test_settings_view_links_to_full_window_gas_auth_view(*, tmp_path: Path) -> None:
     """Open GAS auth as an output setting without using modal backdrops."""
     page = _FakePage()
-    store = _settings_store(tmp_path)
+    store = _settings_store(tmp_path=tmp_path)
     view = MonitorView(
-        page,
-        controller=_controller_for(_FakeManager(), store=store),
+        page=page,
+        controller=_controller_for(manager=_FakeManager(), store=store),
     )
     view.build()
 
     view.open_settings()
-    assert _active_heading(view) == "設定"
+    assert _active_heading(view=view) == "設定"
+
+    settings_header = cast("ft.Row", view.root_view.controls[0])
+    close_button = cast("Any", settings_header.controls[-1])
+    close_button.on_click(None)
+    assert _active_heading(view=view) == "LCStats Relay Monitor"
+
+    view.open_settings()
     view.tracker_url_field.value = "http://localhost:2145/"
     view.data_dir_field.value = str(tmp_path / "archive-root")
 
@@ -477,16 +498,16 @@ def test_settings_view_links_to_full_window_gas_auth_view(tmp_path: Path) -> Non
     gas_button = cast("Any", output_row.controls[1])
     gas_button.on_click(None)
 
-    assert _active_heading(view) == "GAS認証"
+    assert _active_heading(view=view) == "GAS認証"
     view.gas_url_field.value = "https://script.google.com/macros/s/id/exec"
     view.gas_token_field.value = "secret"
     view.submit_gas_auth()
-    assert _active_heading(view) == "設定"
+    assert _active_heading(view=view) == "設定"
 
     view.tracker_url_field.value = "http://localhost:2145/"
     view.data_dir_field.value = str(tmp_path / "archive-root")
     view.submit_settings()
-    assert _active_heading(view) == "LCStats Relay Monitor"
+    assert _active_heading(view=view) == "LCStats Relay Monitor"
 
     settings = store.load()
     assert settings.tracker_url == "http://localhost:2145/"
@@ -496,28 +517,30 @@ def test_settings_view_links_to_full_window_gas_auth_view(tmp_path: Path) -> Non
     assert "secret" not in store.path.read_text(encoding="utf-8")
 
 
-def test_full_window_view_save_errors_keep_active_view(tmp_path: Path) -> None:
+def test_full_window_view_save_errors_keep_active_view(*, tmp_path: Path) -> None:
     """Report validation errors without leaving the active settings view."""
     page = _FakePage()
     view = MonitorView(
-        page,
-        controller=_controller_for(_FakeManager(), store=_settings_store(tmp_path)),
+        page=page,
+        controller=_controller_for(
+            manager=_FakeManager(), store=_settings_store(tmp_path=tmp_path)
+        ),
     )
     view.build()
 
     view.open_settings()
     view.data_dir_field.value = ""
     view.submit_settings()
-    assert _active_heading(view) == "設定"
+    assert _active_heading(view=view) == "設定"
     assert view.error.value == "ローカル保存先ディレクトリを指定してください"
 
     view.open_gas_auth()
     view.submit_gas_auth()
-    assert _active_heading(view) == "設定"
+    assert _active_heading(view=view) == "設定"
     assert view.error.value == ""
 
     view.open_gas_auth()
     view.gas_url_field.value = "https://example.com/macros/s/id/exec"
     view.submit_gas_auth()
-    assert _active_heading(view) == "GAS認証"
+    assert _active_heading(view=view) == "GAS認証"
     assert view.error.value == "GAS URLにはscript.google.comのHTTPS URLを指定してください"

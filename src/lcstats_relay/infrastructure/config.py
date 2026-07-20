@@ -47,7 +47,7 @@ def default_data_dir() -> Path:
 class SettingsStore:
     """Load and save the relay settings JSON file."""
 
-    def __init__(self, path: Path | None = None) -> None:
+    def __init__(self, *, path: Path | None = None) -> None:
         """Use the supplied path or the platform default."""
         self.path = path or default_config_path()
 
@@ -67,22 +67,22 @@ class SettingsStore:
             raise TypeError(msg)
 
         return RelaySettings(
-            tracker_url=_string_value(raw, key="tracker_url", default=DEFAULT_TRACKER_URL),
-            gas_url=_string_value(raw, key="gas_url", default=""),
-            data_dir=Path(_string_value(raw, key="data_dir", default=str(default_data_dir()))),
+            tracker_url=_string_value(raw=raw, key="tracker_url", default=DEFAULT_TRACKER_URL),
+            gas_url=_string_value(raw=raw, key="gas_url", default=""),
+            data_dir=Path(_string_value(raw=raw, key="data_dir", default=str(default_data_dir()))),
         )
 
-    def save(self, settings: RelaySettings) -> None:
+    def save(self, *, settings: RelaySettings) -> None:
         """Persist settings atomically as readable JSON."""
         payload = asdict(settings)
         payload["data_dir"] = str(settings.data_dir)
         write_text_atomic(
-            self.path,
+            path=self.path,
             content=f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n",
         )
 
 
-def _string_value(raw: dict[str, Any], *, key: str, default: str) -> str:
+def _string_value(*, raw: dict[str, Any], key: str, default: str) -> str:
     value = raw.get(key, default)
     if not isinstance(value, str):
         msg = f"設定ファイルの{key}は文字列である必要があります"

@@ -27,7 +27,7 @@ _RUNTIME_DIRECTORY_PATTERN = re.compile(r"^python(?P<major>\d+)\.(?P<minor>\d+)(
 _RUNTIME_FILE_PATTERN = re.compile(r"^python(?P<compact>\d{2,3})\.(?:dll|zip|_pth)$")
 
 
-def _validate_path(name: str, *, label: str) -> PurePosixPath | None:
+def _validate_path(*, name: str, label: str) -> PurePosixPath | None:
     normalized = name.removeprefix("./")
     if normalized in {"", "."}:
         return None
@@ -99,14 +99,14 @@ def _verify_zip(*, archive_path: Path, launcher: PurePosixPath) -> str:
     regular_files: set[PurePosixPath] = set()
     with zipfile.ZipFile(archive_path) as archive:
         for member in archive.infolist():
-            path = _validate_path(member.filename, label="ZIP")
+            path = _validate_path(name=member.filename, label="ZIP")
             if path is None or member.is_dir():
                 continue
             _record_path(path=path, paths=paths)
             mode = member.external_attr >> 16
             if stat.S_ISLNK(mode):
                 target = archive.read(member).decode("utf-8")
-                _validate_path(target, label=f"ZIP link {path}")
+                _validate_path(name=target, label=f"ZIP link {path}")
             else:
                 regular_files.add(path)
     return _verify_required_files(regular_files=regular_files, launcher=launcher)
@@ -118,12 +118,12 @@ def _verify_tar(*, archive_path: Path, launcher: PurePosixPath) -> str:
     launcher_mode: int | None = None
     with tarfile.open(archive_path, "r:gz") as archive:
         for member in archive.getmembers():
-            path = _validate_path(member.name, label="tar")
+            path = _validate_path(name=member.name, label="tar")
             if path is None or member.isdir():
                 continue
             _record_path(path=path, paths=paths)
             if member.issym() or member.islnk():
-                _validate_path(member.linkname, label=f"tar link {path}")
+                _validate_path(name=member.linkname, label=f"tar link {path}")
             elif member.isfile():
                 regular_files.add(path)
                 if path == launcher:
@@ -143,8 +143,8 @@ def verify_desktop_archive(*, archive_path: Path, target: str, launcher_name: st
     if not archive_path.is_file():
         msg = f"desktop archive does not exist: {archive_path}"
         raise ValueError(msg)
-    launcher = _validate_path(launcher_name, label="launcher")
-    if launcher is None or launcher.parent != PurePosixPath("."):
+    launcher = _validate_path(name=launcher_name, label="launcher")
+    if launcher is None or launcher.parent != PurePosixPath():
         msg = "launcher name must be one safe root path component"
         raise ValueError(msg)
 
@@ -156,7 +156,7 @@ def verify_desktop_archive(*, archive_path: Path, target: str, launcher_name: st
     raise ValueError(msg)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(*, argv: Sequence[str] | None = None) -> int:
     """Verify a desktop archive from command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--archive", type=Path, required=True)

@@ -14,7 +14,7 @@ from lcstats_relay.domain.payload import RelayPayload
 class OutputDeliveryError(Exception):
     """An output failure carrying safe UI text and retry eligibility."""
 
-    def __init__(self, message: str, *, retryable: bool) -> None:
+    def __init__(self, *, message: str, retryable: bool) -> None:
         """Retain a user-facing message without sensitive boundary details."""
         super().__init__(message)
         self.message = message
@@ -38,7 +38,7 @@ class RetrySemantics(StrEnum):
 class OutputSink(Protocol):
     """Deliver one received payload to an output surface."""
 
-    async def deliver(self, payload: RelayPayload) -> OutputReceipt:
+    async def deliver(self, *, payload: RelayPayload) -> OutputReceipt:
         """Deliver a payload or raise OutputDeliveryError."""
 
 
@@ -74,8 +74,8 @@ class RetryQueuePort(Protocol):
 
     def enqueue(
         self,
-        output_key: str,
         *,
+        output_key: str,
         payload: RelayPayload,
         queued_at: datetime,
     ) -> object:
@@ -84,10 +84,10 @@ class RetryQueuePort(Protocol):
     def pending(self) -> list[RetryItem]:
         """Return queued deliveries in deterministic order."""
 
-    def remove(self, item: RetryItem) -> None:
+    def remove(self, *, item: RetryItem) -> None:
         """Remove a successfully delivered item."""
 
-    def count(self, output_key: str | None = None) -> int:
+    def count(self, *, output_key: str | None = None) -> int:
         """Return all queued deliveries or those for one output."""
 
 
@@ -101,20 +101,20 @@ class ReceiverPort(Protocol):
 class ReceiverError(Exception):
     """A receive-boundary failure containing only presentation-safe detail."""
 
-    def __init__(self, detail: str) -> None:
+    def __init__(self, *, detail: str) -> None:
         """Retain a stable safe detail without leaking request data."""
         super().__init__(detail)
         self.detail = detail
 
     @classmethod
-    def from_http_status(cls, status_code: int) -> ReceiverError:
+    def from_http_status(cls, *, status_code: int) -> ReceiverError:
         """Build a safe error from an HTTP response status."""
-        return cls(f"HTTP {status_code}")
+        return cls(detail=f"HTTP {status_code}")
 
     @classmethod
-    def from_transport_error(cls, error: Exception) -> ReceiverError:
+    def from_transport_error(cls, *, error: Exception) -> ReceiverError:
         """Build a safe error without exposing request or credential details."""
-        return cls(type(error).__name__)
+        return cls(detail=type(error).__name__)
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
@@ -131,7 +131,7 @@ class RelayRuntime(Protocol):
     async def __aenter__(self) -> RelaySession:
         """Open resources and return application-facing ports."""
 
-    async def __aexit__(
+    async def __aexit__(  # noqa: PLR0917 -- keyword-only-exception: async context manager protocol ABI
         self,
         exc_type: type[BaseException] | None,
         exc: BaseException | None,

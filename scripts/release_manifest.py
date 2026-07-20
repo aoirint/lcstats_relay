@@ -9,6 +9,7 @@ import re
 import tomllib
 from collections.abc import Sequence
 from dataclasses import dataclass
+from operator import attrgetter
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -45,7 +46,7 @@ class ReleasePlan:
     checksums_path: Path
 
 
-def _parse_artifact(value: str) -> ReleaseArtifact:
+def _parse_artifact(*, value: str) -> ReleaseArtifact:
     target, separator, path_text = value.partition("=")
     if not separator or not target or not path_text:
         msg = "artifact must use TARGET=PATH with non-empty values"
@@ -53,7 +54,7 @@ def _parse_artifact(value: str) -> ReleaseArtifact:
     return ReleaseArtifact(target=target, path=Path(path_text))
 
 
-def _read_project_name(pyproject_path: Path) -> str:
+def _read_project_name(*, pyproject_path: Path) -> str:
     data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
     project = data.get("project")
     name = project.get("name") if isinstance(project, dict) else None
@@ -63,7 +64,7 @@ def _read_project_name(pyproject_path: Path) -> str:
     return name
 
 
-def _read_resolved_package_version(lock_path: Path, *, package_name: str) -> str:
+def _read_resolved_package_version(*, lock_path: Path, package_name: str) -> str:
     data = tomllib.loads(lock_path.read_text(encoding="utf-8"))
     packages = data.get("package")
     if not isinstance(packages, list):
@@ -80,7 +81,7 @@ def _read_resolved_package_version(lock_path: Path, *, package_name: str) -> str
     return versions[0]
 
 
-def _sha256(path: Path) -> str:
+def _sha256(*, path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as artifact:
         while chunk := artifact.read(1024 * 1024):
@@ -112,7 +113,7 @@ def _validate_build_identity(
 
 def write_release_files(*, plan: ReleasePlan) -> None:
     """Validate release identity and write one manifest plus checksum list."""
-    metadata = read_version_metadata(plan.pyproject_path)
+    metadata = read_version_metadata(pyproject_path=plan.pyproject_path)
     if metadata.release_mode == "edge":
         msg = "project version 0.0.0 cannot be released"
         raise ValueError(msg)
@@ -143,7 +144,7 @@ def write_release_files(*, plan: ReleasePlan) -> None:
         raise ValueError(msg)
 
     artifact_records = []
-    for artifact in sorted(plan.artifacts, key=lambda item: item.target):
+    for artifact in sorted(plan.artifacts, key=attrgetter("target")):
         launcher_name = "lcstats-relay.exe" if artifact.target == "windows" else "lcstats-relay"
         runtime_version = verify_desktop_archive(
             archive_path=artifact.path,
@@ -154,7 +155,7 @@ def write_release_files(*, plan: ReleasePlan) -> None:
             {
                 "file": artifact.path.name,
                 "python_runtime_version": runtime_version,
-                "sha256": _sha256(artifact.path),
+                "sha256": _sha256(path=artifact.path),
                 "size": artifact.path.stat().st_size,
                 "target": artifact.target,
             }
@@ -162,7 +163,9 @@ def write_release_files(*, plan: ReleasePlan) -> None:
     manifest: dict[str, Any] = {
         "artifacts": artifact_records,
         "build": {
-            "flet_version": _read_resolved_package_version(plan.lock_path, package_name="flet"),
+            "flet_version": _read_resolved_package_version(
+                lock_path=plan.lock_path, package_name="flet"
+            ),
             "number": plan.build_number,
             "builder_python_version": builder_python_version,
             "source_commit": plan.source_commit,
@@ -170,7 +173,7 @@ def write_release_files(*, plan: ReleasePlan) -> None:
             "workflow_url": plan.workflow_url,
         },
         "project": {
-            "name": _read_project_name(plan.pyproject_path),
+            "name": _read_project_name(pyproject_path=plan.pyproject_path),
             "version": metadata.project_version,
         },
         "schema_version": _SCHEMA_VERSION,
@@ -188,7 +191,7 @@ def write_release_files(*, plan: ReleasePlan) -> None:
     )
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(*, argv: Sequence[str] | None = None) -> int:
     """Generate release metadata from command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--pyproject", type=Path, default=Path("pyproject.toml"))
@@ -208,7 +211,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             pyproject_path=args.pyproject,
             python_version_path=args.python_version,
             lock_path=args.lock,
-            artifacts=[_parse_artifact(value) for value in args.artifact],
+            artifacts=[_parse_artifact(value=value) for value in args.artifact],
             build_number=args.build_number,
             source_commit=args.source_commit,
             workflow_url=args.workflow_url,

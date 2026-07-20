@@ -18,6 +18,7 @@ from scripts.version_metadata import main, read_version_metadata
     ],
 )
 def test_read_version_metadata(
+    *,
     tmp_path: Path,
     version: str,
     build_version: str,
@@ -27,7 +28,7 @@ def test_read_version_metadata(
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text(f'[project]\nversion = "{version}"\n', encoding="utf-8")
 
-    metadata = read_version_metadata(pyproject)
+    metadata = read_version_metadata(pyproject_path=pyproject)
 
     assert metadata.project_version == version
     assert metadata.build_version == build_version
@@ -47,6 +48,7 @@ def test_read_version_metadata(
     ],
 )
 def test_read_version_metadata_rejects_unsupported_versions(
+    *,
     tmp_path: Path,
     document: str,
     message: str,
@@ -56,16 +58,16 @@ def test_read_version_metadata_rejects_unsupported_versions(
     pyproject.write_text(document, encoding="utf-8")
 
     with pytest.raises(ValueError, match=message):
-        read_version_metadata(pyproject)
+        read_version_metadata(pyproject_path=pyproject)
 
 
-def test_main_writes_github_outputs(tmp_path: Path) -> None:
+def test_main_writes_github_outputs(*, tmp_path: Path) -> None:
     """Expose stable output names for the local Composite Action."""
     pyproject = tmp_path / "pyproject.toml"
     output = tmp_path / "github-output.txt"
     pyproject.write_text('[project]\nversion = "1.2.3"\n', encoding="utf-8")
 
-    assert main(["--pyproject", str(pyproject), "--github-output", str(output)]) == 0
+    assert main(argv=["--pyproject", str(pyproject), "--github-output", str(output)]) == 0
     assert output.read_text(encoding="utf-8").splitlines() == [
         "project_version=1.2.3",
         "build_version=1.2.3",

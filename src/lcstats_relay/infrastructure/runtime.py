@@ -2,20 +2,32 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from types import TracebackType
+from typing import Protocol
 
 import httpx
 
 from lcstats_relay.application.ports import BoundOutput, OutputPolicy, OutputSink, RelaySession
 from lcstats_relay.infrastructure.receiver import StatsReceiver
 
-type ClientFactory = Callable[[httpx.Timeout], httpx.AsyncClient]
-type OutputFactory = Callable[[httpx.AsyncClient], OutputSink]
+
+class ClientFactory(Protocol):
+    """Build an HTTP client from an explicit timeout."""
+
+    def __call__(self, *, timeout: httpx.Timeout) -> httpx.AsyncClient:
+        """Create one unentered client."""
 
 
-def make_http_client(timeout: httpx.Timeout) -> httpx.AsyncClient:
+class OutputFactory(Protocol):
+    """Bind an output to the shared HTTP client."""
+
+    def __call__(self, *, client: httpx.AsyncClient) -> OutputSink:
+        """Create one output adapter."""
+
+
+def make_http_client(*, timeout: httpx.Timeout) -> httpx.AsyncClient:
     """Create the production HTTP client with explicit redirect policy."""
     return httpx.AsyncClient(timeout=timeout, follow_redirects=True)
 
@@ -47,17 +59,17 @@ class HttpRelayRuntime:
     async def __aenter__(self) -> RelaySession:
         """Open the client and bind every application output policy."""
         timeout = httpx.Timeout(30.0, read=None)
-        client = self._client_factory(timeout)
+        client = self._client_factory(timeout=timeout)
         self._client = await client.__aenter__()
         return RelaySession(
-            receiver=StatsReceiver(self._sse_url, client=self._client),
+            receiver=StatsReceiver(url=self._sse_url, client=self._client),
             outputs=tuple(
-                BoundOutput(policy=output.policy, sink=output.build(self._client))
+                BoundOutput(policy=output.policy, sink=output.build(client=self._client))
                 for output in self._outputs
             ),
         )
 
-    async def __aexit__(
+    async def __aexit__(  # noqa: PLR0917 -- keyword-only-exception: async context manager protocol ABI
         self,
         exc_type: type[BaseException] | None,
         exc: BaseException | None,

@@ -5,6 +5,7 @@ import json
 import tarfile
 import zipfile
 from dataclasses import replace
+from operator import attrgetter
 from pathlib import Path
 
 import pytest
@@ -16,7 +17,7 @@ _SCHEMA_VERSION = 2
 _WORKFLOW_URL = "https://github.com/aoirint/lcstats_relay/actions/runs/123"
 
 
-def _write_metadata(tmp_path: Path, *, version: str = "1.2.3") -> tuple[Path, Path, Path]:
+def _write_metadata(*, tmp_path: Path, version: str = "1.2.3") -> tuple[Path, Path, Path]:
     pyproject_path = tmp_path / "pyproject.toml"
     pyproject_path.write_text(
         f'[project]\nname = "lcstats-relay"\nversion = "{version}"\n',
@@ -29,7 +30,7 @@ def _write_metadata(tmp_path: Path, *, version: str = "1.2.3") -> tuple[Path, Pa
     return pyproject_path, python_version_path, lock_path
 
 
-def _write_artifacts(tmp_path: Path) -> list[ReleaseArtifact]:
+def _write_artifacts(*, tmp_path: Path) -> list[ReleaseArtifact]:
     windows_path = tmp_path / "app-windows.zip"
     linux_path = tmp_path / "app-linux.tar.gz"
     with zipfile.ZipFile(windows_path, "w") as archive:
@@ -60,15 +61,17 @@ def _write_artifacts(tmp_path: Path) -> list[ReleaseArtifact]:
     ]
 
 
-def _build_plan(tmp_path: Path, *, version: str = "1.2.3") -> ReleasePlan:
-    pyproject_path, python_version_path, lock_path = _write_metadata(tmp_path, version=version)
+def _build_plan(*, tmp_path: Path, version: str = "1.2.3") -> ReleasePlan:
+    pyproject_path, python_version_path, lock_path = _write_metadata(
+        tmp_path=tmp_path, version=version
+    )
     manifest_path = tmp_path / "release-manifest.json"
     checksums_path = tmp_path / "SHA256SUMS"
     return ReleasePlan(
         pyproject_path=pyproject_path,
         python_version_path=python_version_path,
         lock_path=lock_path,
-        artifacts=_write_artifacts(tmp_path),
+        artifacts=_write_artifacts(tmp_path=tmp_path),
         build_number=42,
         source_commit=_COMMIT,
         workflow_url=_WORKFLOW_URL,
@@ -79,18 +82,18 @@ def _build_plan(tmp_path: Path, *, version: str = "1.2.3") -> ReleasePlan:
 
 
 def _write_release(
-    tmp_path: Path,
     *,
+    tmp_path: Path,
     plan: ReleasePlan | None = None,
     version: str = "1.2.3",
 ) -> tuple[Path, Path]:
-    selected_plan = plan if plan is not None else _build_plan(tmp_path, version=version)
+    selected_plan = plan if plan is not None else _build_plan(tmp_path=tmp_path, version=version)
     write_release_files(plan=selected_plan)
     return selected_plan.manifest_path, selected_plan.checksums_path
 
 
-def _invalid_identity_plan(tmp_path: Path, *, case: str) -> ReleasePlan:
-    plan = _build_plan(tmp_path)
+def _invalid_identity_plan(*, tmp_path: Path, case: str) -> ReleasePlan:
+    plan = _build_plan(tmp_path=tmp_path)
     match case:
         case "build_number":
             return replace(plan, build_number=0)
@@ -111,10 +114,10 @@ def _invalid_identity_plan(tmp_path: Path, *, case: str) -> ReleasePlan:
             raise AssertionError(case)
 
 
-def test_write_release_files_records_sorted_provenance(tmp_path: Path) -> None:
+def test_write_release_files_records_sorted_provenance(*, tmp_path: Path) -> None:
     """Bind every published target to source, tools, sizes, and digests."""
-    plan = _build_plan(tmp_path)
-    manifest_path, checksums_path = _write_release(tmp_path, plan=plan)
+    plan = _build_plan(tmp_path=tmp_path)
+    manifest_path, checksums_path = _write_release(tmp_path=tmp_path, plan=plan)
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["schema_version"] == _SCHEMA_VERSION
@@ -134,7 +137,7 @@ def test_write_release_files_records_sorted_provenance(tmp_path: Path) -> None:
     ]
     assert [record["size"] for record in manifest["artifacts"]] == [
         artifact.path.stat().st_size
-        for artifact in sorted(plan.artifacts, key=lambda item: item.target)
+        for artifact in sorted(plan.artifacts, key=attrgetter("target"))
     ]
     assert checksums_path.read_text(encoding="utf-8").splitlines() == [
         f"{record['sha256']}  {record['file']}" for record in manifest["artifacts"]
@@ -154,34 +157,35 @@ def test_write_release_files_records_sorted_provenance(tmp_path: Path) -> None:
     ],
 )
 def test_write_release_files_rejects_invalid_identity(
+    *,
     tmp_path: Path,
     case: str,
     message: str,
 ) -> None:
     """Reject incomplete, mutable, or non-release build identities."""
     with pytest.raises(ValueError, match=message):
-        _write_release(tmp_path, plan=_invalid_identity_plan(tmp_path, case=case))
+        _write_release(tmp_path=tmp_path, plan=_invalid_identity_plan(tmp_path=tmp_path, case=case))
 
 
-def test_write_release_files_rejects_edge_version(tmp_path: Path) -> None:
+def test_write_release_files_rejects_edge_version(*, tmp_path: Path) -> None:
     """Keep the repository placeholder version out of GitHub Releases."""
     with pytest.raises(ValueError, match="cannot be released"):
-        _write_release(tmp_path, version="0.0.0")
+        _write_release(tmp_path=tmp_path, version="0.0.0")
 
 
-def test_write_release_files_rejects_empty_python_version(tmp_path: Path) -> None:
+def test_write_release_files_rejects_empty_python_version(*, tmp_path: Path) -> None:
     """Require the selected Python runtime in the manifest."""
     python_version_path = tmp_path / "empty-python-version"
     python_version_path.write_text("\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="must not be empty"):
         _write_release(
-            tmp_path,
-            plan=replace(_build_plan(tmp_path), python_version_path=python_version_path),
+            tmp_path=tmp_path,
+            plan=replace(_build_plan(tmp_path=tmp_path), python_version_path=python_version_path),
         )
 
 
-def test_write_release_files_rejects_duplicate_file_names(tmp_path: Path) -> None:
+def test_write_release_files_rejects_duplicate_file_names(*, tmp_path: Path) -> None:
     """Keep release asset lookup unambiguous across target archives."""
     first_directory = tmp_path / "first"
     second_directory = tmp_path / "second"
@@ -194,9 +198,9 @@ def test_write_release_files_rejects_duplicate_file_names(tmp_path: Path) -> Non
 
     with pytest.raises(ValueError, match="file names must be unique"):
         _write_release(
-            tmp_path,
+            tmp_path=tmp_path,
             plan=replace(
-                _build_plan(tmp_path),
+                _build_plan(tmp_path=tmp_path),
                 artifacts=[
                     ReleaseArtifact(target="linux", path=first_path),
                     ReleaseArtifact(target="windows", path=second_path),
@@ -205,22 +209,22 @@ def test_write_release_files_rejects_duplicate_file_names(tmp_path: Path) -> Non
         )
 
 
-def test_write_release_files_rejects_duplicate_targets(tmp_path: Path) -> None:
+def test_write_release_files_rejects_duplicate_targets(*, tmp_path: Path) -> None:
     """Require one archive for each supported desktop target."""
-    plan = _build_plan(tmp_path)
+    plan = _build_plan(tmp_path=tmp_path)
     duplicate_targets = [replace(artifact, target="linux") for artifact in plan.artifacts]
 
     with pytest.raises(ValueError, match="exactly one linux"):
-        _write_release(tmp_path, plan=replace(plan, artifacts=duplicate_targets))
+        _write_release(tmp_path=tmp_path, plan=replace(plan, artifacts=duplicate_targets))
 
 
-def test_write_release_files_rejects_missing_artifact(tmp_path: Path) -> None:
+def test_write_release_files_rejects_missing_artifact(*, tmp_path: Path) -> None:
     """Never publish a manifest for an absent target file."""
-    plan = _build_plan(tmp_path)
+    plan = _build_plan(tmp_path=tmp_path)
     plan.artifacts[0].path.unlink()
 
     with pytest.raises(ValueError, match="existing file"):
-        _write_release(tmp_path, plan=plan)
+        _write_release(tmp_path=tmp_path, plan=plan)
 
 
 @pytest.mark.parametrize(
@@ -244,13 +248,14 @@ def test_write_release_files_rejects_missing_artifact(tmp_path: Path) -> None:
     ],
 )
 def test_write_release_files_rejects_invalid_project_metadata(
+    *,
     tmp_path: Path,
     pyproject: str | None,
     lock: str | None,
     message: str,
 ) -> None:
     """Require canonical project and resolved Flet identity."""
-    plan = _build_plan(tmp_path)
+    plan = _build_plan(tmp_path=tmp_path)
     if pyproject is not None:
         plan.pyproject_path.write_text(pyproject, encoding="utf-8")
     if lock is not None:
@@ -259,19 +264,19 @@ def test_write_release_files_rejects_invalid_project_metadata(
     exception_type = TypeError if message == "package list" else ValueError
     with pytest.raises(exception_type, match=message):
         _write_release(
-            tmp_path,
+            tmp_path=tmp_path,
             plan=plan,
         )
 
 
 @pytest.mark.parametrize("value", ["linux", "=path", "linux="])
-def test_main_rejects_invalid_artifact_spec(tmp_path: Path, value: str) -> None:
+def test_main_rejects_invalid_artifact_spec(*, tmp_path: Path, value: str) -> None:
     """Require an explicit target-to-file mapping at the CLI boundary."""
-    pyproject_path, python_version_path, lock_path = _write_metadata(tmp_path)
+    pyproject_path, python_version_path, lock_path = _write_metadata(tmp_path=tmp_path)
 
     with pytest.raises(ValueError, match="TARGET=PATH"):
         main(
-            [
+            argv=[
                 "--pyproject",
                 str(pyproject_path),
                 "--python-version",
@@ -296,16 +301,16 @@ def test_main_rejects_invalid_artifact_spec(tmp_path: Path, value: str) -> None:
         )
 
 
-def test_main_writes_release_files(tmp_path: Path) -> None:
+def test_main_writes_release_files(*, tmp_path: Path) -> None:
     """Generate both publication metadata files through the CLI."""
-    pyproject_path, python_version_path, lock_path = _write_metadata(tmp_path)
-    artifacts = _write_artifacts(tmp_path)
+    pyproject_path, python_version_path, lock_path = _write_metadata(tmp_path=tmp_path)
+    artifacts = _write_artifacts(tmp_path=tmp_path)
     manifest_path = tmp_path / "manifest.json"
     checksums_path = tmp_path / "SHA256SUMS"
 
     assert (
         main(
-            [
+            argv=[
                 "--pyproject",
                 str(pyproject_path),
                 "--python-version",

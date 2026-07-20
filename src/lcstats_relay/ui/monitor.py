@@ -42,8 +42,8 @@ class MonitorView:
 
     def __init__(
         self,
-        page: PagePort,
         *,
+        page: PagePort,
         controller: MonitorController,
     ) -> None:
         """Create controls and bind them to a Flet-free controller."""
@@ -101,55 +101,65 @@ class MonitorView:
         )
         self._controller.bind(on_change=self._controller_changed, on_payload=self.add_payload)
         self._refresh_settings_summary()
-        self._apply_relay(self._controller.relay_state)
+        self._apply_relay(state=self._controller.relay_state)
 
     def build(self) -> ft.Container:
         """Build the complete monitor control tree."""
         self._show_monitor_view(update=False)
         return self.root_container
 
-    def open_settings(self, _event: object | None = None) -> None:
+    def open_settings(  # keyword-only-exception: Flet event callback ABI
+        self, _event: object | None = None
+    ) -> None:
         """Switch to the full-window tracker, storage, and output settings view."""
         self.tracker_url_field.value = self._controller.settings.tracker_url
         self.data_dir_field.value = str(self._controller.settings.data_dir)
         self._show_settings_view()
 
-    def open_gas_auth(self, _event: object | None = None) -> None:
+    def open_gas_auth(  # keyword-only-exception: Flet event callback ABI
+        self, _event: object | None = None
+    ) -> None:
         """Switch to the full-window Google Apps Script settings view."""
         self.gas_url_field.value = self._controller.settings.gas_url
         self.gas_token_field.value = ""
         self._show_gas_auth_view()
 
-    def save_settings(self, tracker_url: str, *, data_dir: str) -> bool:
+    def save_settings(self, *, tracker_url: str, data_dir: str) -> bool:
         """Validate and persist tracker plus local storage settings."""
-        return self._controller.save_settings(tracker_url, data_dir=data_dir)
+        return self._controller.save_settings(tracker_url=tracker_url, data_dir=data_dir)
 
-    def save_gas_auth(self, gas_url: str, *, gas_token: str) -> bool:
+    def save_gas_auth(self, *, gas_url: str, gas_token: str) -> bool:
         """Validate and persist the GAS destination while keeping the token in memory."""
-        return self._controller.save_gas_auth(gas_url, gas_token=gas_token)
+        return self._controller.save_gas_auth(gas_url=gas_url, gas_token=gas_token)
 
-    async def start(self, _event: object | None = None) -> None:
+    async def start(  # keyword-only-exception: Flet event callback ABI
+        self, _event: object | None = None
+    ) -> None:
         """Validate settings and start a new connection manager."""
         if not await self._controller.start():
             return
         self._show_monitor_view(update=False)
 
-    async def stop(self, _event: object | None = None) -> None:
+    async def stop(  # keyword-only-exception: Flet event callback ABI
+        self, _event: object | None = None
+    ) -> None:
         """Stop the active manager and unlock connection settings."""
         await self._controller.stop()
         self._show_monitor_view(update=False)
 
-    async def close(self, _event: object | None = None) -> None:
+    async def close(  # keyword-only-exception: Flet event callback ABI
+        self, _event: object | None = None
+    ) -> None:
         """Stop background work when the desktop window closes."""
         await self._controller.close()
 
-    def update_state(self, state: ConnectionState) -> None:
+    def update_state(self, *, state: ConnectionState) -> None:
         """Apply a manager state snapshot to visible controls."""
-        self._apply_relay(state)
+        self._apply_relay(state=state)
         self._page.update()
 
-    def _apply_relay(self, state: ConnectionState) -> None:
-        relay = present_relay(state, gas_enabled=bool(self._controller.settings.gas_url))
+    def _apply_relay(self, *, state: ConnectionState) -> None:
+        relay = present_relay(state=state, gas_enabled=bool(self._controller.settings.gas_url))
         self.status.value = relay.status_label
         self.receive_count.value = relay.receive_count
         self.last_received.value = relay.last_received
@@ -160,10 +170,10 @@ class MonitorView:
         self.health_icon.color = _TONE_COLORS[relay.health.glyph_tone]
         self.health_detail.value = relay.health.detail
         self.output_destinations.controls = [
-            self._output_destination(output) for output in relay.outputs
+            self._output_destination(output=output) for output in relay.outputs
         ]
 
-    def add_payload(self, payload: JSONValue) -> None:
+    def add_payload(self, *, payload: JSONValue) -> None:
         """Accept payload callbacks without rendering raw details in the monitor."""
 
     def _show_monitor_view(self, *, update: bool) -> None:
@@ -200,18 +210,18 @@ class MonitorView:
 
     def _show_settings_view(self) -> None:
         self.root_view.controls = [
-            self._full_view_title("設定"),
+            self._full_view_title(title="設定"),
             ft.Column(
                 [
                     self.error,
                     self._settings_section(
-                        "接続元",
+                        title="接続元",
                         controls=[
                             self.tracker_url_field,
                         ],
                     ),
                     self._settings_section(
-                        "出力先",
+                        title="出力先",
                         controls=[
                             self.data_dir_field,
                             self._gas_output_setting_row(),
@@ -235,7 +245,7 @@ class MonitorView:
         self._page.update()
 
     @staticmethod
-    def _settings_section(title: str, *, controls: list[ft.Control]) -> ft.Column:
+    def _settings_section(*, title: str, controls: list[ft.Control]) -> ft.Column:
         return ft.Column(
             [
                 ft.Text(title, size=13, weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_700),
@@ -262,7 +272,7 @@ class MonitorView:
 
     def _show_gas_auth_view(self) -> None:
         self.root_view.controls = [
-            self._full_view_title("GAS認証"),
+            self._full_view_title(title="GAS認証"),
             self.gas_url_field,
             self.gas_token_field,
             ft.Row(
@@ -278,35 +288,46 @@ class MonitorView:
         ]
         self._page.update()
 
-    def _full_view_title(self, title: str) -> ft.Row:
+    def _full_view_title(self, *, title: str) -> ft.Row:
         return ft.Row(
             [
                 ft.Text(title, size=20, weight=ft.FontWeight.BOLD, expand=True),
                 ft.IconButton(
                     icon=ft.Icons.CLOSE,
                     tooltip="閉じる",
-                    on_click=lambda _event: self._show_monitor_view(update=True),
+                    on_click=self._close_full_view,
                 ),
             ],
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
-    def _open_gas_auth_from_settings(self, _event: object | None = None) -> None:
+    def _close_full_view(  # keyword-only-exception: Flet event callback ABI
+        self, _event: object | None = None
+    ) -> None:
+        self._show_monitor_view(update=True)
+
+    def _open_gas_auth_from_settings(  # keyword-only-exception: Flet event callback ABI
+        self, _event: object | None = None
+    ) -> None:
         self.open_gas_auth()
 
-    def submit_settings(self, _event: object | None = None) -> None:
+    def submit_settings(  # keyword-only-exception: Flet event callback ABI
+        self, _event: object | None = None
+    ) -> None:
         """Validate the visible settings fields and return to the monitor on success."""
         if not self.save_settings(
-            self.tracker_url_field.value or "",
+            tracker_url=self.tracker_url_field.value or "",
             data_dir=self.data_dir_field.value or "",
         ):
             return
         self._show_monitor_view(update=True)
 
-    def submit_gas_auth(self, _event: object | None = None) -> None:
+    def submit_gas_auth(  # keyword-only-exception: Flet event callback ABI
+        self, _event: object | None = None
+    ) -> None:
         """Validate the visible GAS fields and return to settings on success."""
         if not self.save_gas_auth(
-            self.gas_url_field.value or "",
+            gas_url=self.gas_url_field.value or "",
             gas_token=self.gas_token_field.value or "",
         ):
             return
@@ -323,7 +344,7 @@ class MonitorView:
         self.gas_summary.value = gas
 
     def _controller_changed(self) -> None:
-        self._apply_relay(self._controller.relay_state)
+        self._apply_relay(state=self._controller.relay_state)
         self.error.value = self._controller.error
         self.start_button.disabled = self._controller.active
         self.stop_button.disabled = not self._controller.active
@@ -354,7 +375,7 @@ class MonitorView:
         )
 
     @staticmethod
-    def _output_destination(output: OutputViewState) -> ft.Container:
+    def _output_destination(*, output: OutputViewState) -> ft.Container:
         status = ft.Text(
             output.status_label,
             color=_TONE_COLORS[output.tone],

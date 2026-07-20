@@ -41,17 +41,19 @@ _UNHEALTHY_OUTPUT_STATUSES = frozenset({OutputStatus.ERROR, OutputStatus.RETRY_Q
 _DEFAULT_OUTPUT_ORDER = ("archive", "gas")
 
 
-def present_relay(state: ConnectionState, *, gas_enabled: bool) -> RelayViewState:
+def present_relay(*, state: ConnectionState, gas_enabled: bool) -> RelayViewState:
     """Map one application snapshot without reading or mutating Flet controls."""
-    outputs = _display_outputs(state, gas_enabled=gas_enabled)
-    unhealthy = any(_is_unhealthy(output) for output in outputs)
+    outputs = _display_outputs(state=state, gas_enabled=gas_enabled)
+    unhealthy = any(_is_unhealthy(output=output) for output in outputs)
     return RelayViewState(
         status_label=_STATUS_LABELS[state.status],
         receive_count=str(state.receive_count),
-        last_received=_format_time(state.last_received_at),
+        last_received=_format_time(value=state.last_received_at),
         error=state.last_error or "",
-        health=_present_health(state, has_unhealthy_output=unhealthy),
-        outputs=tuple(_present_output(output, connected=state.running) for output in outputs),
+        health=_present_health(state=state, has_unhealthy_output=unhealthy),
+        outputs=tuple(
+            _present_output(output=output, connected=state.running) for output in outputs
+        ),
     )
 
 
@@ -69,7 +71,7 @@ def settings_summaries(
     return settings, f"GAS: {gas_state} / Token: {token_state}"
 
 
-def _display_outputs(state: ConnectionState, *, gas_enabled: bool) -> list[OutputState]:
+def _display_outputs(*, state: ConnectionState, gas_enabled: bool) -> list[OutputState]:
     if state.outputs and not any(key in state.outputs for key in _DEFAULT_OUTPUT_ORDER):
         return list(state.outputs.values())
     defaults = {"archive": OutputState(key="archive", label="ローカル保存")}
@@ -80,14 +82,14 @@ def _display_outputs(state: ConnectionState, *, gas_enabled: bool) -> list[Outpu
 
 
 def _present_health(
-    state: ConnectionState,
     *,
+    state: ConnectionState,
     has_unhealthy_output: bool,
 ) -> HealthViewState:
     if state.running and state.receive_count == 0 and not has_unhealthy_output:
         return HealthViewState(
             label="接続失敗" if state.last_error else "接続試行中",
-            detail=_connection_attempt_detail(state),
+            detail=_connection_attempt_detail(state=state),
             tone=Tone.WARNING,
             glyph=StatusGlyph.WARNING if state.last_error else StatusGlyph.SYNC,
             glyph_tone=Tone.WARNING,
@@ -125,7 +127,7 @@ def _present_health(
     )
 
 
-def _present_output(output: OutputState, *, connected: bool) -> OutputViewState:
+def _present_output(*, output: OutputState, connected: bool) -> OutputViewState:
     status_label = _OUTPUT_STATUS_LABELS[output.status]
     tone = _OUTPUT_STATUS_TONES[output.status]
     if output.status is OutputStatus.IDLE and not connected:
@@ -135,13 +137,13 @@ def _present_output(output: OutputState, *, connected: bool) -> OutputViewState:
         label=output.label,
         status_label=status_label,
         tone=tone,
-        glyph=_output_glyph(output, connected=connected),
-        glyph_tone=_output_glyph_tone(output),
-        detail=output.message if _is_unhealthy(output) else None,
+        glyph=_output_glyph(output=output, connected=connected),
+        glyph_tone=_output_glyph_tone(output=output),
+        detail=output.message if _is_unhealthy(output=output) else None,
     )
 
 
-def _output_glyph(output: OutputState, *, connected: bool) -> StatusGlyph:
+def _output_glyph(*, output: OutputState, connected: bool) -> StatusGlyph:
     if output.status is OutputStatus.ERROR:
         return StatusGlyph.ERROR
     if output.status is OutputStatus.RETRY_QUEUED or output.pending_count > 0:
@@ -155,7 +157,7 @@ def _output_glyph(output: OutputState, *, connected: bool) -> StatusGlyph:
     return StatusGlyph.IDLE
 
 
-def _output_glyph_tone(output: OutputState) -> Tone:
+def _output_glyph_tone(*, output: OutputState) -> Tone:
     if output.status is OutputStatus.ERROR:
         return Tone.ERROR
     if output.status is OutputStatus.RETRY_QUEUED or output.pending_count > 0:
@@ -167,16 +169,16 @@ def _output_glyph_tone(output: OutputState) -> Tone:
     return Tone.NEUTRAL
 
 
-def _is_unhealthy(output: OutputState) -> bool:
+def _is_unhealthy(*, output: OutputState) -> bool:
     return output.status in _UNHEALTHY_OUTPUT_STATUSES or output.pending_count > 0
 
 
-def _connection_attempt_detail(state: ConnectionState) -> str:
+def _connection_attempt_detail(*, state: ConnectionState) -> str:
     if state.retry_after_seconds is not None:
         retry_after = f"{state.retry_after_seconds:g}"
         return f"{retry_after}秒後に再試行"
     return "再試行中" if state.last_error else "待機中"
 
 
-def _format_time(value: datetime | None) -> str:
+def _format_time(*, value: datetime | None) -> str:
     return value.strftime("%Y-%m-%d %H:%M:%S") if value is not None else "-"

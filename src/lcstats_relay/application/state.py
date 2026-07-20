@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import StrEnum
+from typing import Protocol
 
 
 class RelayStatus(StrEnum):
@@ -57,7 +58,11 @@ class ConnectionState:
     outputs: dict[str, OutputState] = field(default_factory=dict)
 
 
-type StateCallback = Callable[[ConnectionState], None]
+class StateCallback(Protocol):
+    """Receive an immutable state snapshot with an explicit argument name."""
+
+    def __call__(self, *, state: ConnectionState) -> None:
+        """Consume one state snapshot."""
 
 
 class RelayStateStore:
@@ -65,8 +70,8 @@ class RelayStateStore:
 
     def __init__(
         self,
-        outputs: Iterable[tuple[str, str]],
         *,
+        outputs: Iterable[tuple[str, str]],
         on_change: StateCallback,
         pending_counts: Mapping[str, int] | None = None,
     ) -> None:
@@ -110,14 +115,14 @@ class RelayStateStore:
         self.state.retry_after_seconds = None
         self._emit()
 
-    def receiver_error(self, message: str, *, retry_after_seconds: float | None = None) -> None:
+    def receiver_error(self, *, message: str, retry_after_seconds: float | None = None) -> None:
         """Expose an input-side error independently from output failures."""
         self.state.status = RelayStatus.ERROR
         self.state.last_error = message
         self.state.retry_after_seconds = retry_after_seconds
         self._emit()
 
-    def output_started(self, key: str, *, at: datetime) -> None:
+    def output_started(self, *, key: str, at: datetime) -> None:
         """Mark one output attempt as running."""
         output = self.state.outputs[key]
         output.status = OutputStatus.RUNNING
@@ -126,21 +131,21 @@ class RelayStateStore:
         self.state.status = RelayStatus.DISPATCHING
         self._emit()
 
-    def pending_counts_loaded(self, counts: Mapping[str, int]) -> None:
+    def pending_counts_loaded(self, *, counts: Mapping[str, int]) -> None:
         """Publish persisted queue counts after non-blocking startup I/O."""
         for key, count in counts.items():
             self.state.outputs[key].pending_count = count
         self._emit()
 
-    def pending_count_changed(self, key: str, *, count: int) -> None:
+    def pending_count_changed(self, *, key: str, count: int) -> None:
         """Publish one queue count after a retry record changes."""
         self.state.outputs[key].pending_count = count
         self._emit()
 
     def output_succeeded(
         self,
-        key: str,
         *,
+        key: str,
         at: datetime,
         message: str,
         pending_count: int,
@@ -156,8 +161,8 @@ class RelayStateStore:
 
     def output_failed(
         self,
-        key: str,
         *,
+        key: str,
         message: str,
         pending_count: int,
         queued: bool,
@@ -175,4 +180,4 @@ class RelayStateStore:
             self.state,
             outputs={key: replace(value) for key, value in self.state.outputs.items()},
         )
-        self._on_change(snapshot)
+        self._on_change(state=snapshot)
