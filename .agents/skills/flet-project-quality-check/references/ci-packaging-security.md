@@ -3,7 +3,7 @@
 ## Contents
 
 - [GitHub Actions quality gate](#github-actions-quality-gate)
-- [Minimum workflow shape](#minimum-workflow-shape)
+- [Event-owned workflow shape](#event-owned-workflow-shape)
 - [Flet build contract](#flet-build-contract)
 - [Artifact and release verification](#artifact-and-release-verification)
 - [Application security](#application-security)
@@ -14,8 +14,12 @@
 
 Use `github-actions-quality-check` and `security-check` while implementing this baseline.
 
-- Trigger validation on `pull_request`, pushes to the protected integration branch, and merge queue
-  events when the repository uses merge queues. `workflow_dispatch` is optional for diagnostics.
+- Use separate event-owned entry workflows. The pull-request workflow triggers on `pull_request`
+  and `merge_group` when a merge queue uses required checks; it validates proposed source only. The
+  integration-branch workflow triggers on the protected branch's `push`, re-runs the source quality
+  gate on that exact commit, and directly gates plan/build/artifact/release jobs with `needs`.
+  Do not add `workflow_dispatch` by default; add it only for a documented diagnostic or recovery
+  operation with defined inputs, permissions, artifacts, and cancellation behavior.
 - Set workflow or job permissions to `contents: read`; add no write permission to untrusted
   validation.
 - Use concurrency keyed by workflow plus PR number/ref and cancel superseded validation runs.
@@ -34,32 +38,39 @@ Use `github-actions-quality-check` and `security-check` while implementing this 
   credentials in separately triggered, protected jobs/environments.
 - Keep CI commands equal to the documented local commands. CI-only hidden flags and local-only
   shortcuts are findings.
-- Select runners per job with `github-actions-quality-check`. Prefer `ubuntu-slim` for Flet project
-  lint, type-check, and unit-test jobs only after a representative run shows they fit its
-  unprivileged container, minimal tool set, single CPU, 5 GB RAM, and 15-minute limit. Keep Flet or
-  Flutter desktop/mobile builds on a full platform runner; their native toolchains and resource use
-  are not lightweight automation.
-- Extract repeated, repository-owned setup into a local Composite Action when multiple workflows
-  need the exact same lock verification, sync, or tool installation. Keep behavior-changing checks
-  in the workflows that own their result. The bundled checker follows reachable local Composite
-  Actions and reusable workflows when it verifies required commands and immutable external pins.
+- Select runners per job with `github-actions-quality-check`. Start Flet lint, type-check, and
+  unit-test jobs on `ubuntu-slim`. Move a job to a full VM only when its required Composite Action,
+  tools, or runtime cannot meet the slim container, resource, software, or 15-minute limits; then
+  validate the reason and periodically retry slim. Keep Flet or Flutter desktop/mobile builds on a
+  full platform runner; their native toolchains and resource use are not lightweight automation.
+- Extract repeated, repository-owned same-runner setup into a local Composite Action when multiple
+  workflows need the exact same lock verification, sync, or tool installation. Keep job ownership,
+  runner selection, permissions, artifact upload, and release gating in the workflow. If the shared
+  source-quality gate needs job-level matrix, outputs, or permission boundaries that a Composite
+  Action cannot express, use a reusable workflow and document that reason. The bundled checker
+  follows reachable local Composite Actions and reusable workflows when it verifies required commands
+  and immutable external pins.
 
-## Minimum workflow shape
+## Event-owned workflow shape
+
+The bundled `assets/github/` templates instantiate this source-quality floor:
+`pull-request.yml.template`, `main.yml.template`, and the small local
+`setup-python`, `install-workflow-tools`, `lint-source`, and `test-source`
+Composite Actions. Keep the two workflows responsible for event boundaries and
+job dependencies; each action owns one named setup or check sequence. Add a
+repository-specific `plan`/build/release extension only after its artifact and
+publication facts are evidenced.
 
 This shape is normative; replace action SHAs/version comments and the integration branch with
 reviewed current values. Add repository-specific documentation or packaging checks rather than
 removing the baseline commands.
 
 ```yaml
-name: CI
+name: Pull Request
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
   merge_group:
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -117,6 +128,57 @@ jobs:
         run: uv run --locked pytest
 ```
 
+Create a separate `Main` workflow for the protected integration branch. It repeats the same source
+quality gate for the exact pushed commit; it does not assume a completed pull-request workflow is a
+gate. A read-only `plan` job may resolve version/release state in parallel when the repository needs
+that state. Build must name all of its required predecessors directly, and release must consume the
+verified build artifact rather than rebuilding it.
+
+```yaml
+name: Main
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-slim
+    steps:
+      - uses: ./.github/actions/run-source-quality
+
+  plan:
+    # Read canonical version/release state only; do not publish.
+    runs-on: ubuntu-slim
+    outputs:
+      publish: ${{ steps.release-state.outputs.publish }}
+    steps:
+      - id: release-state
+        run: echo "publish=false" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: [quality, plan]
+    # Build and upload the target artifact for every main/edge commit.
+    runs-on: windows-2025
+    steps: []
+
+  release:
+    needs: build
+    if: needs.plan.outputs.publish == 'true'
+    runs-on: ubuntu-slim
+    steps:
+      - run: ./scripts/publish-verified-artifact.sh
+```
+
+The snippet is a dependency shape, not a promise that every Flet project has a `plan` or release job.
+Use `plan` only when the build/release contract needs resolved state. Always retain the verified
+integration-branch build artifact (including a non-published edge build) with its source commit and
+digest. Never replace these dependencies with an API-polling wait job.
+
 After a representative slim run proves compatibility and sufficient duration/resource headroom,
 change that job to `runs-on: ubuntu-slim` and set `timeout-minutes` to at most `15`. Do not infer
 slim suitability from the same commands running quickly on a multi-CPU full VM.
@@ -157,6 +219,9 @@ configuration visible to Git.
 ## Artifact and release verification
 
 - Build from the exact reviewed commit and `uv.lock`, with no dirty-tree input.
+- Upload the verified integration-branch build artifact even when the resolved version is an
+  unpublished edge/development version. Give it a stable, versioned name and record its source
+  commit and SHA-256 in the workflow summary; release jobs consume that uploaded output.
 - Gate immutable publication on the complete lint, type, test, documentation, workflow, and build
   checks for the exact source commit. Independent workflows that can still fail after publication
   are not a sufficient gate unless repository settings or the publishing workflow demonstrably
