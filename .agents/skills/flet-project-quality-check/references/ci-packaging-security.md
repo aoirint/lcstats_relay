@@ -46,19 +46,19 @@ Use `github-actions-quality-check` and `security-check` while implementing this 
 - Extract repeated, repository-owned same-runner setup into a local Composite Action when multiple
   workflows need the exact same lock verification, sync, or tool installation. Keep job ownership,
   runner selection, permissions, artifact upload, and release gating in the workflow. If the shared
-  source-quality gate needs job-level matrix, outputs, or permission boundaries that a Composite
+  shared command sequence needs job-level matrix, outputs, or permission boundaries that a Composite
   Action cannot express, use a reusable workflow and document that reason. The bundled checker
   follows reachable local Composite Actions and reusable workflows when it verifies required commands
   and immutable external pins.
 
 ## Event-owned workflow shape
 
-The bundled `assets/github/` templates instantiate this source-quality floor:
+The bundled `assets/github/` templates instantiate this lint-and-test floor:
 `pull-request.yml.template`, `main.yml.template`, and the small local
 `setup-python`, `install-workflow-tools`, `lint-source`, and `test-source`
 Composite Actions. Keep the two workflows responsible for event boundaries and
 job dependencies; each action owns one named setup or check sequence. Add a
-repository-specific `plan`/build/release extension only after its artifact and
+repository-specific `plan`, build, and release extension only after its artifact and
 publication facts are evidenced.
 
 This shape is normative; replace action SHAs/version comments and the integration branch with
@@ -80,7 +80,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  quality:
+  lint:
     # Start on an explicit full VM until a representative run proves that the
     # complete job fits ubuntu-slim's environment and 15-minute hard limit.
     runs-on: ubuntu-24.04
@@ -124,14 +124,20 @@ jobs:
       - name: Type-check Python
         run: uv run --locked mypy src tests
 
-      - name: Test with full coverage
-        run: uv run --locked pytest
+  test:
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@<full-reviewed-sha> # <reviewed-version>
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/test-source
 ```
 
-Create a separate `Main` workflow for the protected integration branch. It repeats the same source
-quality gate for the exact pushed commit; it does not assume a completed pull-request workflow is a
-gate. A read-only `plan` job may resolve version/release state in parallel when the repository needs
-that state. Build must name all of its required predecessors directly, and release must consume the
+Create a separate `Main` workflow for the protected integration branch. It repeats the same `lint`
+and `test` jobs for the exact pushed commit; it does not assume a completed pull-request workflow is
+a gate. A read-only `plan` job may resolve version/release state in parallel when the repository needs
+that state. Build must name all of `lint`, `test`, and `plan` as required predecessors directly, and release must consume the
 verified build artifact rather than rebuilding it.
 
 ```yaml
@@ -146,10 +152,17 @@ permissions:
   contents: read
 
 jobs:
-  quality:
+  lint:
     runs-on: ubuntu-slim
     steps:
-      - uses: ./.github/actions/run-source-quality
+      - uses: actions/checkout@<full-reviewed-sha> # <reviewed-version>
+      - uses: ./.github/actions/lint-source
+
+  test:
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@<full-reviewed-sha> # <reviewed-version>
+      - uses: ./.github/actions/test-source
 
   plan:
     # Read canonical version/release state only; do not publish.
@@ -161,7 +174,7 @@ jobs:
         run: echo "publish=false" >> "$GITHUB_OUTPUT"
 
   build:
-    needs: [quality, plan]
+    needs: [lint, test, plan]
     # Build and upload the target artifact for every main/edge commit.
     runs-on: windows-2025
     steps: []
