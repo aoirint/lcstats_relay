@@ -1,0 +1,9 @@
+name: Test source
+description: Run the locked test suite with its coverage policy.
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/setup-python
+    - shell: bash
+      run: uv run --locked pytest
