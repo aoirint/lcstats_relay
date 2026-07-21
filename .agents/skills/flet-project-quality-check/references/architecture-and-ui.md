@@ -229,7 +229,7 @@ Flet's official documentation supports async entry points and handlers, lifecycl
 tasks, custom-control lifecycle hooks, route-derived navigation, and accessible controls. Re-check
 the target Flet version before relying on a specific API:
 
-- https://flet.dev/docs/cookbook/async-apps/
-- https://flet.dev/docs/cookbook/custom-controls/
-- https://flet.dev/docs/cookbook/navigation-and-routing/
-- https://flet.dev/docs/cookbook/accessibility/
+- <https://flet.dev/docs/cookbook/async-apps/>
+- <https://flet.dev/docs/cookbook/custom-controls/>
+- <https://flet.dev/docs/cookbook/navigation-and-routing/>
+- <https://flet.dev/docs/cookbook/accessibility/>

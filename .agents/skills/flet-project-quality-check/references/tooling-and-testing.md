@@ -344,9 +344,9 @@ bare `pip install`, a globally installed checker, or an unlocked `uv run` as rel
 
 Primary tool references:
 
-- https://docs.astral.sh/uv/concepts/projects/sync/
-- https://docs.astral.sh/uv/concepts/resolution/
-- https://docs.astral.sh/ruff/configuration/
-- https://mypy.readthedocs.io/en/stable/config_file.html
-- https://pytest-cov.readthedocs.io/en/latest/config.html
-- https://coverage.readthedocs.io/en/latest/config.html
+- <https://docs.astral.sh/uv/concepts/projects/sync/>
+- <https://docs.astral.sh/uv/concepts/resolution/>
+- <https://docs.astral.sh/ruff/configuration/>
+- <https://mypy.readthedocs.io/en/stable/config_file.html>
+- <https://pytest-cov.readthedocs.io/en/latest/config.html>
+- <https://coverage.readthedocs.io/en/latest/config.html>
