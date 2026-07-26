@@ -3,14 +3,12 @@ name: flet-project-quality-check
 description: >-
   Create, align, or review production-quality Python Flet applications across
   package and module architecture, presentation state, Flet controls, async
-  lifecycle, persistence and I/O boundaries, uv dependency management, Ruff,
-  strict mypy, pytest, 100% branch and statement coverage, GitHub Actions,
-  Flet packaging, security, and developer documentation. Use for new Flet
-  projects, large UI refactors, quality-baseline adoption, CI setup, release
-  readiness, or reviews of pyproject.toml, uv.lock, src/tests layout, and Flet
-  application code. Pair with software-documentation-maintenance for document
-  ownership and with security-check for dependencies, secrets, and CI supply
-  chain decisions.
+  lifecycle, persistence and I/O boundaries, semantic UI tests, Flet packaging,
+  platform artifacts, security, and developer documentation. Use for new Flet
+  projects, large UI refactors, Flet architecture alignment, target packaging,
+  release readiness, or reviews of Flet application code. Pair with
+  python-quality-check for uv, Ruff, mypy, pytest, coverage, Python packaging,
+  and CI quality gates.
 ---
 
 # Flet Project Quality Check
@@ -22,20 +20,18 @@ Use this Skill for `setup`, `alignment`, `implementation`, `review`, or
 with Flet. Apply the baseline to the whole repository; do not accept a weak UI,
 missing documentation, or an existing low test bar as precedent.
 
-For Python projects without Flet, use a general Python/code quality workflow.
+For Python projects without Flet, use `python-quality-check`.
 For prose wording alone, use `prose-quality-check`. This Skill owns which
-Flet/Python facts and quality gates are required, not the repository-wide
-documentation taxonomy or general CI supply-chain policy.
+Flet facts and framework quality gates are required, not the repository-wide
+Python baseline, documentation taxonomy, or general CI supply-chain policy.
 
 ## Goals
 
 - Keep domain and application behavior independent of Flet controls and page state.
 - Make every UI state transition, async task, side effect, and render decision explicit and testable.
-- Reproduce the Python environment from `pyproject.toml` and committed `uv.lock` under a seven-day
-  package cooldown.
-- Require formatting, linting, strict typing, deterministic tests, and 100% branch and statement
-  coverage locally and in GitHub Actions.
-- Keep build, package, data, secret, failure, and documentation contracts reviewable.
+- Add Flet-specific architecture, lifecycle, UI, and packaging checks to the
+  shared Python quality baseline.
+- Keep target build, platform, data, secret, failure, and documentation contracts reviewable.
 
 ## Responsibility Boundaries
 
@@ -44,6 +40,15 @@ Use `software-documentation-maintenance` to create and maintain the required
 the Flet-specific facts those documents must own: supported Flet/Python targets,
 UI state and navigation, task lifetime, component boundaries, platform storage,
 test/build commands, and packaging behavior.
+
+Use `python-quality-check` for
+`pyproject.toml`, `.python-version`, `uv.lock`,
+dependency groups, Ruff, keyword-only APIs, strict mypy, pytest, statement and
+branch coverage, ordinary Python distributions, and Python CI parity. Apply
+that Skill first; this Skill adds Flet-specific constraints and does not weaken
+or duplicate them. Install both Skills as adjacent siblings before running the
+Flet checker; a missing shared Python Skill is a blocked dependency, not a
+reason to copy or redefine its baseline here.
 
 Use `github-workflow` for workflow triggers, permissions,
 concurrency, action pins, actionlint, ShellCheck, and pinact. Use `security-check`
@@ -56,15 +61,13 @@ duplicate weaker substitutes here.
 - Use a `src/` package layout, a thin Flet entry point, and one composition root.
 - Separate application policy, presentation state, Flet rendering, and external I/O. Flet types must
   not enter domain/application modules.
-- Commit `pyproject.toml`, `.python-version`, and `uv.lock`. Set
-  `[tool.uv] exclude-newer = "P7D"` and keep runtime and development dependencies declared.
-- Put `ruff`, `mypy`, `pytest`, and `pytest-cov` in a development dependency group.
-- Require keyword arguments from the first project-owned parameter at definitions and call sites;
-  retain positional compatibility only for a documented external signature.
-- Configure Ruff lint and format checks, `mypy` with `strict = true` plus
-  `warn_unreachable = true`, and pytest-cov with both branch and statement coverage at 100%.
-- Run checks through the locked uv environment. A passing test command that mutates the lockfile is
-  not valid verification.
+- Meet the complete `python-quality-check` baseline before making a Flet
+  architecture, UI, package, or release-readiness claim.
+- Keep three evidence surfaces separate: ordinary wheel/sdist inspection owned
+  by `python-quality-check`, final Flet target-artifact inspection, and installed
+  target-runtime semantic readiness. A pass on one never substitutes for another.
+- Keep Flet callback positional exceptions narrow, evidenced against the exact
+  supported Flet API, and compliant with the shared keyword-only policy.
 - Require event-owned GitHub Actions: pull-request validation (and merge-queue validation when
   used), plus protected-integration-branch validation re-run on the exact pushed commit. Use direct
   `needs` dependencies to gate plan/build/artifact/release work, least-privilege permissions, and
@@ -83,7 +86,7 @@ informal list.
    - Inspect repository guidance, Python/Flet metadata, source/tests, workflows, docs, build assets,
      generated files, and repository settings before proposing a target-specific value.
    - Run
-     `uv run --no-project --no-config --locked --script <skill-root>/scripts/check_project.py <repository-root>` for the
+     `uv run --no-config --locked --script <skill-root>/scripts/check_project.py <repository-root>` for the
      mechanical floor. Treat every finding as evidence to inspect; a pass does not approve
      architecture, UI behavior, tests, security, or release readiness.
 2. Establish the target and contracts.
@@ -104,20 +107,23 @@ informal list.
    - Split by cohesive state/lifecycle ownership, not by file size alone. A large control tree,
      scattered `page.update()`, control-index navigation, or one object owning settings, networking,
      state transitions, and rendering is a finding.
-4. Align tooling, typing, and tests.
-   - Read [tooling-and-testing.md](references/tooling-and-testing.md) before editing
-     `pyproject.toml`, `uv.lock`, Ruff, mypy, pytest, coverage, or the test layout.
-   - Preserve the exact dependency graph with uv; apply package changes only after `security-check`.
+4. Extend Python tests for Flet behavior.
+   - Apply `python-quality-check` before
+     editing Python metadata, dependencies,
+     lint, typing, coverage, packaging, or ordinary Python CI.
+   - Read [tooling-and-testing.md](references/tooling-and-testing.md) before
+     changing Flet dependency compatibility, callback signatures, presentation
+     tests, control adapters, or target smoke tests.
    - Test policy and presentation behavior without Flet, then test Flet adapters at semantic
      boundaries. Cover success, validation, failure, cancellation, stale completion, shutdown,
      persistence corruption, and platform-specific paths.
-   - Keep coverage at 100% for both branches and statements without broad omissions, fabricated
-     tests, or exclusions that hide reachable behavior.
+   - Preserve the shared 100% statement/branch baseline while adding semantic
+     assertions for Flet state, intents, lifecycle, and rendered outcomes.
 5. Align CI, packaging, and security.
    - Read [ci-packaging-security.md](references/ci-packaging-security.md) before changing workflows,
      `flet build`, assets, identifiers, storage, logging, secrets, caches, or releases.
-   - CI must check the lock, exact sync, Ruff lint, Ruff format, strict mypy, tests, coverage, and any
-     repository-specific documentation or build contracts from a clean checkout.
+   - Start from the Python CI gate required by `python-quality-check`, then add
+     repository-specific documentation, Flet target build, artifact, and runtime checks.
    - Keep pull-request and integration-branch entry workflows distinct. Reuse a local Composite
      Action for a same-runner setup/check sequence. Use a reusable workflow only when job-level
      matrix, outputs, or permission boundaries make a Composite Action insufficient, and document
@@ -145,7 +151,7 @@ informal list.
 - Presentation state and transitions are immutable or otherwise centrally owned and independently tested.
 - Flet controls render state and emit intents; they do not own business workflows or hidden task state.
 - Every background task has an owner, cancellation path, stale-result policy, and shutdown test.
-- uv lock/cooldown, Ruff, strict mypy, pytest, branch coverage, and 100% threshold are enforced.
+- The complete `python-quality-check` baseline is enforced without a Flet-specific downgrade.
 - First-party API definitions and calls require keywords from the first project-owned argument.
 - CI is least-privilege, SHA-pinned, lock-preserving, and equivalent to documented local checks.
 - Persistence, secrets, logs, external input, and packaged artifacts have explicit safety contracts.

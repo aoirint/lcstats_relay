@@ -17,14 +17,14 @@ lower the baseline.
 
 1. Select exactly one primary request type: `setup`, `alignment`, `implementation`, `review`,
    `release-readiness`, or `plan-only`.
-2. Read repository/agent guidance, root README, contributor/security/changelog/license files,
-   `pyproject.toml`, `.python-version`, `uv.lock`, `.gitignore`, all Python source/tests, Flet assets,
+2. Apply `python-quality-check`, then read repository/agent guidance, root README,
+   contributor/security/changelog/license files, Python project evidence, all source/tests, Flet assets,
    workflows/actions, build/release files, and every documentation index.
 3. List source modules with line counts and import edges. Identify entry points, composition roots,
    state owners, Flet imports, external adapters, task creation, update calls, private-member access,
    suppressions, broad exceptions, settings/secrets, and generated output.
 4. Run
-   `uv run --no-project --no-config --locked --script <skill-root>/scripts/check_project.py <root>`.
+   `uv run --no-config --locked --script <skill-root>/scripts/check_project.py <root>`.
    Record its findings
    as `mechanical`; do not mix them with semantic findings or edit before the evidence ledger
    exists.
@@ -60,10 +60,8 @@ project. Put unresolved placeholders only in plans, never in executable metadata
 
 | Artifact | Required invariant | Valid exception |
 | --- | --- | --- |
-| `pyproject.toml` | complete PEP 621/build/Flet/uv/Ruff/mypy/pytest/coverage configuration | none |
-| `.python-version` | one reviewed development minor consistent with project/CI | library matrix documents another policy |
-| `uv.lock` | committed, current, reviewed, cooldown-bound graph | none for an application |
-| `src/<package>/` | installable package with thin entry and composition root | none |
+| Python project/tooling artifacts | complete `python-quality-check` baseline plus Flet app metadata | none |
+| `src/<package>/` | installable package with thin Flet entry and composition root | none |
 | application/presentation/UI boundaries | framework-free policy/state and thin Flet adapter | trivial proof with no policy/effects, documented |
 | infrastructure adapters | each external effect behind a typed boundary | no external effect exists |
 | `tests/` | typed contract tests for all maintained behavior and branches | none |
@@ -94,14 +92,13 @@ exist. Required documentation indexes may explicitly state that a section has no
 
 ### 4.2 Python project and locked toolchain
 
-1. Set project/build metadata and the selected Python minor/range.
+1. Complete the `python-quality-check` workflow for metadata, Python versions,
+   dependencies, lock, Ruff, keyword-only APIs, strict mypy, pytest, coverage,
+   ordinary distributions, and Python CI.
 2. Configure Flet app path/module and keep the Flet entry shim thin.
-3. Declare runtime dependencies and one dev group containing Ruff, mypy, pytest, and pytest-cov.
-4. Set `exclude-newer = "P7D"`; use `security-check` for every dependency/lock delta.
-5. Configure the complete Ruff, strict mypy, pytest, and branch+statement coverage baseline from
-   `tooling-and-testing.md`.
-6. Generate/update `uv.lock` intentionally, inspect the entire delta, then run `uv lock --check` and
-   exact sync. Do not continue semantic refactoring in an unresolved environment.
+3. Apply the supported Python/Flet/target compatibility and Flet callback
+   exception rules from `tooling-and-testing.md`.
+4. Do not continue semantic Flet refactoring in an unresolved Python environment.
 
 ### 4.3 Module and state boundaries
 
@@ -209,13 +206,8 @@ Run applicable rows and record exact commands/results.
 
 | Surface | Required verification |
 | --- | --- |
-| Mechanical baseline | `uv run --no-project --no-config --locked --script <skill-root>/scripts/check_project.py .` and finding review |
-| Lock/dependencies | `uv lock --check`; reviewed lock delta; `uv sync --locked --all-groups` |
-| Python lint | `uv run --locked ruff check .` with no warnings/errors |
-| Python formatting | `uv run --locked ruff format --check .` |
-| Types | `uv run --locked mypy src tests` under strict + unreachable checks |
-| Tests/coverage | `uv run --locked pytest`; 100% statements and branches; XML generated |
-| Distribution | `uv build` plus wheel/sdist content/import/entry inspection when applicable |
+| Mechanical baseline | `uv run --no-config --locked --script <skill-root>/scripts/check_project.py .` and finding review |
+| Python baseline | Complete `python-quality-check` verification, including lock, lint, format, types, tests, coverage, CI, and ordinary distributions |
 | Architecture | import-direction review; framework-free layer import/test; state/intent coverage |
 | Async | start/stop/restart/cancel/stale/close/fault interleavings; no leaked task |
 | UI | semantic adapter tests plus supported-target manual/runtime checklist |
