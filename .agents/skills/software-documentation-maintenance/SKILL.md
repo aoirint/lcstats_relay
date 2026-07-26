@@ -84,16 +84,27 @@ docs/
 - `docs/operations/` owns repeatable development, test, migration, deployment, release, recovery,
   incident, and artifact-generation procedures.
 
+Classify visual material by responsibility and lifecycle, not by its medium. `domain/` and `architecture/` own the
+facts a diagram explains. Use an indexed `docs/release/` extension when a diagram, icon, screenshot, or package-renderer
+fallback is a shared release-facing asset: keep its editable source and focused authoring guide together there, while
+linking back to the document that owns its facts. `operations/` owns shared rendering, conversion, capture, and
+verification procedures that apply across more than one release asset. Keep runtime-package files in their
+package-owned location.
+
 Keep all four indexes even when a section has no detailed document yet. State that it currently has
 no entries and name the condition that would add one. This makes absence explicit instead of making
 readers guess whether documentation is missing.
 
 Extend the base map when a distinct audience or change lifecycle justifies it. Examples include
-`docs/user/`, `docs/api/`, `docs/security/`, `docs/decisions/`, or nested concern directories. Add
+`docs/user/`, `docs/api/`, `docs/security/`, `docs/decisions/`, `docs/release/`, or nested concern directories. Add
 each extension to `docs/README.md`, define its ownership against the three base sections, and avoid
 parallel categories that could canonically own the same fact. Existing repositories may retain
 clear equivalent names during a staged migration, but the final map must provide the required base
 paths unless repository instructions explicitly document an approved exception.
+
+For diagram, icon, screenshot, or renderer-fallback work, read
+[visual documentation assets](references/visual-documentation-assets.md) before creating a directory or moving an
+asset. It defines responsibility-based placement and which local differences a rollout may retain.
 
 ## Workflow
 
@@ -123,8 +134,19 @@ Use the required map rather than a file's current name:
 - Put repeatable maintainer actions in `operations/`.
 - Keep user contracts, installation, configuration, examples, troubleshooting, and compatibility in
   the root README or an indexed user-facing extension; link to technical detail instead of copying it.
+- When deriving user guidance from a domain mechanic, keep exact predicates, thresholds, and
+  implementation terms in the domain document. In the user-facing summary, lead with the
+  player-visible outcome, name each independently relevant condition, and give only bounded
+  guidance supported by that domain knowledge. Synchronize parallel package-facing READMEs in the
+  same change.
 - Keep contribution, review, security-reporting, and agent policy in their repository governance
   files; link to operations when a procedure is shared.
+
+For a host-consent or authorization concern, keep the need to prevent unapproved client use,
+external protocol constraints, and credible technical options in `domain/`. Put the product's
+selection of an option, its authorization model, rejected alternatives, and rationale in
+`architecture/`. Do not present a selected transport as reusable domain truth merely because it
+uses an external API.
 
 Keep each fact in one canonical place and link to it elsewhere. Split a mixed document when its
 facts have different owners, audiences, evidence sources, or change triggers. Do not create a
@@ -153,6 +175,12 @@ applicable version, build, API level, environment, or deployment target once in 
 - public contract from implementation detail;
 - external-system facts from this product's policy or design choice.
 
+Follow the repository's established `Target` shape when one exists. For example, sibling domain
+documents may consistently list the game, manifest/build identifier, and evidence. Put that scope
+once near the start of the concern document; do not repeat version literals throughout the body.
+Do not add an `Evidence` field merely to imitate a template: include only evidence that was
+actually inspected and can be repeated by a future maintainer.
+
 Do not include machine-local paths, secrets, incidental generated output, or substantial copied
 third-party source. Give enough evidence detail for a future maintainer to repeat the check. Inspect
 configuration, schemas, declarative bindings, generated code, and assets when they can override or
@@ -178,10 +206,15 @@ requires an undocumented external fact, add or update the domain document first.
 defects and intended-but-unimplemented paths explicitly instead of presenting the desired design as
 current behavior.
 
-For `operations/`, state prerequisites, inputs, exact commands or actions where precision matters,
-expected outputs, state-changing effects, rollback or recovery, verification, and the trigger for
-updating the procedure. Verify commands, paths, environment variables, CI jobs, package contents,
-and release targets against the repository.
+For `operations/` and any indexed concern directory that owns artifact generation, state
+prerequisites, inputs, exact commands or actions where precision matters, expected outputs,
+state-changing effects, rollback or recovery, verification, and the trigger for updating the
+procedure. For a derived visual asset, also identify the canonical editable source,
+each retained derivative and its consumer, the regeneration timing, and the target-renderer check;
+keep transient previews out of the documented deliverables. Keep an asset-specific guide next to
+the source when they change together; link it to a shared operation rather than duplicating that
+operation. Verify commands, paths, environment
+variables, CI jobs, package contents, and release targets against the repository.
 
 ### 5. Migrate without losing information
 

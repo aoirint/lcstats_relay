@@ -6,8 +6,9 @@ description: Select a reviewed APM CLI version, then set up, pin, deploy, audit,
 # APM Usage
 
 Keep agent context reproducible and reviewable. Select the newest reviewed APM
-release that has completed the seven-day cooldown; filesystem location and
-local recency do not establish eligibility. Require full commit pins, lockfile
+release that has completed the seven-day cooldown or has a manifest-recorded
+maintainer exception for a specific unmet gate. Filesystem location and local
+recency do not establish eligibility. Require full commit pins, lockfile
 hashes, and review for every changed third-party dependency.
 
 ## 1. Inspect before changing
@@ -19,9 +20,11 @@ hashes, and review for every changed third-party dependency.
    older CLI forever.
 2. Read [the bootstrap manifest](references/apm-bootstrap.json). Its version is
    the newest APM release whose provenance, artifacts, checksums, publication
-   date, and seven-day cooldown this Skill has reviewed. Do not prefer a newer
-   local `current`, `PATH`, project-local, or legacy executable merely because
-   it is easier to find.
+   date, and cooldown status this Skill has reviewed. When
+   `cooldown_exception` is present, verify that it identifies the specific
+   unmet gate, reason, approval time, and scope. Do not infer a broader waiver.
+   Do not prefer a newer local `current`, `PATH`, project-local, or legacy
+   executable merely because it is easier to find.
 3. Keep an unpublished consumer project at `version: 0.0.0` in `apm.yml`.
    Change that version only after its distribution and versioning design is
    explicitly decided.
@@ -108,7 +111,9 @@ Do not change the bootstrap manifest automatically. Use this proposal flow:
 1. Record the current and candidate tags, release URLs, publication dates,
    platform assets, SHA-256 values, and the candidate cooldown date. Start with
    the newest candidate that has completed the cooldown, not merely the newest
-   published or locally installed version.
+   published or locally installed version. A maintainer may instead select one
+   exact newer release and approve a cooldown exception for a concrete defect
+   or operational blocker.
 2. Treat cooldown as a minimum gate, not adoption approval. Review provenance,
    release notes, installer and artifact integrity, and compatibility from the
    current official sources. Require explicit maintainer approval.
@@ -127,6 +132,15 @@ Do not change the bootstrap manifest automatically. Use this proposal flow:
    `--write --confirm-version <candidate>`. It updates only
    `references/apm-bootstrap.json` and refuses an unconfirmed or mismatched
    version. Review the manifest diff before committing.
+
+For a maintainer-approved cooldown exception, pass the exact
+`--candidate-version`, `--cooldown-exception-reason`, and deterministic
+`--now` approval timestamp first without `--write`, then repeat with
+`--write --confirm-version <candidate>`. The helper records
+`cooldown_exception` in the manifest and refuses an exception without an exact
+candidate and reason. The exception waives only the time gate for that
+bootstrap CLI release; provenance, checksums, artifact inspection,
+compatibility tests, and dependency review remain required.
 
 Do not use `apm self-update` to perform this refresh.
 
@@ -169,11 +183,19 @@ or MCP dependency:
    unclear license or required notice as a blocker unless a maintainer records
    an explicit exception.
 4. Add the dependency to `apm.yml` with the full commit SHA, never a default
-   branch, `latest`, or an unbounded range. Keep MCP entries under the same
-   review gate and do not put tokens in tracked YAML.
+   branch, `latest`, or an unbounded range. When selecting multiple Skills from
+   one repository at one ref, use one object-form dependency with `git`, `ref`,
+   and `skills`; do not encode each Skill as a separate virtual dependency.
+   Keep separate entries only when their repository, ref, or dependency policy
+   differs. Keep MCP entries under the same review gate and do not put tokens
+   in tracked YAML.
 5. Run `apm lock` to resolve and download without deploying to agent targets.
    Review `apm.lock.yaml`: each dependency must resolve to the expected commit
-   and carry its content hash. Commit the manifest and lockfile together.
+   and carry its content hash. In PowerShell checks, wrap variable-cardinality
+   query results in `@(...)` before using `.Count`, indexing, or membership
+   tests; one result otherwise becomes a scalar while multiple results become
+   an array. Assert the expected count and element type. Commit the manifest
+   and lockfile together.
 6. Run `apm install --frozen` only after that review. It must reproduce the
    reviewed lockfile and must not resolve a new dependency. Never use
    `--force`, `--allow-insecure`, or an insecure HTTP source unless an explicit
@@ -220,6 +242,35 @@ authoring target such as `.agents/skills/` and a package directory such as
    use `git diff --cached --check` and a content review to distinguish a real
    generated-file delta from line-ending noise.
 
+### 3.3 Rename or remove packaged local Skills
+
+Apply this section when a local packaged Skill is renamed, consolidated, or
+removed. Treat it as a deployment-ledger change, not a documentation-only
+rename.
+
+1. Before editing, inventory the retiring and destination source folders,
+   deployed paths, resource moves, README index rows, repository references,
+   and every matching entry in `apm.lock.yaml` (`deployments`, deployed-file
+   lists, and local deployed-file hashes).
+2. Move or remove canonical content and update callers first. Preserve
+   deterministic scripts and directly linked references when their behavior
+   remains supported; do not recreate them gratuitously. Regenerate every
+   managed deployment from the canonical source rather than hand-editing
+   `.agents/` output.
+3. Regenerate the lockfile from scratch with the selected reviewed APM CLI
+   whenever the existing ledger still names a retired deployment path, or when
+   a normal lock/install cycle cannot prove that removed paths left the ledger.
+   Do not patch lockfile hashes or deployment entries by hand. Review that no
+   retired path remains before running `apm install --frozen`.
+4. Run `apm install --frozen` and `apm audit --ci`. Treat missing expected
+   files, orphaned retired files, unintegrated outputs, or a source/deployed
+   file-set mismatch as release blockers. If the available generator cannot
+   remove a retired generated path, stop and record the tool limitation rather
+   than claiming the deployment is clean.
+5. Review the complete canonical, deployment, and lockfile diff together.
+   Confirm the installed target contains the destination Skill exactly once and
+   no retired Skill name, resource, or hash record remains.
+
 ## 4. Propose updates; do not silently apply them
 
 Pinned dependencies stay unchanged until a maintainer approves an update.
@@ -264,7 +315,8 @@ Before handoff, reconcile `THIRD_PARTY_NOTICES.md` with the reviewed lockfile:
 - An unpublished project keeps `version: 0.0.0` until its distribution and
   versioning design is approved.
 - The selected APM CLI was the newest reviewed release that completed the
-  seven-day cooldown; its absolute path and version were recorded.
+  seven-day cooldown or had a manifest-recorded maintainer exception for the
+  specific unmet gate; its absolute path and version were recorded.
 - No PATH, active APM installation, or other user-environment state changed
   without explicit authorization.
 - Any lock-format migration was explicit and reviewed separately from resolved

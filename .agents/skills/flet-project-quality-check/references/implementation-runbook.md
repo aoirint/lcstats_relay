@@ -39,7 +39,7 @@ Create this ledger before writing target-specific values. `blocked` stops only d
 | --- | --- | --- |
 | Product purpose and user workflows | confirmed / blocked | UI states, architecture, docs |
 | Python minor range and `.python-version` | confirmed / blocked | Ruff target, CI, Flet build |
-| Flet range and verified APIs | confirmed / blocked | lifecycle, controls, packaging |
+| Flet versions, component compatibility, and verified APIs | confirmed / blocked | lifecycle, controls, packaging |
 | Supported OS and desktop/web/mobile targets | confirmed / blocked / none | platform adapters/build claims |
 | Distribution/import/command/app/artifact identities | confirmed / blocked | packaging and release identity |
 | App entry, composition root, and Flet build module | confirmed / blocked | source layout/build |
@@ -157,7 +157,9 @@ exist. Required documentation indexes may explicitly state that a section has no
    partial/stale, error, retrying, success, and disabled states that apply.
 2. Define responsive and platform-adaptive behavior for every supported target/window class.
 3. Verify forms, double submission, focus/error behavior, Back/deep-link/unknown route, unsaved
-   changes, keyboard traversal, semantics, text scaling, contrast, and status without color.
+   changes, keyboard traversal, semantics, text scaling, contrast, and status without color. For
+   local path inputs, verify editable text plus supported native file/directory selection, cancel
+   preservation, target capability differences, and state-synchronized picker availability.
 4. Keep UI tests semantic. Add targeted manual/runtime checks for behavior that Flet adapters/fakes
    cannot prove.
 
@@ -167,10 +169,14 @@ exist. Required documentation indexes may explicitly state that a section has no
    repository policy.
 2. Confirm local and CI command equivalence from a clean clone.
 3. For each enabled Flet build target, confirm runner/toolchain, Python/Flet versions, app identity,
-   assets, dependencies, permissions, storage, and output contract.
-4. Build and inspect the final artifact, then run target-specific launch/install/upgrade/shutdown
-   checks. Source tests alone do not approve it.
-5. If release is enabled, separate protected publishing from PR validation, bind the artifact to the
+   assets, dependencies, permissions, storage, packaging resolver input, and output contract.
+4. Build and inspect the final artifact. Compare its packaged Python Flet distributions and
+   generated Flutter Flet package with the CLI/template version under the selected compatibility
+   contract; do not infer them from `uv.lock` or the builder environment.
+5. Run target-specific launch/install/upgrade/shutdown checks. Require a bounded semantic signal
+   that the first page mounted and retain packaged runtime diagnostics on failure; process survival
+   or a background-only window is not startup evidence. Source tests alone do not approve it.
+6. If release is enabled, separate protected publishing from PR validation, bind the artifact to the
    reviewed source/lock, and verify repository settings. Keep blocked release facts out of
    executable placeholders.
 
@@ -216,7 +222,7 @@ Run applicable rows and record exact commands/results.
 | Persistence/network | corruption/atomicity/permissions/path; timeout/schema/size/auth/redaction |
 | Docs | required indexes, ownership, links, clean-clone commands, current/proposed labels |
 | Workflows | actionlint, ShellCheck targets, pinact cooldown/pins, least-privilege review |
-| Flet package | target runner build; manifest/hash/content; install/launch/upgrade/shutdown |
+| Flet package | target runner build; packaged Python/CLI/Flutter version parity; manifest/hash/content; semantic first-page readiness; install/launch/upgrade/shutdown |
 | Repository settings | branch/ruleset, Actions permissions, secrets/environment, release controls |
 
 Do not mark a row passed from configuration alone when it requires runtime, artifact, or repository
