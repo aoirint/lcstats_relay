@@ -12,7 +12,7 @@
 
 ## GitHub Actions quality gate
 
-Use `github-actions-quality-check` and `security-check` while implementing this baseline.
+Use `github-workflow` and `security-check` while implementing this baseline.
 
 - Use separate event-owned entry workflows. The pull-request workflow triggers on `pull_request` and `merge_group` when
   a merge queue uses required checks; it validates proposed source only. The integration-branch workflow triggers on the
@@ -35,7 +35,7 @@ Use `github-actions-quality-check` and `security-check` while implementing this 
 - Never use `pull_request_target` to check out and execute untrusted PR code. Keep release/signing credentials in
   separately triggered, protected jobs/environments.
 - Keep CI commands equal to the documented local commands. CI-only hidden flags and local-only shortcuts are findings.
-- Select runners per job with `github-actions-quality-check`. Start Flet lint, type-check, and unit-test jobs on
+- Select runners per job with `github-workflow`. Start Flet lint, type-check, and unit-test jobs on
   `ubuntu-slim`. Move a job to a full VM only when its required Composite Action, tools, or runtime cannot meet the slim
   container, resource, software, or 15-minute limits; then validate the reason and periodically retry slim. Keep Flet or
   Flutter desktop/mobile builds on a full platform runner; their native toolchains and resource use are not lightweight
@@ -208,6 +208,8 @@ Before enabling `flet build`, record:
 - project/product/artifact names, organization/bundle identifiers, version and build-number source;
 - application assets, icons, splash screens, permissions/entitlements, and excluded paths;
 - direct runtime packages and whether their binary wheels/extensions support the target;
+- the dependency input used by `flet build`, whether it consumes the project lock, and how the
+  packaged Flet Python distributions remain compatible with the CLI-generated Flutter client;
 - data/config/cache locations and behavior after installation or upgrade;
 - network permissions, local-service assumptions, deep links, and platform-specific integration;
 - output directory and exact artifact(s) accepted for release.
@@ -216,6 +218,12 @@ Flet packages Python and project assets into a platform build and may download/u
 target tooling. Treat build execution as supply-chain-sensitive. Pin/review the Flet and Python dependency graph,
 isolate the build environment, and record tool versions. Do not claim a target works because the source runs on the
 developer OS.
+
+Launching `flet build` through a locked environment does not prove that its internal application packager reproduces
+that lock. Inspect the supported Flet version's packaging behavior. Fail the build when packaged `flet` and any
+target-specific Python distributions, the Flet CLI/template version, or the generated Flutter `flet` package violate
+the selected compatibility contract. Prefer one exact version across protocol-coupled components when no authoritative
+cross-version compatibility matrix exists.
 
 Keep generated `build/` output out of source control unless the repository has a separately reviewed vendoring contract.
 Keep user source/assets, lockfiles, metadata, licenses, and build configuration visible to Git.
@@ -230,9 +238,10 @@ Keep user source/assets, lockfiles, metadata, licenses, and build configuration 
   source commit. Independent workflows that can still fail after publication are not a sufficient gate unless repository
   settings or the publishing workflow demonstrably waits for their successful check runs.
 - Produce one manifest containing artifact name, target, app/build version, source commit, build workflow/run, Flet/uv
-  versions, and SHA-256. Record the builder interpreter separately from the Python runtime actually packaged into each
-  target artifact. Derive each packaged runtime identity from the inspected final archive or bundle; do not copy the
-  builder's `.python-version` value into every target record by assumption.
+  versions, and SHA-256. Record the Flet CLI/template version, generated Flutter Flet package version, and packaged
+  Python Flet distribution versions separately before asserting parity. Record the builder interpreter separately from
+  the Python runtime actually packaged into each target artifact. Derive each packaged runtime identity from the
+  inspected final archive or bundle; do not copy builder-environment values into every target record by assumption.
 - Inspect the final archive/installer/app bundle for expected identity, entry point, assets, licenses/notices, and
   absence of repository-owned tests, caches, `.env`, credentials, local paths, source-control metadata, development
   tools, and unrelated files. Inspect archive entry paths without unsafe extraction, reject traversal/unsupported
@@ -242,8 +251,11 @@ Keep user source/assets, lockfiles, metadata, licenses, and build configuration 
   `site-packages/.../tests` or package metadata directory as repository leakage solely because of a basename match.
   Continue to reject unsafe paths, unsupported special files, caches, and secret-bearing content at every depth where
   the rule is semantically valid.
-- Install or launch the produced artifact on every supported target class. Verify first run, upgrade/migration when
-  supported, data path, settings, network failure, clean shutdown, and uninstall/residual-data policy.
+- Install or launch the produced artifact on every supported target class. Require a bounded semantic readiness signal
+  proving that the first page mounted; a live process, open window, background color, or successful package command is
+  insufficient. Capture the packaged runtime log on failure and cleanly terminate the smoke-test process. Also verify
+  first run, upgrade/migration when supported, data path, settings, network failure, clean shutdown, and
+  uninstall/residual-data policy.
 - Separate stable/prerelease/channel semantics and derive all artifact/release identities from one verified version
   source. Do not rewrite only a subset of metadata during CI.
 - Treat the canonical version source and publication trigger as maintained repository contracts. Inspect and preserve an

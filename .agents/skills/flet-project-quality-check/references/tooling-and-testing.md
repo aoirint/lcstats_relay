@@ -29,6 +29,11 @@
   confirmed application target imports or packages that surface.
 - Commit `uv.lock`. Treat it as the installed application graph across supported markers, not as a
   generated file to refresh opportunistically.
+- Do not assume `uv.lock` controls the Python dependencies embedded by `flet build`. Record the
+  selected Flet version's packaging resolver inputs and behavior. When the Flet CLI, Python server,
+  desktop/web packages, and generated Flutter client are protocol-coupled, constrain them to one
+  exact reviewed version unless an authoritative compatibility contract supports a wider set.
+  Verify their resolved versions again inside the final bundle.
 - Set `[tool.uv] exclude-newer = "P7D"`. Apply `security-check` before changing constraints or the
   lock. A package-specific exemption requires a documented reason, exact scope, and removal/review
   trigger; never disable the project-wide cooldown casually.
@@ -330,6 +335,8 @@ uv run --locked pytest
 Run `uv build` when the project is an installable distribution. Run the applicable `flet build`
 smoke/package branch from the packaging procedure for every supported release target. Do not use
 bare `pip install`, a globally installed checker, or an unlocked `uv run` as release evidence.
+The locked source environment and the packaged application are separate verification surfaces:
+inspect both even when the build command itself was launched through `uv run --locked`.
 
 ## Dependency changes
 

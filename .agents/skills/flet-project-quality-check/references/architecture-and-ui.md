@@ -168,6 +168,12 @@ Model UI behavior as a deterministic transition wherever possible:
   invalid, nested, and back-navigation cases.
 - Give every input a label, help/error relationship, expected format, and validation time. Preserve
   user input after a recoverable error; focus the first actionable error where supported.
+- For local file or directory paths, pair editable text entry with a native picker when the target
+  supports one. Retain typing and paste for exact paths and automation; treat a canceled or pathless
+  selection as no change. Verify the selected Flet version and target separately: desktop pickers
+  can return local paths, while browser file selection is an upload boundary and must not be modeled
+  as access to the controller machine's absolute path. Keep picker enabled/busy state synchronized
+  with the form operation it configures.
 - Separate field syntax validation from application validation and remote rejection. Do not show an
   exception string directly to users.
 - Define enabled/loading/success/error behavior for each action. Prevent double submission and make
@@ -217,6 +223,8 @@ Require tests that prove:
 - presentation mapping covers every status/result variant exhaustively;
 - Flet adapters emit the intended intent and render semantic properties without positional tree
   traversal;
+- path inputs cover typed or pasted values, supported file/directory selection, cancellation without
+  value loss, target capability differences, and disabled/busy state synchronization;
 - mount/unmount, route replacement, repeated actions, and window close leave no live tasks;
 - persistence round-trips, corrupt/truncated input, unique temporary cleanup, replacement failure,
   concurrent writers, and new/legacy platform paths behave as documented;

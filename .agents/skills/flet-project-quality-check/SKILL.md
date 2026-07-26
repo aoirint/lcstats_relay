@@ -45,7 +45,7 @@ the Flet-specific facts those documents must own: supported Flet/Python targets,
 UI state and navigation, task lifetime, component boundaries, platform storage,
 test/build commands, and packaging behavior.
 
-Use `github-actions-quality-check` for workflow triggers, permissions,
+Use `github-workflow` for workflow triggers, permissions,
 concurrency, action pins, actionlint, ShellCheck, and pinact. Use `security-check`
 for package provenance and cooldown, lock changes, secrets, URL/file input,
 downloaded tools, caches, build artifacts, and release credentials. Do not
@@ -139,7 +139,8 @@ informal list.
 
 ## Completion Checklist
 
-- Target Python/Flet/platform and app identity are explicit and consistent.
+- Target Python/Flet/platform and app identity are explicit and consistent, including packaged
+  Python/CLI/Flutter Flet compatibility and a semantic first-page startup check.
 - Domain/application code imports no Flet or concrete infrastructure.
 - Presentation state and transitions are immutable or otherwise centrally owned and independently tested.
 - Flet controls render state and emit intents; they do not own business workflows or hidden task state.
