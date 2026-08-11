@@ -17,7 +17,8 @@ defaults:
     shell: bash
 
 jobs:
-  lint:
+  check:
+    name: Check
     # Main re-runs the source checks for the exact commit that can produce a
     # release. Native packaging remains outside this lightweight job.
     runs-on: ubuntu-slim
@@ -30,7 +31,7 @@ jobs:
           persist-credentials: false
 
       - name: Lint source
-        uses: ./.github/actions/lint-source
+        uses: ./.github/actions/check-python-flet-source
 
   test:
     name: Test
@@ -45,7 +46,7 @@ jobs:
           persist-credentials: false
 
       - name: Test source
-        uses: ./.github/actions/test-source
+        uses: ./.github/actions/test-python-flet-source
 
   plan:
     name: Plan
@@ -68,7 +69,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up locked Python environment
-        uses: ./.github/actions/setup-python
+        uses: ./.github/actions/setup-python-locked
 
       - name: Generate version metadata
         id: version
@@ -131,7 +132,7 @@ jobs:
 
   build:
     needs:
-      - lint
+      - check
       - test
       - plan
     if: needs.plan.outputs.should_release == 'true'
@@ -197,7 +198,7 @@ jobs:
 
       - name: Set up locked Python environment
         id: setup
-        uses: ./.github/actions/setup-python
+        uses: ./.github/actions/setup-python-locked
 
       - name: Download release inputs
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0

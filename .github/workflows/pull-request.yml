@@ -18,7 +18,8 @@ defaults:
     shell: bash
 
 jobs:
-  lint:
+  check:
+    name: Check
     # Source checks run on the lightweight, unprivileged runner and remain
     # separate from the test job for a focused PR failure signal.
     runs-on: ubuntu-slim
@@ -31,7 +32,7 @@ jobs:
           persist-credentials: false
 
       - name: Lint source
-        uses: ./.github/actions/lint-source
+        uses: ./.github/actions/check-python-flet-source
 
   test:
     name: Test
@@ -47,4 +48,4 @@ jobs:
           persist-credentials: false
 
       - name: Test source
-        uses: ./.github/actions/test-source
+        uses: ./.github/actions/test-python-flet-source

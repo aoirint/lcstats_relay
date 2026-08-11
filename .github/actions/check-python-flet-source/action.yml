@@ -1,10 +1,21 @@
-name: Lint Flet source
+name: Check Flet source
 description: Run workflow, Python, type, and Markdown source checks.
 
 runs:
   using: composite
   steps:
+    - name: Set up reviewed APM CLI
+      uses: microsoft/apm-action@d723bb64ed70c135bbaf87d126b721dd2dae0439 # v1.10.0
+      with:
+        apm-version: "0.27.0"
+        setup-only: "true"
+
+    - name: Audit APM deployment
+      shell: bash
+      run: apm audit --ci
+
     - name: Install workflow validation tools
+      id: workflow-tools
       uses: ./.github/actions/install-workflow-tools
 
     - name: Lint GitHub Actions syntax
@@ -18,7 +29,8 @@ runs:
       run: pinact run --check --min-age 7
 
     - name: Set up locked Python environment
-      uses: ./.github/actions/setup-python
+      id: setup
+      uses: ./.github/actions/setup-python-locked
 
     - name: Check Python formatting
       shell: bash
@@ -37,3 +49,16 @@ runs:
       with:
         config: .markdownlint-cli2.yaml
         globs: "**/*.md"
+
+    # setup-uv owns its runner cache; remove only the action-created project environment.
+    - name: Remove Python dependencies
+      if: always() && steps.setup.outputs.environment-owned == 'true'
+      shell: bash
+      run: rm -rf .venv
+
+    - name: Remove workflow validation tools
+      if: ${{ always() && steps.workflow-tools.outputs.installation-directory != '' }}
+      shell: bash
+      env:
+        WORKFLOW_TOOLS_DIRECTORY: ${{ steps.workflow-tools.outputs.installation-directory }}
+      run: rm -rf -- "$WORKFLOW_TOOLS_DIRECTORY"
