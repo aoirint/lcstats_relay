@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-08-11T07:13:41.885734+00:00'
+generated_at: '2026-08-11T07:27:51.270794+00:00'
 apm_version: 0.27.0
 dependencies:
 - repo_url: aoirint/skills
