@@ -60,6 +60,10 @@ for package provenance and cooldown, lock changes, secrets, URL/file input,
 downloaded tools, caches, build artifacts, and release credentials. Do not
 duplicate weaker substitutes here.
 
+For an APM-managed repository, apply `apm-workflow` and keep `apm audit --ci`
+in the outer Flet source-check action. Keep Markdown lint in that action beside
+the Python checks so every entry workflow enforces the same repository baseline.
+
 ## Non-Negotiable Baseline
 
 - Use a `src/` package layout, a thin Flet entry point, and one composition root.
@@ -124,6 +128,12 @@ informal list.
      `flet build`, assets, identifiers, storage, logging, secrets, caches, or releases.
    - Start from the Python CI gate required by `python-quality-check`, then add
      repository-specific documentation, Flet target build, artifact, and runtime checks.
+   - Copy `setup-python-locked` from `python-quality-check` beside the Flet
+     check and test actions. Keep dependency setup inside each outer action by
+     composition; do not copy the setup implementation into this Skill.
+   - Copy `install-workflow-tools` from `github-actions-quality-check` beside
+     the Flet actions when workflow validation is part of the source gate. Do
+     not keep a Flet-owned copy of that shared installer.
    - Verify every selected Flet target on a compatible runner. Keep packaging/release jobs separate
      from untrusted pull-request validation and inspect the final artifact, not only source tests.
 6. Align documentation.

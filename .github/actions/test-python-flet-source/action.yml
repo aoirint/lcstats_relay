@@ -1,0 +1,19 @@
+name: Test Flet source
+description: Run the locked test suite with its coverage policy.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up locked Python environment
+      id: setup
+      uses: ./.github/actions/setup-python-locked-locked
+
+    - name: Run locked Python tests
+      shell: bash
+      run: uv run --locked pytest
+
+    # setup-uv owns its runner cache; remove only the action-created project environment.
+    - name: Remove Python dependencies
+      if: always() && steps.setup.outputs.environment-owned == 'true'
+      shell: bash
+      run: rm -rf .venv

@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  checks:
-    name: Checks
+  check:
+    name: Check
     runs-on: ubuntu-slim
     timeout-minutes: 15
 
@@ -26,7 +26,7 @@ jobs:
           persist-credentials: false
 
       - name: Run Flet source lint
-        uses: ./.github/actions/lint-source
+        uses: ./.github/actions/check-python-flet-source
 
   test:
     name: Test
@@ -40,4 +40,4 @@ jobs:
           persist-credentials: false
 
       - name: Run Flet source tests
-        uses: ./.github/actions/test-source
+        uses: ./.github/actions/test-python-flet-source

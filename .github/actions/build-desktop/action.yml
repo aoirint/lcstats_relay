@@ -58,7 +58,7 @@ runs:
         echo "suffix=${archive_suffix}" >> "${GITHUB_OUTPUT}"
 
     - name: Set up locked Python environment
-      uses: ./.github/actions/setup-python
+      uses: ./.github/actions/setup-python-locked
 
     - name: Generate version metadata
       id: version
