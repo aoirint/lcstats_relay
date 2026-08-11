@@ -1,12 +1,12 @@
 lockfile_version: '1'
-generated_at: '2026-08-11T06:01:56.884703+00:00'
+generated_at: '2026-08-11T06:38:22.991438+00:00'
 apm_version: 0.27.0
 dependencies:
 - repo_url: aoirint/skills
   name: skills
   host: github.com
-  resolved_commit: 7ee24b75904233a42a7fc01d79c6dfc81ca36d7c
-  resolved_ref: 7ee24b75904233a42a7fc01d79c6dfc81ca36d7c
+  resolved_commit: bd19f9e124aeb6947e664df29922ce3881f66609
+  resolved_ref: bd19f9e124aeb6947e664df29922ce3881f66609
   version: 0.0.0
   package_type: apm_package
   deployed_files:
@@ -54,6 +54,7 @@ dependencies:
   - .agents/skills/github-actions-quality-check/agents/openai.yaml
   - .agents/skills/github-actions-quality-check/assets/github/actions/install-workflow-tools/action.yml
   - .agents/skills/github-actions-quality-check/assets/github/actions/install-workflow-tools/install-workflow-tools.sh
+  - .agents/skills/github-actions-quality-check/assets/github/markdownlint-cli2.yaml
   - .agents/skills/github-actions-quality-check/assets/github/workflows/main.yml
   - .agents/skills/github-actions-quality-check/assets/github/workflows/pull-request.yml
   - .agents/skills/github-actions-quality-check/references/composite-actions.md
@@ -145,10 +146,11 @@ dependencies:
     .agents/skills/git-worktree-workflow/SKILL.md: sha256:67e2474b9878cc6cb209ae30b19c233f65969abe5b5d543f0c9a16e46f1d40d2
     .agents/skills/git-worktree-workflow/agents/openai.yaml: sha256:3eb9da73e7a041e77d82f0d5c3a8c67e914575cff8651b71d077db30fe3da99a
     .agents/skills/github-actions-quality-check/README.md: sha256:1c9cb3b29bb4c99e3a2e87b1b79a6eee30470c8762b2cdb5f82cb61387176d86
-    .agents/skills/github-actions-quality-check/SKILL.md: sha256:5dd037fffe2e287c5cfbfb02d2c8eeb94bb28ae192f9c5878fd8370db49f5cd8
+    .agents/skills/github-actions-quality-check/SKILL.md: sha256:499e65b4cf6f77d1f09c8340840e9aa6dcf8d0102371d3a137fdc09c894e2c43
     .agents/skills/github-actions-quality-check/agents/openai.yaml: sha256:505565c70b7441db1d8c17b5522b7f777acd748be441c55fdcc1f2093e185a5d
     .agents/skills/github-actions-quality-check/assets/github/actions/install-workflow-tools/action.yml: sha256:9a46e0ebabe3d4d2302e75e252a11b4639e88884feb2066665a9bcc099c2b0dd
     .agents/skills/github-actions-quality-check/assets/github/actions/install-workflow-tools/install-workflow-tools.sh: sha256:767b5865c488f12e2488f55807e76d789e968f11ef6b1364be5f3b47542ea898
+    .agents/skills/github-actions-quality-check/assets/github/markdownlint-cli2.yaml: sha256:50390308413d207ffb315795ce0ee4029f43e9e78e43249149942421c696e2ed
     .agents/skills/github-actions-quality-check/assets/github/workflows/main.yml: sha256:9c6fc9b8a12eda5300d526de709ab17456781179efa43ea9c911bde795204690
     .agents/skills/github-actions-quality-check/assets/github/workflows/pull-request.yml: sha256:825813d13866d67da9edf0420d9d8290d2ffe36c20ae4ae0f97a1c91992b818b
     .agents/skills/github-actions-quality-check/references/composite-actions.md: sha256:d914d0fe4495121c5fdf168681a6dac62b897c28771e67ffb30c04f8d7fe3298
@@ -198,7 +200,7 @@ dependencies:
     .agents/skills/test-quality-check/agents/openai.yaml: sha256:1b97300ddad1b506c43c47ff8be43eca33e7fd73ee58ad179321a92848aa63f0
     .agents/skills/test-quality-check/references/classification-and-placement.md: sha256:31f5e95627e183789751b1b1942257c3aa253d5c0e2504c02b5e2391d5dad104
     .agents/skills/test-quality-check/references/coverage-and-suite-audit.md: sha256:040af3a01b78c20670ca37c1e62941b830c4b9a90f64e8853ffc0255db709277
-  content_hash: sha256:9880f8b48160964a276f061840d95504326316fdbb1647f88b4ab8c16fed7f85
+  content_hash: sha256:f5509ac40a802023b1b1b8dc5dc7d589ed5c9d7e43e6a81d369b719f2df90134
   skill_subset:
   - apm-workflow
   - changelog-workflow
@@ -585,7 +587,7 @@ deployments:
   owners:
   - aoirint/skills
   active_owner: aoirint/skills
-  content_hash: sha256:5dd037fffe2e287c5cfbfb02d2c8eeb94bb28ae192f9c5878fd8370db49f5cd8
+  content_hash: sha256:499e65b4cf6f77d1f09c8340840e9aa6dcf8d0102371d3a137fdc09c894e2c43
 - kind: project-relative
   target: codex
   value: .agents/skills/github-actions-quality-check/agents/openai.yaml
@@ -613,6 +615,15 @@ deployments:
   - aoirint/skills
   active_owner: aoirint/skills
   content_hash: sha256:767b5865c488f12e2488f55807e76d789e968f11ef6b1364be5f3b47542ea898
+- kind: project-relative
+  target: codex
+  value: .agents/skills/github-actions-quality-check/assets/github/markdownlint-cli2.yaml
+  runtime: null
+  scope: project
+  owners:
+  - aoirint/skills
+  active_owner: aoirint/skills
+  content_hash: sha256:50390308413d207ffb315795ce0ee4029f43e9e78e43249149942421c696e2ed
 - kind: project-relative
   target: codex
   value: .agents/skills/github-actions-quality-check/assets/github/workflows/main.yml
