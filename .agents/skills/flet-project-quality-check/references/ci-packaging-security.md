@@ -1,7 +1,7 @@
 # Flet CI, Packaging, and Security Extension
 
 Use `python-quality-check` for the canonical Python CI and ordinary
-wheel/sdist baseline. Use `github-workflow`
+wheel/sdist baseline. Use `github-actions-quality-check`
 for workflow mechanics and `security-check` for supply-chain decisions. This
 reference adds Flet target-build and packaged-runtime requirements.
 
@@ -20,12 +20,8 @@ reference adds Flet target-build and packaged-runtime requirements.
 - Keep source validation on the smallest compatible runner. Use a full
   platform runner for desktop/mobile builds whose native toolchains or resource
   requirements cannot run on `ubuntu-slim`.
-- Extend the protected integration-branch workflow with Flet build jobs using
-  direct `needs` dependencies on the Python quality gate and any read-only plan.
-- Build and retain every integration-branch artifact, including unpublished
-  edge builds. Release must consume that verified artifact instead of rebuilding it.
-- Keep untrusted pull-request validation free of signing, publishing, or
-  protected target credentials.
+- Build and retain every integration-branch Flet target artifact, including
+  unpublished edge builds, after the Python quality gate passes.
 
 The Flet Skill's `assets/github/` files are example Flet-project integration
 assets, not a second definition of the Python quality criteria. Keep their
@@ -95,9 +91,9 @@ release facts are blocked. Complete validation and report the blocked release br
 
 ## Repository and documentation evidence
 
-For release readiness, verify rather than infer required checks, Actions
-allowlists/token permissions, environments/secrets, merge-queue compatibility,
-release immutability, tag rules, and artifact provenance controls.
+For release readiness, apply the repository-enforcement and artifact-lineage
+checks from `github-actions-quality-check` before assessing the Flet-specific
+target artifacts.
 
 Use `software-documentation-maintenance` so canonical documents own supported
 Flet/Python/platform versions, UI state/navigation, task lifecycle,

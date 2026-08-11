@@ -4,7 +4,8 @@ description: Install checksum-verified actionlint and pinact.
 runs:
   using: composite
   steps:
-    - shell: bash
+    - name: Install checksum-verified workflow tools
+      shell: bash
       run: |
         install_tool() {
           local archive="$1" url="$2" sha256="$3" extract="$4" directory="$5"

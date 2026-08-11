@@ -50,7 +50,11 @@ or duplicate them. Install both Skills as adjacent siblings before running the
 Flet checker; a missing shared Python Skill is a blocked dependency, not a
 reason to copy or redefine its baseline here.
 
-Use `github-workflow` for workflow triggers, permissions,
+Use `test-quality-check` for general test classification, behavioral value,
+coverage policy, determinism, and suite overengineering. This Skill retains only
+Flet-specific presentation, adapter, lifecycle, and packaged-runtime contracts.
+
+Use `github-actions-quality-check` for workflow triggers, permissions,
 concurrency, action pins, actionlint, ShellCheck, and pinact. Use `security-check`
 for package provenance and cooldown, lock changes, secrets, URL/file input,
 downloaded tools, caches, build artifacts, and release credentials. Do not
@@ -68,10 +72,6 @@ duplicate weaker substitutes here.
   target-runtime semantic readiness. A pass on one never substitutes for another.
 - Keep Flet callback positional exceptions narrow, evidenced against the exact
   supported Flet API, and compliant with the shared keyword-only policy.
-- Require event-owned GitHub Actions: pull-request validation (and merge-queue validation when
-  used), plus protected-integration-branch validation re-run on the exact pushed commit. Use direct
-  `needs` dependencies to gate plan/build/artifact/release work, least-privilege permissions, and
-  full-SHA action pins.
 - Maintain the documentation base map required by `software-documentation-maintenance` and make all
   developer procedures executable from a clean clone.
 
@@ -124,11 +124,6 @@ informal list.
      `flet build`, assets, identifiers, storage, logging, secrets, caches, or releases.
    - Start from the Python CI gate required by `python-quality-check`, then add
      repository-specific documentation, Flet target build, artifact, and runtime checks.
-   - Keep pull-request and integration-branch entry workflows distinct. Reuse a local Composite
-     Action for a same-runner setup/check sequence. Use a reusable workflow only when job-level
-     matrix, outputs, or permission boundaries make a Composite Action insufficient, and document
-     that reason; do not introduce manual dispatch or cross-workflow polling without an explicit
-     operator/trust-boundary need.
    - Verify every selected Flet target on a compatible runner. Keep packaging/release jobs separate
      from untrusted pull-request validation and inspect the final artifact, not only source tests.
 6. Align documentation.

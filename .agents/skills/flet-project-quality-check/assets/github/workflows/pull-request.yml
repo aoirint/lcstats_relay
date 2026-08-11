@@ -3,49 +3,41 @@ name: Pull Request
 on:
   pull_request:
   merge_group:
-    types:
-      - checks_requested
+    types: [checks_requested]
 
 permissions:
   contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # Merge-queue commits are immutable; cancel only superseded pull-request runs.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
-defaults:
-  run:
-    shell: bash
 
 jobs:
   checks:
     name: Checks
-    # Source checks run on the lightweight, unprivileged runner and remain
-    # separate from the test job for a focused PR failure signal.
     runs-on: ubuntu-slim
     timeout-minutes: 15
 
     steps:
-      - name: Check out repository
+      - name: Check out proposed source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
-      - name: Lint source
+      - name: Run Flet source lint
         uses: ./.github/actions/lint-source
 
   test:
     name: Test
-    # Unit tests use the locked Python environment without desktop packaging or
-    # privileged services, so this job fits the slim runner contract.
     runs-on: ubuntu-slim
     timeout-minutes: 15
 
     steps:
-      - name: Check out repository
+      - name: Check out proposed source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
-      - name: Test source
+      - name: Run Flet source tests
         uses: ./.github/actions/test-source

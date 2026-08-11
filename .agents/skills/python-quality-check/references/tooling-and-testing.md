@@ -60,10 +60,41 @@ target-version = "<matching-pyNNN>"
 preview = true
 explicit-preview-rules = true
 select = [
-    "ANN", "ARG", "ASYNC", "B", "C4", "C90", "COM", "D", "DTZ", "E",
-    "ERA", "F", "FBT", "FLY", "G", "I", "ICN", "LOG", "N", "PERF",
-    "PIE", "PL", "PLR0917", "PT", "PTH", "RET", "RUF", "S", "SIM",
-    "SLF", "T20", "TRY", "UP", "W",
+    "E",       # pycodestyle errors
+    "W",       # pycodestyle warnings
+    "F",       # Pyflakes correctness
+    "FBT",     # prevent positional Boolean traps
+    "I",       # deterministic imports
+    "ANN",     # annotations
+    "ARG",     # unused arguments
+    "ASYNC",   # async correctness
+    "B",       # bugbear correctness
+    "C4",      # comprehension clarity
+    "C90",     # explicit complexity ceiling
+    "COM",     # stable comma use
+    "D",       # public documentation
+    "DTZ",     # timezone-aware datetimes
+    "ERA",     # no commented-out code
+    "FLY",     # modern string formatting
+    "G",       # logging format correctness
+    "ICN",     # conventional import names
+    "LOG",     # logging correctness
+    "N",       # naming
+    "PERF",    # avoid ordinary performance traps
+    "PIE",     # miscellaneous correctness
+    "PL",      # maintainability and correctness
+    # Preview rule selected by exact code: reject every project-owned positional parameter.
+    "PLR0917",
+    "PT",      # pytest style
+    "PTH",     # pathlib boundaries
+    "RET",     # return-path clarity
+    "RUF",     # Ruff-specific correctness
+    "S",       # common security mistakes
+    "SIM",     # needless control-flow complexity
+    "SLF",     # private-member boundary violations
+    "T20",     # stray print/pprint
+    "TRY",     # exception design
+    "UP",      # syntax modernization
 ]
 ignore = [
     "COM812",  # Ruff formatter owns trailing comma layout.
@@ -119,6 +150,10 @@ configured development target.
 - Run both `ruff check` and `ruff format --check`.
 - Use a reasoned selected rule set rather than `ALL`. Treat configuration
   warnings as failures.
+- Keep every `[tool.ruff.lint].select` entry on its own line with a concise
+  rationale comment. Preserve those comments when reordering, extracting, or
+  deploying this baseline; add or update the rationale in the same change as a
+  rule selection change.
 - Fix code first. A file or line suppression must name the exact rule and give
   a durable reason at the suppression site.
 - Require keyword arguments at first-party definitions and call sites,
@@ -155,18 +190,14 @@ configured development target.
 
 ## pytest and coverage policy
 
-- Require 100% statement and branch coverage for maintained first-party source.
-- Do not use broad omit rules, `pragma: no cover`, or import guards to
-  manufacture 100%.
+- Apply `test-quality-check` for test classification, behavioral oracles,
+  determinism, the shared 100% statement/branch policy, exclusions, and suite
+  overengineering audits.
+- Configure pytest and Coverage.py against the intended maintained first-party
+  source roots, enable branch measurement, and fail below the shared threshold.
 - Test module and console entry points without launching work at import time.
-- Fail on unknown markers/configuration and make clock, randomness, sleep,
-  filesystem, subprocess, and network behavior deterministic through seams.
-- Assert state, declared effects, boundary calls, failures, cleanup, and
-  user-observable outcomes; executing a line is not a sufficient assertion.
-- Keep ordinary tests offline and independent of user credentials.
-- Organize tests around contracts: domain values, application transitions,
-  presentation mapping, infrastructure boundaries, composition, entry points,
-  and artifact smoke behavior. Source-file mirroring alone is insufficient.
+- Fail on unknown pytest markers and configuration. Keep Python-specific
+  fixtures and plugins explicit in the development dependency group.
 
 ## Locked verification
 

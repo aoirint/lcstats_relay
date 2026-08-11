@@ -1,0 +1,4 @@
+interface:
+  display_name: "Test Quality Check"
+  short_description: "Design focused tests with complete coverage."
+  default_prompt: "Use $test-quality-check to review these tests for behavioral value, coverage completeness, and overengineering."

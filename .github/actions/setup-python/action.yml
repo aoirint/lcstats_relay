@@ -1,5 +1,5 @@
 name: Set up locked Python environment
-description: Install the reviewed uv version, selected Python, and the exact locked dependency graph.
+description: Install reviewed uv/Python and synchronize the exact locked graph.
 
 outputs:
   uv_version:
@@ -11,32 +11,31 @@ outputs:
 
 runs:
   using: composite
-
   steps:
-    - name: Select reviewed toolchain
+    - name: Read committed toolchain versions
       id: toolchain
       shell: bash
       run: |
-        mapfile -t python_versions < .python-version
-        python_version="${python_versions[0]%$'\r'}"
-        if [[ "${#python_versions[@]}" -ne 1 || -z "${python_version}" ]]; then
+        mapfile -t versions < .python-version
+        version="${versions[0]%$'\r'}"
+        if [[ "${#versions[@]}" -ne 1 || -z "${version}" ]]; then
           echo ".python-version must select one Python version." >&2
           exit 1
         fi
-        echo "python_version=${python_version}" >> "${GITHUB_OUTPUT}"
-        echo "uv_version=0.11.21" >> "${GITHUB_OUTPUT}"
+        echo "python_version=${version}" >> "$GITHUB_OUTPUT"
+        echo "uv_version=0.11.21" >> "$GITHUB_OUTPUT"
 
-    - name: Install uv and Python
+    - name: Install uv
       uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
       with:
         enable-cache: true
         python-version: ${{ steps.toolchain.outputs.python_version }}
         version: ${{ steps.toolchain.outputs.uv_version }}
 
-    - name: Verify lockfile
+    - name: Verify the dependency lock
       shell: bash
       run: uv lock --check
 
-    - name: Synchronize exact environment
+    - name: Synchronize locked dependencies
       shell: bash
       run: uv sync --locked --all-groups
