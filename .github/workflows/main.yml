@@ -17,8 +17,7 @@ defaults:
     shell: bash
 
 jobs:
-  checks:
-    name: Checks
+  lint:
     # Main re-runs the source checks for the exact commit that can produce a
     # release. Native packaging remains outside this lightweight job.
     runs-on: ubuntu-slim
@@ -132,7 +131,7 @@ jobs:
 
   build:
     needs:
-      - checks
+      - lint
       - test
       - plan
     if: needs.plan.outputs.should_release == 'true'

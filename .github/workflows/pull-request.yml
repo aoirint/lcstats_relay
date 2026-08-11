@@ -18,8 +18,7 @@ defaults:
     shell: bash
 
 jobs:
-  checks:
-    name: Checks
+  lint:
     # Source checks run on the lightweight, unprivileged runner and remain
     # separate from the test job for a focused PR failure signal.
     runs-on: ubuntu-slim
