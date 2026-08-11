@@ -1,12 +1,12 @@
 lockfile_version: '1'
-generated_at: '2026-08-11T06:01:56.884703+00:00'
+generated_at: '2026-08-11T07:27:51.270794+00:00'
 apm_version: 0.27.0
 dependencies:
 - repo_url: aoirint/skills
   name: skills
   host: github.com
-  resolved_commit: 7ee24b75904233a42a7fc01d79c6dfc81ca36d7c
-  resolved_ref: 7ee24b75904233a42a7fc01d79c6dfc81ca36d7c
+  resolved_commit: 6a1e6431bbaed762f55783c3dcd7dc4b07736596
+  resolved_ref: 6a1e6431bbaed762f55783c3dcd7dc4b07736596
   version: 0.0.0
   package_type: apm_package
   deployed_files:
@@ -76,6 +76,7 @@ dependencies:
   - .agents/skills/prose-quality-check/README.md
   - .agents/skills/prose-quality-check/SKILL.md
   - .agents/skills/prose-quality-check/agents/openai.yaml
+  - .agents/skills/prose-quality-check/assets/markdownlint-cli2.yaml
   - .agents/skills/python-quality-check
   - .agents/skills/python-quality-check/README.md
   - .agents/skills/python-quality-check/SKILL.md
@@ -145,7 +146,7 @@ dependencies:
     .agents/skills/git-worktree-workflow/SKILL.md: sha256:67e2474b9878cc6cb209ae30b19c233f65969abe5b5d543f0c9a16e46f1d40d2
     .agents/skills/git-worktree-workflow/agents/openai.yaml: sha256:3eb9da73e7a041e77d82f0d5c3a8c67e914575cff8651b71d077db30fe3da99a
     .agents/skills/github-actions-quality-check/README.md: sha256:1c9cb3b29bb4c99e3a2e87b1b79a6eee30470c8762b2cdb5f82cb61387176d86
-    .agents/skills/github-actions-quality-check/SKILL.md: sha256:5dd037fffe2e287c5cfbfb02d2c8eeb94bb28ae192f9c5878fd8370db49f5cd8
+    .agents/skills/github-actions-quality-check/SKILL.md: sha256:1a87ddc803a005060d2db30782e1fdd0518f34a157fb9d754f2d0fd1de270ae4
     .agents/skills/github-actions-quality-check/agents/openai.yaml: sha256:505565c70b7441db1d8c17b5522b7f777acd748be441c55fdcc1f2093e185a5d
     .agents/skills/github-actions-quality-check/assets/github/actions/install-workflow-tools/action.yml: sha256:9a46e0ebabe3d4d2302e75e252a11b4639e88884feb2066665a9bcc099c2b0dd
     .agents/skills/github-actions-quality-check/assets/github/actions/install-workflow-tools/install-workflow-tools.sh: sha256:767b5865c488f12e2488f55807e76d789e968f11ef6b1364be5f3b47542ea898
@@ -166,8 +167,9 @@ dependencies:
     .agents/skills/gitignore-workflow/SKILL.md: sha256:2ef38f42e418c10e0ba7632e3ba37614df97044dfa8847ad1338e6c4c896c089
     .agents/skills/gitignore-workflow/agents/openai.yaml: sha256:f6a9b176003028588ff4c1d9ee4e23c625892d00b65086bf4b6b26a3f896030d
     .agents/skills/prose-quality-check/README.md: sha256:8e4d9f8f8fdfba1cf7fe71fa88cac6baffa0d3c7616f744c0e3b1add102be5e7
-    .agents/skills/prose-quality-check/SKILL.md: sha256:9ec45813d04382e04a3b504fd187e4151fc5198352564bd0bcb064f4eaf9a702
+    .agents/skills/prose-quality-check/SKILL.md: sha256:9509e1ec536631841ae6e2395a8305e853ed68c0231332ac4923699c32a98c1f
     .agents/skills/prose-quality-check/agents/openai.yaml: sha256:b83e0a5d151e6e20df6f7d97f268955c6abfd105d53820f6baad0de8403fc062
+    .agents/skills/prose-quality-check/assets/markdownlint-cli2.yaml: sha256:1044e29915fe15e9083f808d1170c84cfc0b848123c0da435cabb9512d39c203
     .agents/skills/python-quality-check/README.md: sha256:20a23003a24a8caf2f03dd5a06bed99c81cf93ab53fe5a196c6a67ab59c53b0e
     .agents/skills/python-quality-check/SKILL.md: sha256:201e37035213c33daf2e469c757a66a0414d7df6ec0c3778ae669d90c3b9a76d
     .agents/skills/python-quality-check/agents/openai.yaml: sha256:f0b4ad3807e177becec02271314fb32c1ec8d5a7682725ddd4a611a5381084d1
@@ -198,7 +200,7 @@ dependencies:
     .agents/skills/test-quality-check/agents/openai.yaml: sha256:1b97300ddad1b506c43c47ff8be43eca33e7fd73ee58ad179321a92848aa63f0
     .agents/skills/test-quality-check/references/classification-and-placement.md: sha256:31f5e95627e183789751b1b1942257c3aa253d5c0e2504c02b5e2391d5dad104
     .agents/skills/test-quality-check/references/coverage-and-suite-audit.md: sha256:040af3a01b78c20670ca37c1e62941b830c4b9a90f64e8853ffc0255db709277
-  content_hash: sha256:9880f8b48160964a276f061840d95504326316fdbb1647f88b4ab8c16fed7f85
+  content_hash: sha256:ac27952ee585df0cc8fdfb53d02e4681405ca7b5eebb80f2c2d1707342adaeef
   skill_subset:
   - apm-workflow
   - changelog-workflow
@@ -585,7 +587,7 @@ deployments:
   owners:
   - aoirint/skills
   active_owner: aoirint/skills
-  content_hash: sha256:5dd037fffe2e287c5cfbfb02d2c8eeb94bb28ae192f9c5878fd8370db49f5cd8
+  content_hash: sha256:1a87ddc803a005060d2db30782e1fdd0518f34a157fb9d754f2d0fd1de270ae4
 - kind: project-relative
   target: codex
   value: .agents/skills/github-actions-quality-check/agents/openai.yaml
@@ -801,7 +803,7 @@ deployments:
   owners:
   - aoirint/skills
   active_owner: aoirint/skills
-  content_hash: sha256:9ec45813d04382e04a3b504fd187e4151fc5198352564bd0bcb064f4eaf9a702
+  content_hash: sha256:9509e1ec536631841ae6e2395a8305e853ed68c0231332ac4923699c32a98c1f
 - kind: project-relative
   target: codex
   value: .agents/skills/prose-quality-check/agents/openai.yaml
@@ -811,6 +813,15 @@ deployments:
   - aoirint/skills
   active_owner: aoirint/skills
   content_hash: sha256:b83e0a5d151e6e20df6f7d97f268955c6abfd105d53820f6baad0de8403fc062
+- kind: project-relative
+  target: codex
+  value: .agents/skills/prose-quality-check/assets/markdownlint-cli2.yaml
+  runtime: null
+  scope: project
+  owners:
+  - aoirint/skills
+  active_owner: aoirint/skills
+  content_hash: sha256:1044e29915fe15e9083f808d1170c84cfc0b848123c0da435cabb9512d39c203
 - kind: project-relative
   target: codex
   value: .agents/skills/python-quality-check
