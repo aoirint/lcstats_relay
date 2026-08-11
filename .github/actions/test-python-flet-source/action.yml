@@ -6,7 +6,7 @@ runs:
   steps:
     - name: Set up locked Python environment
       id: setup
-      uses: ./.github/actions/setup-python-locked-locked
+      uses: ./.github/actions/setup-python-locked
 
     - name: Run locked Python tests
       shell: bash
