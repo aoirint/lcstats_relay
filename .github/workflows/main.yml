@@ -17,14 +17,15 @@ defaults:
     shell: bash
 
 jobs:
-  lint:
+  checks:
+    name: Checks
     # Main re-runs the source checks for the exact commit that can produce a
     # release. Native packaging remains outside this lightweight job.
     runs-on: ubuntu-slim
     timeout-minutes: 15
 
     steps:
-      - name: Check out main source
+      - name: Check out integrated source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
@@ -33,12 +34,13 @@ jobs:
         uses: ./.github/actions/lint-source
 
   test:
+    name: Test
     # Main re-runs the complete test suite for the exact release candidate.
     runs-on: ubuntu-slim
     timeout-minutes: 15
 
     steps:
-      - name: Check out main source
+      - name: Check out integrated source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
@@ -47,6 +49,7 @@ jobs:
         uses: ./.github/actions/test-source
 
   plan:
+    name: Plan
     # Planning resolves locked metadata and release state without invoking the
     # native Flet toolchain, so it can run beside the source-quality jobs.
     runs-on: ubuntu-slim
@@ -60,7 +63,7 @@ jobs:
       source_commit: ${{ steps.source.outputs.commit }}
 
     steps:
-      - name: Check out main source
+      - name: Check out integrated source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
@@ -129,7 +132,7 @@ jobs:
 
   build:
     needs:
-      - lint
+      - checks
       - test
       - plan
     if: needs.plan.outputs.should_release == 'true'
@@ -173,6 +176,7 @@ jobs:
           retention-days: 3
 
   release:
+    name: Release
     needs:
       - plan
       - build

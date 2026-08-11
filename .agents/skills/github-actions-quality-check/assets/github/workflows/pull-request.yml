@@ -1,0 +1,35 @@
+name: Pull Request
+
+on:
+  pull_request:
+    branches:
+      - main
+  merge_group:
+    types:
+      - checks_requested
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Keep proposed source validation separate from publishing privileges.
+  checks:
+    name: Checks
+    runs-on: ubuntu-slim
+
+    steps:
+      - name: Check out proposed source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Run shared source gate
+        uses: ./.github/actions/lint-source

@@ -192,7 +192,8 @@ The mechanical checker cannot decide these. Review them explicitly:
 - no monolithic view/controller coordinating unrelated lifetimes;
 - correct async cancellation, stale-result, retry, failure, and shutdown behavior;
 - user-facing error/actionability, responsive/accessibility behavior, and semantic UI tests;
-- no blanket lint/type/coverage suppressions or tests written only to execute lines;
+- no blanket lint/type/coverage suppressions, with general test-value and suite
+  overengineering findings owned by `test-quality-check`;
 - safe inputs, secrets, persistence, logging, dependency graph, workflow, and artifacts;
 - current/proposed documentation accuracy and complete operational reproduction.
 
@@ -213,9 +214,8 @@ Run applicable rows and record exact commands/results.
 | UI | semantic adapter tests plus supported-target manual/runtime checklist |
 | Persistence/network | corruption/atomicity/permissions/path; timeout/schema/size/auth/redaction |
 | Docs | required indexes, ownership, links, clean-clone commands, current/proposed labels |
-| Workflows | actionlint, ShellCheck targets, pinact cooldown/pins, least-privilege review |
+| Workflows and repository settings | Complete `github-actions-quality-check` verification |
 | Flet package | target runner build; packaged Python/CLI/Flutter version parity; manifest/hash/content; semantic first-page readiness; install/launch/upgrade/shutdown |
-| Repository settings | branch/ruleset, Actions permissions, secrets/environment, release controls |
 
 Do not mark a row passed from configuration alone when it requires runtime, artifact, or repository
 setting evidence. State `not applicable` only with the ledger fact that disables it.
