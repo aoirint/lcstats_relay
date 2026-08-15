@@ -1,12 +1,12 @@
 lockfile_version: '1'
-generated_at: '2026-08-15T09:44:01.890615+00:00'
+generated_at: '2026-08-15T10:10:25.470073+00:00'
 apm_version: 0.28.0
 dependencies:
 - repo_url: aoirint/skills
   name: skills
   host: github.com
-  resolved_commit: 44b51eef2237a460a4d3bca423a675b1ffd09eda
-  resolved_ref: 44b51eef2237a460a4d3bca423a675b1ffd09eda
+  resolved_commit: e5adf74a632936834a31a7cc2507030b362a7210
+  resolved_ref: e5adf74a632936834a31a7cc2507030b362a7210
   version: 0.0.0
   package_type: apm_package
   deployed_files:
@@ -29,6 +29,11 @@ dependencies:
   - .agents/skills/commit-message-quality-check/README.md
   - .agents/skills/commit-message-quality-check/SKILL.md
   - .agents/skills/commit-message-quality-check/agents/openai.yaml
+  - .agents/skills/domain-architecture-docs-workflow
+  - .agents/skills/domain-architecture-docs-workflow/README.md
+  - .agents/skills/domain-architecture-docs-workflow/SKILL.md
+  - .agents/skills/domain-architecture-docs-workflow/agents/openai.yaml
+  - .agents/skills/domain-architecture-docs-workflow/references/visual-documentation-assets.md
   - .agents/skills/flet-project-quality-check
   - .agents/skills/flet-project-quality-check/README.md
   - .agents/skills/flet-project-quality-check/SKILL.md
@@ -103,11 +108,6 @@ dependencies:
   - .agents/skills/security-check/references/artifact-inspection.md
   - .agents/skills/security-check/references/distributed-software-licensing.md
   - .agents/skills/security-check/references/external-code-execution.md
-  - .agents/skills/software-documentation-maintenance
-  - .agents/skills/software-documentation-maintenance/README.md
-  - .agents/skills/software-documentation-maintenance/SKILL.md
-  - .agents/skills/software-documentation-maintenance/agents/openai.yaml
-  - .agents/skills/software-documentation-maintenance/references/visual-documentation-assets.md
   - .agents/skills/test-quality-check
   - .agents/skills/test-quality-check/README.md
   - .agents/skills/test-quality-check/SKILL.md
@@ -130,16 +130,20 @@ dependencies:
     .agents/skills/commit-message-quality-check/README.md: sha256:c23949080d05f47cce728410ca3190225397aa41ac2015c6f02ee478ec412a24
     .agents/skills/commit-message-quality-check/SKILL.md: sha256:db272bb7467bcb6a6c3d837dec60a34f7081c135fcd40a9e00cf4a84e29ffabe
     .agents/skills/commit-message-quality-check/agents/openai.yaml: sha256:faffd948a0989dcfc87dcd3b0580c4a7003d01ef436e66dab9f280df57de652c
+    .agents/skills/domain-architecture-docs-workflow/README.md: sha256:25cbfeff60f18fdafd54ae64ae1c62fd70632a07bade9362e156c82987dac30b
+    .agents/skills/domain-architecture-docs-workflow/SKILL.md: sha256:7f57b8223059bcb06e444d73437d14cf03ceea117ef2a4a32dec99d73b51de78
+    .agents/skills/domain-architecture-docs-workflow/agents/openai.yaml: sha256:92810bc64095da4048cb1dd60630a03ec4eec9397aa88dcfcb4bd50ccbd14ee9
+    .agents/skills/domain-architecture-docs-workflow/references/visual-documentation-assets.md: sha256:967e49ba1593e58753ff48c94394d0edcadfba55574151f91cf7679d6aa7b774
     .agents/skills/flet-project-quality-check/README.md: sha256:5fdc047f0235d83c9bb30a668f96f7a6b54c930bb997fc661dc209312e46e278
-    .agents/skills/flet-project-quality-check/SKILL.md: sha256:fc9088264dba0106afda58adfb2d067ce6e82836d4c8b96ee8a89436cfc7d746
+    .agents/skills/flet-project-quality-check/SKILL.md: sha256:8035704fdc657041820a6bb78541dd417618e6ad20a4fa0fc50cbf118a549dd8
     .agents/skills/flet-project-quality-check/agents/openai.yaml: sha256:6b8a81074e807de9c50c9a510d47a9e658dd4bbda440aa9937c38ba140992e7d
     .agents/skills/flet-project-quality-check/assets/github/actions/check-python-flet-source/action.yml: sha256:09c80668d1ac216750584840b1c62b068830a73a0a97e27a8249fa344312c89b
     .agents/skills/flet-project-quality-check/assets/github/actions/test-python-flet-source/action.yml: sha256:166d0c6e0024ff19aea9bbb882873f87fa0326bae16737b0b1a72f6eb01df9a4
     .agents/skills/flet-project-quality-check/assets/github/workflows/main.yml: sha256:e2cda7f124aac7227127970274b13b25646aea112f5e7454ed0dd7602bbc6ee6
     .agents/skills/flet-project-quality-check/assets/github/workflows/pull-request.yml: sha256:06ef51578eaa11bfa473d7f656e9aad6d7cec34720eabd2e22c34ca056b1c4ba
     .agents/skills/flet-project-quality-check/references/architecture-and-ui.md: sha256:4aff6599ccb6c8fd00e44d34e48cdc51b672de71199bca90d02511e18c357b27
-    .agents/skills/flet-project-quality-check/references/ci-packaging-security.md: sha256:4a07dfb4465aa5bea5497658f94f4cfa1dee7dcd0214ceea5d87010cf64bb8c8
-    .agents/skills/flet-project-quality-check/references/implementation-runbook.md: sha256:92e8cc9a8c602dd443d9f06c243b0bcfbc2f31a6122329c29f9c2b022e3b24aa
+    .agents/skills/flet-project-quality-check/references/ci-packaging-security.md: sha256:6f6f69f4e3ab449a53eeb9f86f79bb2dbcd07f5840dc1a06ea3c432588fd198d
+    .agents/skills/flet-project-quality-check/references/implementation-runbook.md: sha256:7afd02ec04fb1dd1751f8c6594070da283ee228c643083e43d42da2f8a748a29
     .agents/skills/flet-project-quality-check/references/tooling-and-testing.md: sha256:9974be10c0755f49280a47b8f3679dd2b3916ee8aa6fc115b91c738ae09d1dac
     .agents/skills/flet-project-quality-check/scripts/check_project.py: sha256:32e6c93215b1c397eae485e2d6920b4916ee2b6d01158dc400db03b723fb01e7
     .agents/skills/flet-project-quality-check/scripts/check_project.py.lock: sha256:76042d39ffdbb675188966b4fc41d312b0ec9374a7aa438d4f5e919adcf04c07
@@ -170,7 +174,7 @@ dependencies:
     .agents/skills/gitignore-workflow/SKILL.md: sha256:2ef38f42e418c10e0ba7632e3ba37614df97044dfa8847ad1338e6c4c896c089
     .agents/skills/gitignore-workflow/agents/openai.yaml: sha256:f6a9b176003028588ff4c1d9ee4e23c625892d00b65086bf4b6b26a3f896030d
     .agents/skills/prose-quality-check/README.md: sha256:8e4d9f8f8fdfba1cf7fe71fa88cac6baffa0d3c7616f744c0e3b1add102be5e7
-    .agents/skills/prose-quality-check/SKILL.md: sha256:9509e1ec536631841ae6e2395a8305e853ed68c0231332ac4923699c32a98c1f
+    .agents/skills/prose-quality-check/SKILL.md: sha256:f2e0eca08cdbfb7efe9eadcf352b3ae874c8e8d48c753d0ea27ed3eda135bcff
     .agents/skills/prose-quality-check/agents/openai.yaml: sha256:b83e0a5d151e6e20df6f7d97f268955c6abfd105d53820f6baad0de8403fc062
     .agents/skills/prose-quality-check/assets/markdownlint-cli2.yaml: sha256:1044e29915fe15e9083f808d1170c84cfc0b848123c0da435cabb9512d39c203
     .agents/skills/python-quality-check/README.md: sha256:20a23003a24a8caf2f03dd5a06bed99c81cf93ab53fe5a196c6a67ab59c53b0e
@@ -195,21 +199,18 @@ dependencies:
     .agents/skills/security-check/references/artifact-inspection.md: sha256:9842555f4789e77e6cf3d22b000116497207ecf6fa5587f2b1fe0dc20e7dffda
     .agents/skills/security-check/references/distributed-software-licensing.md: sha256:dce7c9fbfe665eb875388ab732b63b0226a5fd4592b12a62c42b6d1372c0d025
     .agents/skills/security-check/references/external-code-execution.md: sha256:87ca817baa02ef6b955e5878f0cd79c875abdb0be6e0177cfce158968e628bc3
-    .agents/skills/software-documentation-maintenance/README.md: sha256:df6442dbefc58dab91b442b51f3ca4a0af5938f844542d35a3c18a721b631861
-    .agents/skills/software-documentation-maintenance/SKILL.md: sha256:36d61f85d5f982e691c807a369ada22bbeb661ef13dca1891591e34c0662d890
-    .agents/skills/software-documentation-maintenance/agents/openai.yaml: sha256:ee6ff516cfb6b9d7a76bacd166c461bc79cd012e0a7e7683aada95e1b5d1ff14
-    .agents/skills/software-documentation-maintenance/references/visual-documentation-assets.md: sha256:967e49ba1593e58753ff48c94394d0edcadfba55574151f91cf7679d6aa7b774
     .agents/skills/test-quality-check/README.md: sha256:fdd89fb9033263dfbc3c8420e11c722f897c5d094bac1d545705e12604a4fa19
     .agents/skills/test-quality-check/SKILL.md: sha256:92c658da6f89dd5e99aca4b15354ee86231f22e547765b16b03b5e0d91cad0c5
     .agents/skills/test-quality-check/agents/openai.yaml: sha256:1b97300ddad1b506c43c47ff8be43eca33e7fd73ee58ad179321a92848aa63f0
     .agents/skills/test-quality-check/references/classification-and-placement.md: sha256:31f5e95627e183789751b1b1942257c3aa253d5c0e2504c02b5e2391d5dad104
     .agents/skills/test-quality-check/references/coverage-and-suite-audit.md: sha256:040af3a01b78c20670ca37c1e62941b830c4b9a90f64e8853ffc0255db709277
-  content_hash: sha256:4dd5a906943c218d3d61fad4e13de7618b61ce9643af1727db4a8f520938dd29
+  content_hash: sha256:18511437387a51f8955b68f497f9826fcef3f8facea3f823b996ec6b104ec600
   skill_subset:
   - apm-workflow
   - changelog-workflow
   - code-quality-check
   - commit-message-quality-check
+  - domain-architecture-docs-workflow
   - flet-project-quality-check
   - git-worktree-workflow
   - github-actions-quality-check
@@ -219,7 +220,6 @@ dependencies:
   - python-quality-check
   - release-note-workflow
   - security-check
-  - software-documentation-maintenance
   - test-quality-check
   declared_license: MIT
 deployments:
@@ -396,6 +396,51 @@ deployments:
   content_hash: sha256:faffd948a0989dcfc87dcd3b0580c4a7003d01ef436e66dab9f280df57de652c
 - kind: project-relative
   target: codex
+  value: .agents/skills/domain-architecture-docs-workflow
+  runtime: null
+  scope: project
+  owners:
+  - aoirint/skills
+  active_owner: aoirint/skills
+  content_hash: null
+- kind: project-relative
+  target: codex
+  value: .agents/skills/domain-architecture-docs-workflow/README.md
+  runtime: null
+  scope: project
+  owners:
+  - aoirint/skills
+  active_owner: aoirint/skills
+  content_hash: sha256:25cbfeff60f18fdafd54ae64ae1c62fd70632a07bade9362e156c82987dac30b
+- kind: project-relative
+  target: codex
+  value: .agents/skills/domain-architecture-docs-workflow/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - aoirint/skills
+  active_owner: aoirint/skills
+  content_hash: sha256:7f57b8223059bcb06e444d73437d14cf03ceea117ef2a4a32dec99d73b51de78
+- kind: project-relative
+  target: codex
+  value: .agents/skills/domain-architecture-docs-workflow/agents/openai.yaml
+  runtime: null
+  scope: project
+  owners:
+  - aoirint/skills
+  active_owner: aoirint/skills
+  content_hash: sha256:92810bc64095da4048cb1dd60630a03ec4eec9397aa88dcfcb4bd50ccbd14ee9
+- kind: project-relative
+  target: codex
+  value: .agents/skills/domain-architecture-docs-workflow/references/visual-documentation-assets.md
+  runtime: null
+  scope: project
+  owners:
+  - aoirint/skills
+  active_owner: aoirint/skills
+  content_hash: sha256:967e49ba1593e58753ff48c94394d0edcadfba55574151f91cf7679d6aa7b774
+- kind: project-relative
+  target: codex
   value: .agents/skills/flet-project-quality-check
   runtime: null
   scope: project
@@ -420,7 +465,7 @@ deployments:
   owners:
   - aoirint/skills
   active_owner: aoirint/skills
-  content_hash: sha256:fc9088264dba0106afda58adfb2d067ce6e82836d4c8b96ee8a89436cfc7d746
+  content_hash: sha256:8035704fdc657041820a6bb78541dd417618e6ad20a4fa0fc50cbf118a549dd8
 - kind: project-relative
   target: codex
   value: .agents/skills/flet-project-quality-check/agents/openai.yaml
@@ -483,7 +528,7 @@ deployments:
   owners:
   - aoirint/skills
   active_owner: aoirint/skills
-  content_hash: sha256:4a07dfb4465aa5bea5497658f94f4cfa1dee7dcd0214ceea5d87010cf64bb8c8
+  content_hash: sha256:6f6f69f4e3ab449a53eeb9f86f79bb2dbcd07f5840dc1a06ea3c432588fd198d
 - kind: project-relative
   target: codex
   value: .agents/skills/flet-project-quality-check/references/implementation-runbook.md
@@ -492,7 +537,7 @@ deployments:
   owners:
   - aoirint/skills
   active_owner: aoirint/skills
-  content_hash: sha256:92e8cc9a8c602dd443d9f06c243b0bcfbc2f31a6122329c29f9c2b022e3b24aa
+  content_hash: sha256:7afd02ec04fb1dd1751f8c6594070da283ee228c643083e43d42da2f8a748a29
 - kind: project-relative
   target: codex
   value: .agents/skills/flet-project-quality-check/references/tooling-and-testing.md
@@ -816,7 +861,7 @@ deployments:
   owners:
   - aoirint/skills
   active_owner: aoirint/skills
-  content_hash: sha256:9509e1ec536631841ae6e2395a8305e853ed68c0231332ac4923699c32a98c1f
+  content_hash: sha256:f2e0eca08cdbfb7efe9eadcf352b3ae874c8e8d48c753d0ea27ed3eda135bcff
 - kind: project-relative
   target: codex
   value: .agents/skills/prose-quality-check/agents/openai.yaml
@@ -1060,51 +1105,6 @@ deployments:
   - aoirint/skills
   active_owner: aoirint/skills
   content_hash: sha256:87ca817baa02ef6b955e5878f0cd79c875abdb0be6e0177cfce158968e628bc3
-- kind: project-relative
-  target: codex
-  value: .agents/skills/software-documentation-maintenance
-  runtime: null
-  scope: project
-  owners:
-  - aoirint/skills
-  active_owner: aoirint/skills
-  content_hash: null
-- kind: project-relative
-  target: codex
-  value: .agents/skills/software-documentation-maintenance/README.md
-  runtime: null
-  scope: project
-  owners:
-  - aoirint/skills
-  active_owner: aoirint/skills
-  content_hash: sha256:df6442dbefc58dab91b442b51f3ca4a0af5938f844542d35a3c18a721b631861
-- kind: project-relative
-  target: codex
-  value: .agents/skills/software-documentation-maintenance/SKILL.md
-  runtime: null
-  scope: project
-  owners:
-  - aoirint/skills
-  active_owner: aoirint/skills
-  content_hash: sha256:36d61f85d5f982e691c807a369ada22bbeb661ef13dca1891591e34c0662d890
-- kind: project-relative
-  target: codex
-  value: .agents/skills/software-documentation-maintenance/agents/openai.yaml
-  runtime: null
-  scope: project
-  owners:
-  - aoirint/skills
-  active_owner: aoirint/skills
-  content_hash: sha256:ee6ff516cfb6b9d7a76bacd166c461bc79cd012e0a7e7683aada95e1b5d1ff14
-- kind: project-relative
-  target: codex
-  value: .agents/skills/software-documentation-maintenance/references/visual-documentation-assets.md
-  runtime: null
-  scope: project
-  owners:
-  - aoirint/skills
-  active_owner: aoirint/skills
-  content_hash: sha256:967e49ba1593e58753ff48c94394d0edcadfba55574151f91cf7679d6aa7b774
 - kind: project-relative
   target: codex
   value: .agents/skills/test-quality-check

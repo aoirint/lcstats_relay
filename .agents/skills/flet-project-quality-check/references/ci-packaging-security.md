@@ -95,7 +95,7 @@ For release readiness, apply the repository-enforcement and artifact-lineage
 checks from `github-actions-quality-check` before assessing the Flet-specific
 target artifacts.
 
-Use `software-documentation-maintenance` so canonical documents own supported
+Use `domain-architecture-docs-workflow` so canonical documents own supported
 Flet/Python/platform versions, UI state/navigation, task lifecycle,
 persistence/error behavior, clean-clone checks, target builds, artifact
 inspection, release, recovery, and known limitations. Separate current,
