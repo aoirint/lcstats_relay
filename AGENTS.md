@@ -75,5 +75,5 @@ require a meaning-preserving manual edit.
   Do not copy one fact into several documents; link to its canonical owner.
 - Record current behavior as current behavior. Label proposed designs, known
   limitations, and unverified release assumptions explicitly.
-- Use `software-documentation-maintenance` for documentation-system changes and
+- Use `domain-architecture-docs-workflow` for documentation-system changes and
   `prose-quality-check` for wording review.

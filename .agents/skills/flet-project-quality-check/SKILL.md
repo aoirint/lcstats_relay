@@ -35,7 +35,7 @@ Python baseline, documentation taxonomy, or general CI supply-chain policy.
 
 ## Responsibility Boundaries
 
-Use `software-documentation-maintenance` to create and maintain the required
+Use `domain-architecture-docs-workflow` to create and maintain the required
 `docs/domain`, `docs/architecture`, and `docs/operations` map. This Skill supplies
 the Flet-specific facts those documents must own: supported Flet/Python targets,
 UI state and navigation, task lifetime, component boundaries, platform storage,
@@ -76,7 +76,7 @@ the Python checks so every entry workflow enforces the same repository baseline.
   target-runtime semantic readiness. A pass on one never substitutes for another.
 - Keep Flet callback positional exceptions narrow, evidenced against the exact
   supported Flet API, and compliant with the shared keyword-only policy.
-- Maintain the documentation base map required by `software-documentation-maintenance` and make all
+- Maintain the documentation base map required by `domain-architecture-docs-workflow` and make all
   developer procedures executable from a clean clone.
 
 ## Workflow
@@ -137,7 +137,7 @@ informal list.
    - Verify every selected Flet target on a compatible runner. Keep packaging/release jobs separate
      from untrusted pull-request validation and inspect the final artifact, not only source tests.
 6. Align documentation.
-   - Invoke `software-documentation-maintenance`. Require root discovery plus indexed domain,
+   - Invoke `domain-architecture-docs-workflow`. Require root discovery plus indexed domain,
      architecture, and operations documents.
    - Document verified current behavior separately from proposed architecture. Include UI states and
      transitions, task ownership/cancellation, I/O and persistence contracts, supported platforms,

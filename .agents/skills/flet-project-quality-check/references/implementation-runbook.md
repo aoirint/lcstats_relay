@@ -85,7 +85,7 @@ exist. Required documentation indexes may explicitly state that a section has no
 2. Fix `.gitignore` so `.venv`, caches, coverage/build output, local config/secrets, editor state,
    Flet generated output, and agent worktrees are ignored while `uv.lock`, source, assets, docs, and
    workflow/config files remain visible.
-3. Establish the required documentation indexes with `software-documentation-maintenance`. Record
+3. Establish the required documentation indexes with `domain-architecture-docs-workflow`. Record
    current defects honestly; do not describe the intended refactor as completed behavior.
 4. Define product identity, supported targets, user data/secret ownership, and release state before
    selecting package/build metadata.
