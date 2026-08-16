@@ -75,7 +75,7 @@ def _build_plan(*, tmp_path: Path, version: str = "1.2.3") -> ReleasePlan:
         build_number=42,
         source_commit=_COMMIT,
         workflow_url=_WORKFLOW_URL,
-        uv_version="0.11.21",
+        uv_version="0.12.3",
         manifest_path=manifest_path,
         checksums_path=checksums_path,
     )
@@ -127,7 +127,7 @@ def test_write_release_files_records_sorted_provenance(*, tmp_path: Path) -> Non
         "number": 42,
         "builder_python_version": "3.14",
         "source_commit": _COMMIT,
-        "uv_version": "0.11.21",
+        "uv_version": "0.12.3",
         "workflow_url": _WORKFLOW_URL,
     }
     assert [record["target"] for record in manifest["artifacts"]] == ["linux", "windows"]
@@ -292,7 +292,7 @@ def test_main_rejects_invalid_artifact_spec(*, tmp_path: Path, value: str) -> No
                 "--workflow-url",
                 _WORKFLOW_URL,
                 "--uv-version",
-                "0.11.21",
+                "0.12.3",
                 "--manifest",
                 str(tmp_path / "manifest.json"),
                 "--checksums",
@@ -328,7 +328,7 @@ def test_main_writes_release_files(*, tmp_path: Path) -> None:
                 "--workflow-url",
                 _WORKFLOW_URL,
                 "--uv-version",
-                "0.11.21",
+                "0.12.3",
                 "--manifest",
                 str(manifest_path),
                 "--checksums",

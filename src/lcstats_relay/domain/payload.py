@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import cast
 
-type JSONValue = None | bool | int | float | str | list[JSONValue] | dict[str, JSONValue]
+type JSONValue = bool | int | float | str | list[JSONValue] | dict[str, JSONValue] | None
 
 
 def parse_json(*, raw_json: str) -> JSONValue:
