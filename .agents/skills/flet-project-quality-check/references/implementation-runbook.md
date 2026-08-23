@@ -214,7 +214,7 @@ Run applicable rows and record exact commands/results.
 | UI | semantic adapter tests plus supported-target manual/runtime checklist |
 | Persistence/network | corruption/atomicity/permissions/path; timeout/schema/size/auth/redaction |
 | Docs | required indexes, ownership, links, clean-clone commands, current/proposed labels |
-| Workflows and repository settings | Complete `github-actions-quality-check` verification |
+| Workflows and repository settings | Complete `github-actions-quality-check` workflow verification and `github-workflow` settings verification |
 | Flet package | target runner build; packaged Python/CLI/Flutter version parity; manifest/hash/content; semantic first-page readiness; install/launch/upgrade/shutdown |
 
 Do not mark a row passed from configuration alone when it requires runtime, artifact, or repository

@@ -91,9 +91,10 @@ release facts are blocked. Complete validation and report the blocked release br
 
 ## Repository and documentation evidence
 
-For release readiness, apply the repository-enforcement and artifact-lineage
-checks from `github-actions-quality-check` before assessing the Flet-specific
-target artifacts.
+For release readiness, apply repository-setting enforcement from
+`github-workflow` and artifact-lineage checks from
+`github-actions-quality-check` before assessing the Flet-specific target
+artifacts.
 
 Use `domain-architecture-docs-workflow` so canonical documents own supported
 Flet/Python/platform versions, UI state/navigation, task lifecycle,
