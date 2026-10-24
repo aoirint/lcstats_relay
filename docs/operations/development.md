@@ -82,3 +82,21 @@ The seven-day default remains active for every other dependency.
 These changes cover the locked source environment and CI builder. A new native
 Flet bundle has not been built or inspected, so its embedded interpreter and
 trust store are not yet verified by this change.
+
+## Reviewed dependency snapshot (2026-10-24)
+
+The source environment uses Flet 1.0.4 as a matching Python/CLI/web/desktop set,
+with mypy 2.4.0 and Ruff 0.17.1. The lock includes all compatible transitive
+updates available after the normal seven-day cooldown. The old msgpack waiver
+was removed; its patched floor is now 1.2.3.
+
+Actions use immutable release commits: setup-uv 10.3.0, upload-artifact 7.0.2,
+and download-artifact 8.0.2. Workflow checking uses pinact 5.0.0; its long CLI
+flags already use the required double-dash form. Shared Skills use the reviewed
+2026-09-01 commit recorded in the APM lock and third-party notices.
+
+APM remains at the repository-reviewed 0.28.0 bootstrap. The newer 0.33.0 CLI
+requires a separate bootstrap/lock-generator migration review; it was not
+substituted merely because it has completed cooldown. Python remains on the
+3.14 line used by the native packaging contract. A Python 3.15 migration and
+native Flet 1.0.4 artifact verification remain separate validation work.

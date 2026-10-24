@@ -5,22 +5,20 @@ description = "Relay local Lethal Company statistics to durable archives and Goo
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "flet[all]>=0.85.3,<0.86.0",
+    "flet[all]>=1.0.4,<1.1.0",
     "httpx>=0.28.1,<0.29.0",
 ]
 
 [build-system]
-requires = ["hatchling>=1.27.0,<2.0.0"]
+requires = ["hatchling>=1.32.4,<2.0.0"]
 build-backend = "hatchling.build"
 
 [project.scripts]
 lcstats-relay = "lcstats_relay.__main__:main"
 
 [tool.uv]
-# msgpack 1.2.1 fixes GHSA-6v7p-g79w-8964, so keep the patched artifact exact.
-# Remove only the cooldown exemption after 2026-06-25; reassess the pin separately.
 constraint-dependencies = [
-    "msgpack==1.2.1",
+    "msgpack>=1.2.3,<2.0.0",
     "certifi==2026.10.19",
     "oauthlib>=4.0.0,<5.0.0",
     "urllib3>=2.8.0,<3.0.0",
@@ -28,7 +26,7 @@ constraint-dependencies = [
 exclude-newer = "P7D"
 # Approved security exception: GHSA-6q48-6c7w-9gw2; the exact constraint above
 # limits the certifi waiver. Remove it after 2026-10-27T02:24:16Z.
-exclude-newer-package = { msgpack = false, certifi = false }
+exclude-newer-package = { certifi = false }
 
 [tool.flet]
 product = "LCStats Relay"
@@ -46,11 +44,11 @@ artifact = "lcstats-relay"
 
 [dependency-groups]
 dev = [
-    "mypy>=2.1.0,<3.0.0",
+    "mypy>=2.4.0,<3.0.0",
     "packaging>=26.2,<27.0",
     "pytest>=9.1.1,<10.0.0",
     "pytest-cov>=7.1.0,<8.0.0",
-    "ruff>=0.16.2,<1.0.0",
+    "ruff>=0.17.1,<1.0.0",
 ]
 
 [tool.ruff]
