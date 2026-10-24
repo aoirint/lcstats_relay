@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import os
+import platform
 import ssl
 import struct
 import sys
@@ -75,6 +76,10 @@ def _write_startup_report(*, report_path: Path, png: bytes, page_title: str | No
         "version": release_version,
         "python_version": sys.version.split()[0],
         "architecture_bits": struct.calcsize("P") * 8,
+        "architecture": platform.machine()
+        .lower()
+        .replace("x86_64", "amd64")
+        .replace("aarch64", "arm64"),
         "flet_version": version("flet"),
         "httpx_version": version("httpx"),
         "certifi_version": version("certifi"),

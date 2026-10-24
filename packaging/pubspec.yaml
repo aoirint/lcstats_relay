@@ -18,7 +18,7 @@ dependencies:
   path: ^1.9.0
   window_manager: ^0.5.1
   flet_secure_storage:
-    path: ../../.venv/Lib/site-packages/flutter/flet_secure_storage
+    path: ../../.venv/flutter-extensions/flet_secure_storage
 dependency_overrides:
   flet: 1.0.4
   serious_python_platform_interface: 5.0.0

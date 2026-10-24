@@ -83,7 +83,13 @@ $env:SERIOUS_PYTHON_BUILD_DATE = $taskProfile.python_build
 $env:SERIOUS_PYTHON_DIST_RELEASE = $taskProfile.compiler_build
 
 # Reference the uv-locked extension installed outside Flet's regenerated output.
-if (-not (Test-Path -LiteralPath ".venv/Lib/site-packages/flutter/flet_secure_storage/pubspec.yaml")) { throw "Official SecureStorage extension missing" }
+@'
+from importlib.metadata import distribution
+from pathlib import Path
+import shutil
+source=distribution('flet-secure-storage').locate_file('flutter/flet_secure_storage')
+shutil.copytree(source,Path('.venv/flutter-extensions/flet_secure_storage'),dirs_exist_ok=True)
+'@ | uv run --locked python -
 New-Item -ItemType Directory -Force -Path (Join-Path $taskBuild "flutter") | Out-Null
 Copy-Item -LiteralPath packaging/pubspec.yaml, packaging/pubspec.lock -Destination (Join-Path $taskBuild "flutter")
 & $taskDart pub get --enforce-lockfile --directory (Join-Path $taskBuild "flutter")

@@ -28,6 +28,12 @@ for the current user. Windows backward-compatibility migration is disabled.
 See the [official Flet source](https://github.com/flet-dev/flet/tree/v1.0.4/sdk/python/packages/flet-secure-storage)
 and [reviewed Windows backend](https://pub.dev/packages/flutter_secure_storage_windows/versions/4.1.0).
 
+On Linux the same official service delegates to libsecret and Secret Service.
+GNOME Keyring is the verified provider; a graphical session with an unlocked
+keyring is part of the supported configuration. The native build gate checks
+save, restore and deletion across three processes in an isolated D-Bus session.
+See [Linux runtime prerequisites](../operations/release.md#linux-runtime-prerequisites).
+
 Credential names combine an app prefix and a SHA-256 digest of the validated GAS
 URL. A token saved for one destination is never implicitly used for another.
 Release versions and installation paths do not enter the credential name.

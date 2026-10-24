@@ -6,10 +6,12 @@ import argparse
 import hashlib
 import json
 import re
+import tarfile
 import tomllib
 import zipfile
 from collections.abc import Sequence
 from dataclasses import dataclass
+from operator import attrgetter
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -17,7 +19,12 @@ from urllib.parse import urlparse
 from scripts.verify_desktop_archive import verify_desktop_archive
 from scripts.version_metadata import read_version_metadata
 
-_SCHEMA_VERSION = 3
+_SCHEMA_VERSION = 4
+_ARCHITECTURE_BITS = 64
+_TARGETS = {
+    "windows-amd64": ("windows", "lcstats-relay.exe", ".zip"),
+    "linux-amd64": ("linux", "lcstats-relay", ".tar.gz"),
+}
 _SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 
 
@@ -110,6 +117,62 @@ def _validate_build_identity(
         raise ValueError(msg)
 
 
+def _bundle_metadata(*, artifact: ReleaseArtifact) -> tuple[str, dict[str, Any]]:
+    if artifact.target.startswith("windows-"):
+        with zipfile.ZipFile(artifact.path) as archive:
+            return archive.read("VERSION").decode("ascii").strip(), json.loads(
+                archive.read("runtime-report.json")
+            )
+    with tarfile.open(artifact.path, "r:gz") as archive:
+        version_file = archive.extractfile("./VERSION")
+        report_file = archive.extractfile("./runtime-report.json")
+        if version_file is None or report_file is None:
+            msg = "release metadata must be regular files"
+            raise ValueError(msg)
+        with version_file, report_file:
+            return version_file.read().decode("ascii").strip(), json.load(report_file)
+
+
+def _artifact_record(
+    *, artifact: ReleaseArtifact, version: str, flet_version: str
+) -> dict[str, Any]:
+    if not artifact.path.is_file():
+        msg = "every release artifact path must be an existing file"
+        raise ValueError(msg)
+    target, launcher, suffix = _TARGETS[artifact.target]
+    expected_name = f"lcstats-relay-v{version}-{artifact.target}{suffix}"
+    if artifact.path.name != expected_name:
+        msg = f"release artifact must be named {expected_name}"
+        raise ValueError(msg)
+    minor = verify_desktop_archive(
+        archive_path=artifact.path, target=target, launcher_name=launcher
+    )
+    packaged_version, report = _bundle_metadata(artifact=artifact)
+    python_runtime = report.get("python_version")
+    if (
+        packaged_version != version
+        or report.get("version") != version
+        or report.get("flet_version") != flet_version
+        or report.get("architecture") != artifact.target.rsplit("-", 1)[1]
+        or report.get("architecture_bits") != _ARCHITECTURE_BITS
+        or not isinstance(python_runtime, str)
+        or not re.fullmatch(rf"{re.escape(minor)}\.\d+", python_runtime)
+        or report.get("credential_restart_check") is not True
+        or report.get("credential_phases") != ["write", "read-delete", "absent"]
+    ):
+        msg = "artifact lacks matching native startup and credential verification"
+        raise ValueError(msg)
+    return {
+        "file": artifact.path.name,
+        "python_runtime_version": python_runtime,
+        "native_startup_verified": True,
+        "credential_restart_verified": True,
+        "sha256": _sha256(path=artifact.path),
+        "size": artifact.path.stat().st_size,
+        "target": artifact.target,
+    }
+
+
 def write_release_files(*, plan: ReleasePlan) -> None:
     """Validate release identity and write one manifest plus checksum list."""
     metadata = read_version_metadata(version_path=plan.pyproject_path.parent / "VERSION")
@@ -129,45 +192,14 @@ def write_release_files(*, plan: ReleasePlan) -> None:
         raise ValueError(msg)
 
     flet_version = _read_resolved_package_version(lock_path=plan.lock_path, package_name="flet")
-    if len(plan.artifacts) != 1 or plan.artifacts[0].target != "windows":
-        msg = "release must contain exactly one windows artifact"
-        raise ValueError(msg)
-    artifact = plan.artifacts[0]
-    if not artifact.path.is_file():
-        msg = "every release artifact path must be an existing file"
-        raise ValueError(msg)
-    expected_name = f"lcstats-relay-v{metadata.project_version}-windows-amd64.zip"
-    if artifact.path.name != expected_name:
-        msg = f"release artifact must be named {expected_name}"
-        raise ValueError(msg)
-    minor = verify_desktop_archive(
-        archive_path=artifact.path, target="windows", launcher_name="lcstats-relay.exe"
-    )
-    with zipfile.ZipFile(artifact.path) as archive:
-        report = json.loads(archive.read("runtime-report.json"))
-        packaged_version = archive.read("VERSION").decode("ascii").strip()
-    python_runtime = report.get("python_version")
-    if (
-        packaged_version != metadata.project_version
-        or report.get("version") != metadata.project_version
-        or report.get("flet_version") != flet_version
-        or not isinstance(python_runtime, str)
-        or not re.fullmatch(rf"{re.escape(minor)}\.\d+", python_runtime)
-        or report.get("credential_restart_check") is not True
-        or report.get("credential_phases") != ["write", "read-delete", "absent"]
-    ):
-        msg = "artifact lacks matching native startup and credential verification"
+    if sorted(artifact.target for artifact in plan.artifacts) != sorted(_TARGETS):
+        msg = "release must contain exactly one archive for each supported target"
         raise ValueError(msg)
     artifact_records = [
-        {
-            "file": artifact.path.name,
-            "python_runtime_version": python_runtime,
-            "native_startup_verified": True,
-            "credential_restart_verified": True,
-            "sha256": _sha256(path=artifact.path),
-            "size": artifact.path.stat().st_size,
-            "target": "windows",
-        }
+        _artifact_record(
+            artifact=artifact, version=metadata.project_version, flet_version=flet_version
+        )
+        for artifact in sorted(plan.artifacts, key=attrgetter("target"))
     ]
     manifest: dict[str, Any] = {
         "artifacts": artifact_records,

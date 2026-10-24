@@ -1,9 +1,9 @@
 name: Build Flet desktop artifact
-description: Build and verify the reviewed Windows x64 release profile.
+description: Build and verify a reviewed native desktop release profile.
 
 inputs:
   target:
-    description: Supported target (windows).
+    description: Supported target (windows-amd64 or linux-amd64).
     required: true
   build_number:
     description: Monotonic build number passed to Flet.
@@ -24,10 +24,10 @@ outputs:
     value: ${{ steps.version.outputs.release_mode }}
   artifact_name:
     description: Packaged artifact filename.
-    value: ${{ steps.build.outputs.name }}
+    value: ${{ steps.windows.outputs.name || steps.linux.outputs.name }}
   artifact_path:
     description: Repository-relative artifact path.
-    value: ${{ steps.build.outputs.path }}
+    value: ${{ steps.windows.outputs.path || steps.linux.outputs.path }}
 
 runs:
   using: composite
@@ -40,7 +40,8 @@ runs:
       uses: ./.github/actions/generate-version
 
     - name: Build and verify Windows x64 binary
-      id: build
+      if: inputs.target == 'windows-amd64'
+      id: windows
       shell: pwsh
       env:
         ACTION_DIRECTORY: ${{ github.action_path }}
@@ -51,8 +52,8 @@ runs:
         BUILD_NUMBER: ${{ inputs.build_number }}
         FLET_CLI_NO_RICH_OUTPUT: "1"
       run: |
-        if ($env:RUNNER_OS -ne "Windows" -or $env:TARGET -ne "windows") {
-          throw "Only the reviewed Windows x64 profile is supported"
+        if ($env:RUNNER_OS -ne "Windows" -or $env:RUNNER_ARCH -ne "X64" -or $env:TARGET -ne "windows-amd64") {
+          throw "Windows amd64 requires the reviewed Windows runner"
         }
         & (Join-Path $env:ACTION_DIRECTORY "build-windows.ps1") `
           -Version $env:PROJECT_VERSION -BuildVersion $env:BUILD_VERSION `
@@ -60,3 +61,25 @@ runs:
         $name = "lcstats-relay-v$($env:PROJECT_VERSION)-windows-amd64.zip"
         "name=$name" >> $env:GITHUB_OUTPUT
         "path=$($env:OUTPUT_DIRECTORY)/$name" >> $env:GITHUB_OUTPUT
+
+    - name: Build and verify Linux amd64 binary
+      if: inputs.target == 'linux-amd64'
+      id: linux
+      shell: bash
+      env:
+        PROJECT_VERSION: ${{ steps.version.outputs.project_version }}
+        BUILD_VERSION: ${{ steps.version.outputs.build_version }}
+        BUILD_NUMBER: ${{ inputs.build_number }}
+        OUTPUT_DIRECTORY: ${{ inputs.output_directory }}
+        FLET_CLI_NO_RICH_OUTPUT: "1"
+      run: |
+        [[ "$RUNNER_OS" == "Linux" && "$RUNNER_ARCH" == "X64" ]]
+        sudo apt-get update
+        sudo apt-get install --yes --no-install-recommends \
+          clang cmake ninja-build libgtk-3-dev liblzma-dev libstdc++-12-dev \
+          libsecret-1-dev libjsoncpp-dev xvfb xauth dbus-x11 gnome-keyring fonts-noto-cjk
+        bash .github/actions/build-desktop/build-linux.sh \
+          "$PROJECT_VERSION" "$BUILD_VERSION" "$BUILD_NUMBER" "$OUTPUT_DIRECTORY"
+        name="lcstats-relay-v${PROJECT_VERSION}-linux-amd64.tar.gz"
+        echo "name=$name" >> "$GITHUB_OUTPUT"
+        echo "path=$OUTPUT_DIRECTORY/$name" >> "$GITHUB_OUTPUT"

@@ -21,13 +21,13 @@ upstream license and notices continue to apply.
   the normal seven-day waiting period. Dependencies remain subject to
   independent review.
 
-## Windows desktop distribution
+## Desktop distributions
 
-Binary ZIPs include components under their original licenses. The app's MIT
+Binary archives include components under their original licenses. The app's MIT
 license does not replace them.
 
 - Flet and its SecureStorage wrapper: Apache-2.0; retain the official Flet
-  1.0.4 license in `licenses/FLET-LICENSE.txt` in the ZIP.
+  1.0.4 license in `licenses/FLET-LICENSE.txt`.
 - dart_bridge 1.10.0: MIT; retain `licenses/DART-BRIDGE-LICENSE.txt`.
 - CPython 3.14.8 and incorporated components: retain the official Windows
   collection and versioned Python license document in
@@ -35,6 +35,13 @@ license does not replace them.
   The Windows collection includes Microsoft runtime terms. Unused Tk and debug
   runtime files are excluded. SQLite is public domain. The bundled liblzma
   library is public-domain code; retain `licenses/LIBLZMA-COPYING.txt`.
+- Linux CPython 3.14.8: retain the license shipped in the reviewed runtime
+  archive as `licenses/PYTHON-LINUX-LICENSE.txt` and the versioned Python license
+  document. Its native library matches the 20261013 python-build-standalone
+  x86-64-v2 distribution. Retain its embedded-library notices and provenance in
+  `licenses/python/`. Unused DBM and Tk extensions are excluded.
+  Linux links desktop and system libraries supplied by the target
+  distribution; those system packages are not included in the app archive.
 - Flutter and Dart: retain their licenses and the generated Flutter
   `data/flutter_assets/NOTICES.Z` collection.
 - Runtime Python wheels retain their `.dist-info` license files. Dart package
