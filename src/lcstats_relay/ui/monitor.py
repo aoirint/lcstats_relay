@@ -54,8 +54,7 @@ class MonitorView:
         self._controller = controller
         self._diagnostics = diagnostics
         self._diagnostic_failure = diagnostic_failure
-        self.diagnostics_status = ft.Text("診断ログと保存先")
-        self.diagnostics = ft.Text(selectable=True)
+        self.diagnostics = ft.Text(size=11, selectable=True)
 
         self.settings_summary = ft.Text(selectable=True)
         self.gas_summary = ft.Text(selectable=True)
@@ -65,7 +64,7 @@ class MonitorView:
             on_click=self.open_settings,
         )
         self.gas_auth_button = ft.OutlinedButton(
-            "GAS認証",
+            "設定",
             icon=ft.Icons.KEY,
             on_click=self.open_gas_auth,
         )
@@ -171,6 +170,7 @@ class MonitorView:
         self.receive_count.value = relay.receive_count
         self.last_received.value = relay.last_received
         self.error.value = relay.error
+        self.error.visible = bool(relay.error)
         self.health.value = relay.health.label
         self.health.color = _TONE_COLORS[relay.health.tone]
         self.health_icon.icon = _STATUS_ICONS[relay.health.glyph]
@@ -202,7 +202,6 @@ class MonitorView:
                 wrap=True,
             ),
             self.error,
-            ft.ExpansionTile(title=self.diagnostics_status, controls=[self.diagnostics]),
             ft.Divider(),
             ft.Row(
                 [
@@ -223,7 +222,6 @@ class MonitorView:
             ft.Column(
                 [
                     self.error,
-                    self.diagnostics,
                     self._settings_section(
                         title="接続元",
                         controls=[
@@ -231,9 +229,15 @@ class MonitorView:
                         ],
                     ),
                     self._settings_section(
-                        title="出力先",
+                        title="保存先",
                         controls=[
                             self.data_dir_field,
+                            self.diagnostics,
+                        ],
+                    ),
+                    self._settings_section(
+                        title="外部出力",
+                        controls=[
                             self._gas_output_setting_row(),
                         ],
                     ),
@@ -268,11 +272,7 @@ class MonitorView:
             content=ft.Row(
                 [
                     ft.Text("Google Apps Script", weight=ft.FontWeight.BOLD, expand=True),
-                    ft.OutlinedButton(
-                        "設定",
-                        icon=ft.Icons.KEY,
-                        on_click=self._open_gas_auth_from_settings,
-                    ),
+                    self.gas_auth_button,
                 ],
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
@@ -315,11 +315,6 @@ class MonitorView:
     ) -> None:
         self._show_monitor_view(update=True)
 
-    def _open_gas_auth_from_settings(  # keyword-only-exception: Flet event callback ABI
-        self, _event: object | None = None
-    ) -> None:
-        self.open_gas_auth()
-
     def submit_settings(  # keyword-only-exception: Flet event callback ABI
         self, _event: object | None = None
     ) -> None:
@@ -343,12 +338,13 @@ class MonitorView:
         self.open_settings()
 
     def _refresh_settings_summary(self) -> None:
-        self.diagnostics.value = self._diagnostics()
-        self.diagnostics_status.value = (
-            "診断ログ書き込み失敗: 保存先を確認してください"
-            if self._diagnostic_failure()
-            else "診断ログと保存先"
-        )
+        failed = self._diagnostic_failure()
+        warning = "診断ログ書き込み失敗: 保存先を確認してください"
+        paths = self._diagnostics()
+        self.diagnostics.value = f"{warning}\n{paths}" if failed else paths
+        self.settings_button.tooltip = warning if failed else "設定"
+        self.settings_button.icon = ft.Icons.ERROR_OUTLINE if failed else ft.Icons.SETTINGS
+        self.settings_button.style = ft.ButtonStyle(color=ft.Colors.RED_700 if failed else None)
         settings, gas = settings_summaries(
             tracker_url=self._controller.settings.tracker_url,
             data_dir=str(self._controller.settings.data_dir),
@@ -361,6 +357,7 @@ class MonitorView:
     def _controller_changed(self) -> None:
         self._apply_relay(state=self._controller.relay_state)
         self.error.value = self._controller.error
+        self.error.visible = bool(self._controller.error)
         self.start_button.disabled = self._controller.active
         self.stop_button.disabled = not self._controller.active
         self.settings_button.disabled = self._controller.active

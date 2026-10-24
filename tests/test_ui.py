@@ -321,6 +321,7 @@ def test_build_and_state_update_render_monitor(*, tmp_path: Path) -> None:
     assert view.receive_count.value == "4"
     assert view.last_received.value == "2026-06-20 09:15:33"
     assert view.error.value == "受信エラー: HTTP 503"
+    assert bool(view.error.visible)
     assert view.health.value == "要確認"
     assert view.health_detail.value == "受信エラー: HTTP 503"
     assert view.health_icon.icon == ft.Icons.ERROR_OUTLINE
@@ -333,6 +334,7 @@ def test_build_and_state_update_render_monitor(*, tmp_path: Path) -> None:
     assert view.last_received.value == "-"
     assert view.error.value == ""
     assert view.health.value == "停止中"
+    assert not bool(view.error.visible)
     assert view.health_icon.icon == ft.Icons.ERROR_OUTLINE
     assert len(view.output_destinations.controls) == 1
 
@@ -500,11 +502,15 @@ def test_settings_view_links_to_full_window_gas_auth_view(*, tmp_path: Path) -> 
     output_section = next(
         section
         for section in settings_body.controls
-        if isinstance(section, ft.Column) and view.data_dir_field in section.controls
+        if isinstance(section, ft.Column)
+        and any(isinstance(control, ft.Container) for control in section.controls)
     )
-    output_row_container = cast("ft.Container", output_section.controls[2])
+    output_row_container = next(
+        control for control in output_section.controls if isinstance(control, ft.Container)
+    )
     output_row = cast("ft.Row", output_row_container.content)
-    gas_button = cast("Any", output_row.controls[1])
+    assert view.gas_auth_button in output_row.controls
+    gas_button = cast("Any", view.gas_auth_button)
     gas_button.on_click(None)
 
     assert _active_heading(view=view) == "GAS認証"
@@ -567,11 +573,19 @@ def test_diagnostic_status_and_paths_refresh_in_monitor(*, tmp_path: Path) -> No
         diagnostic_failure=lambda: failed,
     )
     view.build()
-    assert view.diagnostics_status.value == "診断ログと保存先"
+    assert view.settings_button.icon == ft.Icons.SETTINGS
+    assert view.diagnostics not in view.root_view.controls
     failed = True
     assert view.save_settings(tracker_url="http://localhost:2145/", data_dir=str(tmp_path / "new"))
-    assert "書き込み失敗" in (view.diagnostics_status.value or "")
-    assert view.diagnostics.value == str((tmp_path / "new").resolve())
+    assert view.settings_button.icon == ft.Icons.ERROR_OUTLINE
+    assert view.settings_button.tooltip == "診断ログ書き込み失敗: 保存先を確認してください"
+    assert str((tmp_path / "new").resolve()) in (view.diagnostics.value or "")
     view.open_settings()
     settings_body = next(c for c in view.root_view.controls if isinstance(c, ft.Column))
-    assert view.diagnostics in settings_body.controls
+    storage_section = next(
+        control
+        for control in settings_body.controls
+        if isinstance(control, ft.Column) and view.data_dir_field in control.controls
+    )
+    assert view.diagnostics in storage_section.controls
+    assert view.diagnostics.selectable
