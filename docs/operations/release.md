@@ -4,7 +4,18 @@
 
 The first release profile is **Windows x64**, distributed as a portable ZIP.
 Linux source checks remain in CI; native Linux release verification is deferred.
-The immutable-release setting protects a published tag and asset set.
+The immutable-release setting protects a published tag and asset set. Before
+requesting the first release, an administrator enables that repository setting
+and confirms it in their authenticated CLI session:
+
+```sh
+gh api repos/OWNER/REPO/immutable-releases --jq .enabled
+```
+
+The [setting API](https://docs.github.com/en/rest/repos/repos#check-if-immutable-releases-are-enabled-for-a-repository)
+requires administration read access. CI uses `contents: write` for publication
+and requires the actual published release to be immutable with a valid release
+attestation.
 
 The root `VERSION` contains one bare SemVer, optionally followed by one LF.
 `0.0.0` reserves unreleased development and never creates a GitHub Release.
@@ -69,8 +80,10 @@ publication.
    its exact commit even when `VERSION` remains `0.0.0`.
 6. For a release request, publication downloads that job's artifact, creates
    checksums and schema-3 provenance, selects the dated changelog entry and
-   prepares a mutable draft. Verify source/tag identity and immutability before
-   publishing, then verify the release attestation. Do not rebuild the artifact.
+   verifies or creates the tag at the exact source commit, and prepares a mutable
+   draft with `--verify-tag`. Verify source/tag identity before publishing, then
+   require actual immutability and verify the release attestation. Do not rebuild
+   the artifact.
 
 A release contains the Windows ZIP, `SHA256SUMS` and `release-manifest.json`.
 The ZIP includes `VERSION`, `runtime-report.json`, licenses and the application.

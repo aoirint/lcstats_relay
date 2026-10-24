@@ -227,19 +227,6 @@ jobs:
           ' CHANGELOG.md > release-notes.md
           test -s release-notes.md
 
-      - name: Verify immutable release setting
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          enabled="$(gh api \
-            --header "X-GitHub-Api-Version: 2026-03-10" \
-            "repos/${GITHUB_REPOSITORY}/immutable-releases" \
-            --jq '.enabled')"
-          if [[ "${enabled}" != "true" ]]; then
-            echo "Immutable releases must be enabled before publication." >&2
-            exit 1
-          fi
-
       - name: Verify or create the exact source tag
         env:
           GH_TOKEN: ${{ github.token }}
