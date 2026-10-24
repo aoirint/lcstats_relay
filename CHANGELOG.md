@@ -6,6 +6,34 @@ This is the canonical development and GitHub release history. Versions follow
 
 ## Unreleased
 
+## 0.1.0 - 2026-10-24
+
+### Added
+
+- Initial stable Windows x64 portable release with a desktop monitor for local
+  tracker events, Google Sheets delivery, JSON archives and durable retries.
+- Save, restore, replace and delete GAS tokens through Windows Credential Manager
+  using the official Flet credential service.
+- Retain restart-spanning operational traces and correlation IDs with Python
+  standard logging and bounded file rotation.
+- Publish root-VERSION releases with native rendering, credential restart checks,
+  checksums, runtime provenance and bundled third-party notices.
+
+### Fixed
+
+- Require an HTTP success and Boolean `ok: true` acknowledgement before accepting
+  a GAS delivery; retain failed deliveries for retry.
+
+### Security
+
+- Ship the reviewed dependency set with patched TLS trust. GAS tokens are not
+  written to settings JSON or application logs.
+
+### Notes
+
+- Existing queue records require the current schema and a valid correlation ID;
+  unsupported records report a read error and remain untouched.
+
 ## 0.1.0-alpha.1 - 2026-10-24
 
 ### Added
