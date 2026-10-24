@@ -35,7 +35,7 @@ def _write_metadata(*, tmp_path: Path, version: str = "1.2.3") -> tuple[Path, Pa
 def _write_artifacts(*, tmp_path: Path) -> list[ReleaseArtifact]:
     version = (tmp_path / "VERSION").read_text(encoding="ascii").strip()
     artifacts = []
-    for target in ("windows-amd64", "linux-amd64"):
+    for target in ("windows-amd64", "linux-amd64", "linux-arm64"):
         windows = target.startswith("windows-")
         path = tmp_path / f"lcstats-relay-v{version}-{target}{'.zip' if windows else '.tar.gz'}"
         files = {
@@ -50,7 +50,7 @@ def _write_artifacts(*, tmp_path: Path) -> list[ReleaseArtifact]:
                     "version": version,
                     "python_version": "3.14.8",
                     "flet_version": "1.0.4",
-                    "architecture": "amd64",
+                    "architecture": target.rsplit("-", 1)[1],
                     "architecture_bits": 64,
                     "credential_restart_check": True,
                     "credential_phases": ["write", "read-delete", "absent"],
@@ -143,9 +143,11 @@ def test_write_release_files_records_sorted_provenance(*, tmp_path: Path) -> Non
     }
     assert [record["target"] for record in manifest["artifacts"]] == [
         "linux-amd64",
+        "linux-arm64",
         "windows-amd64",
     ]
     assert [record["python_runtime_version"] for record in manifest["artifacts"]] == [
+        "3.14.8",
         "3.14.8",
         "3.14.8",
     ]
@@ -311,6 +313,8 @@ def test_main_writes_release_files(*, tmp_path: Path) -> None:
                 f"windows-amd64={artifacts[0].path}",
                 "--artifact",
                 f"linux-amd64={artifacts[1].path}",
+                "--artifact",
+                f"linux-arm64={artifacts[2].path}",
                 "--build-number",
                 "42",
                 "--source-commit",

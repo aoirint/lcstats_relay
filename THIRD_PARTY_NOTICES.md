@@ -38,7 +38,7 @@ license does not replace them.
 - Linux CPython 3.14.8: retain the license shipped in the reviewed runtime
   archive as `licenses/PYTHON-LINUX-LICENSE.txt` and the versioned Python license
   document. Its native library matches the 20261013 python-build-standalone
-  x86-64-v2 distribution. Retain its embedded-library notices and provenance in
+  x86-64-v2 or aarch64 distribution. Retain its embedded-library notices and provenance in
   `licenses/python/`. Unused DBM and Tk extensions are excluded.
   Linux links desktop and system libraries supplied by the target
   distribution; those system packages are not included in the app archive.

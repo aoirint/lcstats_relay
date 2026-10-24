@@ -36,7 +36,7 @@ assert data['architecture_bits']==64 and data['width']>0 and data['height']>0
 assert data['architecture']==profile['architecture']
 assert hashlib.sha256(report.with_suffix('.png').read_bytes()).hexdigest()==data['png_sha256']
 header=(Path(sys.argv[3])/'lcstats-relay').read_bytes()[:20]
-assert header[:6]==b'\x7fELF\x02\x01' and struct.unpack('<H',header[18:20])[0]==62,'Wrong executable architecture'
+assert header[:6]==b'\x7fELF\x02\x01' and struct.unpack('<H',header[18:20])[0]=={'amd64':62,'arm64':183}[profile['architecture']],'Wrong executable architecture'
 PY
   printf 'Native render and credential phase passed: %s\n' "$task_phase"
 done

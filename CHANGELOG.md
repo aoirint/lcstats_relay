@@ -8,6 +8,8 @@ This is the canonical development and release history. Versions follow
 
 ### Added
 
+- Build and verify Linux arm64 desktop archives on a native ARM64 runner.
+
 - Build Linux amd64 desktop archives and verify rendering and GNOME Keyring
   credential persistence across separate application launches.
 

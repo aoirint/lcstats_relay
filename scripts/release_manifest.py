@@ -24,6 +24,7 @@ _ARCHITECTURE_BITS = 64
 _TARGETS = {
     "windows-amd64": ("windows", "lcstats-relay.exe", ".zip"),
     "linux-amd64": ("linux", "lcstats-relay", ".tar.gz"),
+    "linux-arm64": ("linux", "lcstats-relay", ".tar.gz"),
 }
 _SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 

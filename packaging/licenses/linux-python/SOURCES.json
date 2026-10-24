@@ -78,5 +78,14 @@
       "member": "python/licenses/LICENSE.zlib.txt",
       "sha256": "818922b2620f12801a12bf78e399644a30990e66824abd8ca8ec24d451d6f92c"
     }
-  ]
+  ],
+  "arm64_source_archive": {
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261013/cpython-3.14.8%2B20261013-aarch64-unknown-linux-gnu-pgo%2Blto-full.tar.zst",
+    "sha256": "45fe97bf0d07d7cef3fee5f1cab6e4a7d7e99a22e0d5f842e005ef61a9656c73"
+  },
+  "arm64_runtime_origin": {
+    "release": "20261013",
+    "target": "aarch64-unknown-linux-gnu",
+    "install_only_sha256": "d8ae14f303d3971431184cf423ae5467202de2bc19bf6491a490250b87647d4b"
+  }
 }
