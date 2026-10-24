@@ -66,7 +66,11 @@ publication.
 
 ## Verification and publication
 
-1. PR source checks and the full test suite run with read-only permissions.
+1. PRs run source checks and the full test suite with read-only permissions.
+   They do not build desktop binaries. Main builds the integrated source.
+   For packaging or platform changes, run the `Desktop Build` workflow manually
+   against the candidate branch before merging. It repeats source validation,
+   produces a verified candidate and render evidence, and does not publish.
 2. The Windows job builds, launches the actual bundled executable, captures its
    rendered first page and records actual Python/Flet/TLS versions.
 3. Three separate launches save an inert credential for a reserved-domain key,

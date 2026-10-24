@@ -1,0 +1,96 @@
+name: Desktop Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Explicit candidate builds retain their evidence even if another run is requested.
+concurrency:
+  group: desktop-build-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check:
+    name: Check
+    # Source checks run on the lightweight, unprivileged runner and remain
+    # separate from the test job for a focused PR failure signal.
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lint source
+        uses: ./.github/actions/check-python-flet-source
+
+  test:
+    name: Test
+    # Unit tests use the locked Python environment without desktop packaging or
+    # privileged services, so this job fits the slim runner contract.
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test source
+        uses: ./.github/actions/test-python-flet-source
+
+  build-windows:
+    name: Windows binary
+    needs: [check, test]
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - name: Check out candidate source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build and verify candidate
+        id: build
+        uses: ./.github/actions/build-desktop
+        with:
+          target: windows
+          build_number: ${{ github.run_number }}
+
+      - name: Upload verified candidate
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-candidate
+          path: ${{ steps.build.outputs.artifact_path }}
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Upload native render evidence
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-native-evidence
+          path: |
+            build/native-probe/startup.png
+            build/native-probe/**/*.log
+            build/windows/runtime-report.json
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Retain failed startup bundle for diagnosis
+        if: ${{ failure() && !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-unverified-diagnostic-bundle
+          path: build/windows/
+          if-no-files-found: ignore
+          retention-days: 1

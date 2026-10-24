@@ -6,6 +6,11 @@ This is the canonical development and release history. Versions follow
 
 ## Unreleased
 
+### Changed
+
+- Run desktop builds on main and on explicit candidate requests, keeping routine
+  pull-request CI focused on source checks and tests.
+
 ## 0.1.0 - 2026-10-24
 
 ### Changed
