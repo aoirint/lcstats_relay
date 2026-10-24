@@ -43,7 +43,7 @@ Download the Windows x64 ZIP from the
 it, and run `lcstats-relay.exe`. Python does not need to be installed separately.
 Checksums and a release manifest are provided alongside the ZIP.
 
-Linux amd64 candidates are available from the manually run `Desktop Build`
+Linux amd64 and arm64 candidates are available from the manually run `Desktop Build`
 workflow until the next release. Extract the tar.gz and run `./lcstats-relay`.
 See [Linux runtime prerequisites](docs/operations/release.md#linux-runtime-prerequisites)
 for desktop and GNOME Keyring requirements.

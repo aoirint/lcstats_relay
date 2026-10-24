@@ -6,7 +6,7 @@ on:
       target:
         description: Native candidate to build
         type: choice
-        options: [all, windows-amd64, linux-amd64]
+        options: [all, windows-amd64, linux-amd64, linux-arm64]
         default: all
 
 permissions:
@@ -60,8 +60,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: ${{ fromJSON(inputs.target == 'all' && '["windows-amd64","linux-amd64"]' || format('["{0}"]', inputs.target)) }}
-    runs-on: ${{ matrix.target == 'windows-amd64' && 'windows-2022' || 'ubuntu-22.04' }}
+        target: ${{ fromJSON(inputs.target == 'all' && '["windows-amd64","linux-amd64","linux-arm64"]' || format('["{0}"]', inputs.target)) }}
+    runs-on: ${{ matrix.target == 'windows-amd64' && 'windows-2022' || matrix.target == 'linux-arm64' && 'ubuntu-22.04-arm' || 'ubuntu-22.04' }}
     timeout-minutes: 60
     steps:
       - name: Check out candidate source

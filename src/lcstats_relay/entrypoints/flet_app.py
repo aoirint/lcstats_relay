@@ -14,10 +14,15 @@ from lcstats_relay.ui.credentials import FletTokenStore, credential_store_name
 from lcstats_relay.ui.monitor import MonitorView
 from lcstats_relay.ui.runtime_check import verify_native_startup
 
+_ASSETS_DIRECTORY = Path(__file__).resolve().parents[2] / "assets"
+
 
 async def main(page: ft.Page) -> None:  # noqa: PLR0917 -- keyword-only-exception: Flet target ABI
     """Configure the desktop page and mount the async monitor view."""
     page.title = "LCStats Relay"
+    page.fonts = {"NotoSansJP": str(_ASSETS_DIRECTORY / "fonts/NotoSansJP.ttf")}
+    page.theme = ft.Theme(font_family="NotoSansJP")
+    page.dark_theme = ft.Theme(font_family="NotoSansJP")
     page.window.min_width = 420
     page.window.min_height = 300
     page.padding = 8
@@ -45,4 +50,4 @@ async def main(page: ft.Page) -> None:  # noqa: PLR0917 -- keyword-only-exceptio
 def run() -> None:
     """Start the Flet desktop runtime."""
     with logging_session():
-        ft.run(main)
+        ft.run(main, assets_dir=str(_ASSETS_DIRECTORY))

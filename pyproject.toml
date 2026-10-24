@@ -204,3 +204,6 @@ skip_covered = false
 [[tool.mypy.overrides]]
 module = ["flet_secure_storage", "flet_secure_storage.*"]
 follow_untyped_imports = true
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/assets" = "assets"

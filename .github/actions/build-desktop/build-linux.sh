@@ -5,7 +5,12 @@ task_version="$1"
 task_build_version="$2"
 task_build_number="$3"
 task_output="$4"
-task_profile=packaging/linux-amd64-toolchain.json
+case "$(uname -m)" in
+  x86_64) task_arch=amd64 ;;
+  aarch64) task_arch=arm64 ;;
+  *) echo "Unsupported Linux host architecture" >&2; exit 1 ;;
+esac
+task_profile="packaging/linux-$task_arch-toolchain.json"
 task_tools="${RUNNER_TEMP:-$PWD/.venv/native-tools}/lcstats-linux"
 mkdir -p "$task_tools/downloads"
 export FLET_CACHE_DIR="$task_tools/flet-cache" PUB_CACHE="$task_tools/pub-cache"
@@ -22,12 +27,39 @@ while IFS=$'\t' read -r task_name task_url task_hash task_cache; do
   fi
 done < <(jq -r '.inputs[] | [.name,.url,.sha256,(.cache // "")] | @tsv' "$task_profile")
 
-uv run --locked python - "$task_tools" <<'PY'
-import sys,tarfile
-from pathlib import Path
-root=Path(sys.argv[1]);(root/'sdk').mkdir(exist_ok=True)
-with tarfile.open(root/'downloads/flutter') as archive:
-    archive.extractall(root/'sdk',filter='data')
+if jq --exit-status '.flutter_source' "$task_profile" >/dev/null; then
+  mkdir -p "$task_tools/sdk"
+  git clone --quiet --depth 1 --branch "$(jq -r .flutter_source.tag "$task_profile")" \
+    "$(jq -r .flutter_source.repository "$task_profile")" "$task_tools/sdk/flutter"
+  [[ "$(git -C "$task_tools/sdk/flutter" rev-parse HEAD)" == "$(jq -r .flutter_source.revision "$task_profile")" ]]
+fi
+uv run --locked python - "$task_tools" "$task_profile" <<'PY'
+import json,os,stat,sys,tarfile,zipfile
+from pathlib import Path,PurePosixPath
+root=Path(sys.argv[1]);profile=json.loads(Path(sys.argv[2]).read_text())
+(root/'sdk').mkdir(exist_ok=True)
+if source:=profile.get('flutter_source'):
+    sdk=root/'sdk/flutter';cache=sdk/'bin/cache';cache.mkdir(parents=True,exist_ok=True)
+    assert (sdk/'bin/internal/engine.version').read_text().strip()==source['engine_revision']
+    for entry in profile['inputs']:
+        if 'sdk_extract' not in entry:continue
+        target=cache/entry['sdk_extract'];target.mkdir(parents=True,exist_ok=True)
+        assert target.resolve().is_relative_to(cache.resolve())
+        with zipfile.ZipFile(root/'downloads'/entry['name']) as archive:
+            for member in archive.infolist():
+                path=PurePosixPath(member.filename)
+                assert not path.is_absolute() and '..' not in path.parts and chr(92) not in member.filename
+                assert not stat.S_ISLNK(member.external_attr>>16)
+            archive.extractall(target)
+            for member in archive.infolist():
+                mode=(member.external_attr>>16)&0o777
+                if mode&0o111:os.chmod(target/member.filename,mode)
+    for name in ('engine-dart-sdk','flutter_sdk','linux-sdk'):
+        (cache/f'{name}.stamp').write_text(source['engine_revision'])
+    (cache/'material_fonts.stamp').write_text(source['material_fonts_version'])
+else:
+    with tarfile.open(root/'downloads/flutter') as archive:
+        archive.extractall(root/'sdk',filter='data')
 PY
 export FLUTTER_ROOT="$task_tools/sdk/flutter"
 export PATH="$FLUTTER_ROOT/bin:$PATH"
@@ -131,7 +163,7 @@ PY
 # The keyring and display live for all three independent executable launches.
 xvfb-run --auto-servernum dbus-run-session -- bash \
   .github/actions/build-desktop/verify-linux.sh "$PWD/build/linux" "$task_version" "$task_profile"
-task_name="lcstats-relay-v$task_version-linux-amd64"
+task_name="lcstats-relay-v$task_version-linux-$task_arch"
 uv run --locked python scripts/package_desktop.py --build-directory build/linux \
   --output-directory "$task_output" --artifact-name "$task_name" --format gztar
 uv run --locked python scripts/verify_desktop_archive.py --target linux \

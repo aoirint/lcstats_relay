@@ -147,6 +147,8 @@ jobs:
             runner: windows-2022
           - target: linux-amd64
             runner: ubuntu-22.04
+          - target: linux-arm64
+            runner: ubuntu-22.04-arm
     # Oldest supported GA image for each native target.
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
@@ -216,6 +218,7 @@ jobs:
           uv run --locked python -m scripts.release_manifest \
             --artifact "windows-amd64=artifacts/lcstats-relay-v${PROJECT_VERSION}-windows-amd64.zip" \
             --artifact "linux-amd64=artifacts/lcstats-relay-v${PROJECT_VERSION}-linux-amd64.tar.gz" \
+            --artifact "linux-arm64=artifacts/lcstats-relay-v${PROJECT_VERSION}-linux-arm64.tar.gz" \
             --build-number "${BUILD_NUMBER}" \
             --source-commit "${SOURCE_COMMIT}" \
             --workflow-url "${WORKFLOW_URL}" \

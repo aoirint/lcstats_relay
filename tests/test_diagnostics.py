@@ -6,6 +6,7 @@ import re
 from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
+from unittest.mock import Mock
 
 import flet as ft
 import httpx
@@ -78,11 +79,7 @@ def test_runtime_failure_propagates_and_closes_log(
     """Keep unexpected runtime errors observable and flush the final event."""
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
 
-    def fail(_target: object) -> None:  # keyword-only-exception: Flet target ABI
-        msg = "private-player"
-        raise RuntimeError(msg)
-
-    monkeypatch.setattr(ft, "run", fail)
+    monkeypatch.setattr(ft, "run", Mock(side_effect=RuntimeError("private-player")))
     with pytest.raises(RuntimeError, match="private-player"):
         flet_app.run()
     content = (default_log_dir() / "relay.log").read_text(encoding="utf-8")

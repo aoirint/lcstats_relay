@@ -2,10 +2,11 @@
 
 ## Scope and version identity
 
-The verified build profiles are **windows-amd64** (portable ZIP) and
-**linux-amd64** (tar.gz, preserving executable modes and links). The Linux
-baseline is Ubuntu 22.04 on an x86-64-v2 CPU, with an X11 desktop and GNOME Keyring providing Secret
-Service. Native builds use the corresponding oldest supported GA runner.
+The verified build profiles are **windows-amd64** (portable ZIP),
+**linux-amd64** and **linux-arm64** (tar.gz, preserving executable modes and
+links). The Linux baseline is Ubuntu 22.04 with an X11 desktop and GNOME Keyring
+providing Secret Service; amd64 also requires an x86-64-v2 CPU. Native builds use
+the corresponding oldest supported GA runner, including `ubuntu-22.04-arm`.
 Published 0.1.0 releases remain Windows-only; these profiles apply to candidates
 and subsequent releases.
 
@@ -43,7 +44,12 @@ release body. Keep `Unreleased` for subsequent work.
 pins artifact URLs and SHA-256 digests for Flutter 3.44.8, Flet's 1.0.4 template,
 serious_python's compatible embedded CPython 3.14.8 and dart_bridge 1.10.0.
 The [Linux profile](../../packaging/linux-amd64-toolchain.json) pins the official
-Linux SDK, runtime, compiler and bridge artifacts for the same versions. Their
+Linux SDK, runtime, compiler and bridge artifacts for the same versions.
+The [ARM64 profile](../../packaging/linux-arm64-toolchain.json) uses that same
+official Flutter source commit, because the 3.44.8 SDK archive targets x64.
+It verifies the source commit and preloads checksum-pinned official ARM64 Dart,
+engine and font archives into Flutter's standard cache before executing the
+SDK. The upstream runtime/bootstrap code remains unchanged. Their
 releases satisfy the seven-day cooldown. The official template receives
 the reviewed Dart lock; runtime/bootstrap code is unchanged.
 
@@ -82,7 +88,7 @@ publication.
    For packaging or platform changes, run the `Desktop Build` workflow manually
    against the candidate branch before merging. It repeats source validation,
    produces a verified candidate and render evidence, and does not publish.
-   Select `windows-amd64`, `linux-amd64` or `all`; each build records its native
+   Select `windows-amd64`, `linux-amd64`, `linux-arm64` or `all`; each build records its native
    CPU architecture as well as its Python version.
 2. Each native job builds, launches the actual bundled executable, captures its
    rendered first page and records actual Python/Flet/TLS versions.
@@ -109,7 +115,7 @@ These labels define naming, not additional supported build targets. The current
 Windows archive is `lcstats-relay-v{VERSION}-windows-amd64.zip`. Previously
 published immutable releases retain their original asset names.
 
-A new release requires exactly one archive for each supported target plus
+A new release requires exactly one archive for each of the three supported targets plus
 `SHA256SUMS` and `release-manifest.json`. Each archive includes `VERSION`,
 `runtime-report.json`, licenses and the application. Publication rejects a
 missing target, an unexpected archive name or inconsistent native architecture.
@@ -135,8 +141,7 @@ or moving its tag.
 
 The Linux archive bundles Python and the application, not the desktop session.
 On the supported Ubuntu baseline, install `libgtk-3-0`, `libsecret-1-0`,
-`libjsoncpp25`, `libstdc++6`, `gnome-keyring` and Japanese fonts such as
-`fonts-noto-cjk`. Run the app in a graphical user
+`libjsoncpp25`, `libstdc++6` and `gnome-keyring`. Run the app in a graphical user
 session with its Secret Service unlocked. The app reports a credential-store
 failure when that service is unavailable; it does not save plaintext tokens.
 
@@ -151,3 +156,13 @@ bash .github/actions/build-desktop/build-linux.sh VERSION BUILD_VERSION BUILD_NU
 Replace the first three arguments with the actual root version, its numeric
 three-part build version and a positive build number. The same script runs the
 isolated native rendering and keyring checks before creating a tar.gz.
+
+## Japanese font assets
+
+The UI registers the bundled Noto Sans JP through Flet's standard font API.
+This avoids the official Linux ARM64 engine's missing CJK system-font fallback
+([upstream issue](https://github.com/flutter/flutter/issues/139293)).
+The font, OFL notice and pinned Google source provenance live in `src/assets/fonts/`.
+Flet includes that standard assets directory in native bundles; the Python wheel
+also installs it alongside the application package. Source and wheel launches
+pass its absolute path to Flet. No runtime download is required.

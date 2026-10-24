@@ -3,3 +3,5 @@ VERSION text eol=lf
 # Preserve verified upstream license bytes across platforms.
 packaging/licenses/* -text -whitespace
 packaging/licenses/linux-python/** -text -whitespace
+src/assets/fonts/*.ttf -text -diff
+src/assets/fonts/OFL.txt -text -whitespace
