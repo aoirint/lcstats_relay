@@ -46,19 +46,22 @@ def test_token_survives_controller_restart_and_can_be_forgotten(*, tmp_path: Pat
         view.build()
         view.open_gas_auth()
         assert view.gas_token_field.value == ""
-        assert "保存済み" in (view.gas_token_status.value or "")
-        assert view.gas_saved_row.visible
-        assert bool(view.gas_token_field.visible) is False
-        cast("Callable[[object | None], None]", view.gas_token_change_button.on_click)(None)
-        assert bool(view.gas_token_field.visible)
-        assert view.gas_token_field.value == ""
-        assert await second.save_gas_auth(gas_url=_URL, gas_token="")
+        assert view.gas_token_field.hint_text == "••••••••"
+        assert bool(view.gas_token_field.can_reveal_password) is False
+        await view.submit_gas_auth()
+        assert tokens.values[_URL] == _TOKEN
+        view.open_gas_auth()
+        view.gas_token_field.value = "replacement-fixture-value"
+        cast("Callable[[object | None], None]", view.gas_token_field.on_change)(None)
+        assert bool(view.gas_token_field.can_reveal_password)
+        await view.submit_gas_auth()
+        assert tokens.values[_URL] == "replacement-fixture-value"
+        view.open_gas_auth()
         assert second.gas_token_configured
         view.gas_url_field.value = _OTHER_URL
         cast("Callable[[object | None], None]", view.gas_url_field.on_change)(None)
         assert view.gas_delete_button.disabled
-        assert bool(view.gas_saved_row.visible) is False
-        assert bool(view.gas_token_field.visible)
+        assert view.gas_token_field.hint_text == ""
         view.open_gas_auth()
         await view.delete_gas_token()
         assert bool(second.gas_token_configured) is False

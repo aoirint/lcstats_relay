@@ -48,7 +48,6 @@ class MonitorView:
         credential_store_name: str = "OSの認証情報ストア",
     ) -> None:
         """Create controls and bind them to a Flet-free controller."""
-        self._editing_gas_token = False
         self._closed = False
         self._page = page
         self._controller = controller
@@ -88,24 +87,14 @@ class MonitorView:
         self.tracker_url_field = ft.TextField(label="LCStatsTracker URL", expand=True)
         self.data_dir_field = ft.TextField(label="ローカル保存先ディレクトリ", expand=True)
         self.gas_url_field = ft.TextField(
-            label="GAS Web App URL", expand=True, on_change=self._gas_url_changed
+            label="GAS Web App URL", expand=True, on_change=self._credential_fields_changed
         )
         self.gas_token_field = ft.TextField(
-            label="GAS Token",
-            helper=f"{credential_store_name}に保存します",
+            on_change=self._credential_fields_changed,
+            helper=f"保存先: {credential_store_name}",
             password=True,
             can_reveal_password=True,
             expand=True,
-        )
-        self.gas_token_status = ft.Text(f"{credential_store_name}に保存済み")
-        self.gas_token_change_button = ft.TextButton("変更", on_click=self.change_gas_token)
-        self.gas_saved_row = ft.Row(
-            [
-                ft.Icon(ft.Icons.CHECK_CIRCLE, color=ft.Colors.GREEN_700),
-                self.gas_token_status,
-                self.gas_token_change_button,
-            ],
-            wrap=True,
         )
         self.gas_save_button = ft.FilledButton(
             "保存", icon=ft.Icons.SAVE, on_click=self.submit_gas_auth
@@ -140,7 +129,6 @@ class MonitorView:
         self, _event: object | None = None
     ) -> None:
         """Switch to the full-window Google Apps Script settings view."""
-        self._editing_gas_token = False
         self.gas_url_field.value = self._controller.settings.gas_url
         self.gas_token_field.value = ""
         self._refresh_credential_controls()
@@ -300,8 +288,13 @@ class MonitorView:
             self._full_view_title(title="GAS認証"),
             self.error,
             self.gas_url_field,
-            self.gas_saved_row,
-            self.gas_token_field,
+            ft.Column(
+                [
+                    ft.Text("GASトークン", size=13),
+                    ft.Semantics(label="GASトークン", content=self.gas_token_field),
+                ],
+                spacing=4,
+            ),
             ft.Row(
                 [
                     self.gas_save_button,
@@ -366,15 +359,7 @@ class MonitorView:
             if not self._closed:
                 self._page.update()
 
-    def change_gas_token(  # keyword-only-exception: Flet event callback ABI
-        self, _event: object | None = None
-    ) -> None:
-        """Reveal an empty replacement field without retrieving the saved secret."""
-        self._editing_gas_token = True
-        self._refresh_credential_controls()
-        self._page.update()
-
-    def _gas_url_changed(  # keyword-only-exception: Flet event callback ABI
+    def _credential_fields_changed(  # keyword-only-exception: Flet event callback ABI
         self, _event: object | None = None
     ) -> None:
         self._refresh_credential_controls()
@@ -388,9 +373,8 @@ class MonitorView:
         unchanged = (self.gas_url_field.value or "").strip() == self._controller.settings.gas_url
         saved = unchanged and self._controller.gas_token_configured
         self.gas_delete_button.disabled = busy or not saved
-        self.gas_saved_row.visible = saved
-        self.gas_token_change_button.disabled = busy or self._editing_gas_token
-        self.gas_token_field.visible = not saved or self._editing_gas_token
+        self.gas_token_field.hint_text = "••••••••" if saved else ""
+        self.gas_token_field.can_reveal_password = bool(self.gas_token_field.value)
 
     def _refresh_settings_summary(self) -> None:
         settings, gas = settings_summaries(
