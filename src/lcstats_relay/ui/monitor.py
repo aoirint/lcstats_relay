@@ -99,7 +99,17 @@ class MonitorView:
         self.gas_save_button = ft.FilledButton(
             "保存", icon=ft.Icons.SAVE, on_click=self.submit_gas_auth
         )
-        self.gas_delete_button = ft.TextButton("保存トークンを削除", on_click=self.delete_gas_token)
+        self.gas_delete_button = ft.TextButton(
+            "トークンを削除",
+            icon=ft.Icons.DELETE_OUTLINE,
+            style=ft.ButtonStyle(
+                color={
+                    ft.ControlState.DEFAULT: ft.Colors.ERROR,
+                    ft.ControlState.DISABLED: ft.Colors.with_opacity(0.38, ft.Colors.ON_SURFACE),
+                }
+            ),
+            on_click=self.delete_gas_token,
+        )
         self.output_destinations = ft.Column([], spacing=4)
         self.root_view = ft.Column([], spacing=8, expand=True, scroll=ft.ScrollMode.AUTO)
         self.root_container = ft.Container(

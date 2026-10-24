@@ -84,7 +84,7 @@ replacement to update it; leaving the field untouched keeps the saved value.
 A destination without a saved token retains unauthenticated
 GAS behavior.
 
-**保存トークンを削除** removes the current destination's credential and memory copy.
+**トークンを削除** removes the current destination's credential and memory copy.
 It is disabled while the URL field contains an unsaved edit. Clearing the GAS
 URL disables output but retains saved credentials: delete first when forgetting
 them is intended. An OS-store failure leaves accepted settings unchanged and
