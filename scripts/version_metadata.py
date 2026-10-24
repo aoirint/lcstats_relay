@@ -1,21 +1,24 @@
-"""Validate canonical project version metadata for Flet desktop builds."""
+"""Read the canonical SemVer release identity from the root VERSION file."""
 
 from __future__ import annotations
 
 import argparse
-import tomllib
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from packaging.version import InvalidVersion, Version
-
-_BUILD_VERSION_SEGMENTS = 3
+_NUMBER = r"(?:0|[1-9][0-9]*)"
+_IDENTIFIER = rf"(?:{_NUMBER}|[0-9]*[A-Za-z-][0-9A-Za-z-]*)"
+_SEMVER = re.compile(
+    rf"(?P<release>{_NUMBER}\.{_NUMBER}\.{_NUMBER})"
+    rf"(?P<prerelease>-{_IDENTIFIER}(?:\.{_IDENTIFIER})*)?"
+)
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
 class VersionMetadata:
-    """Version identities shared by Python, Flet, artifacts, and Git."""
+    """Release identities shared by Flet, artifacts, and Git."""
 
     project_version: str
     build_version: str
@@ -23,40 +26,22 @@ class VersionMetadata:
     release_mode: str
 
 
-def read_version_metadata(*, pyproject_path: Path) -> VersionMetadata:
-    """Read and validate one normalized PEP 440 project version."""
-    data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
-    project = data.get("project")
-    version_text = project.get("version") if isinstance(project, dict) else None
-    if not isinstance(version_text, str) or not version_text:
-        msg = "pyproject.toml must define a non-empty [project].version"
+def read_version_metadata(*, version_path: Path) -> VersionMetadata:
+    """Accept one bare stable or prerelease SemVer and an optional final LF."""
+    version_text = version_path.read_bytes().decode("ascii").removesuffix("\n")
+    match = _SEMVER.fullmatch(version_text)
+    if match is None:
+        msg = "VERSION must contain one canonical SemVer without build metadata"
         raise ValueError(msg)
-    try:
-        version = Version(version_text)
-    except InvalidVersion as exc:
-        msg = f"project.version is not PEP 440 compliant: {version_text}"
-        raise ValueError(msg) from exc
-    if str(version) != version_text:
-        msg = f"project.version must be normalized: {version_text} != {version}"
-        raise ValueError(msg)
-    if version.epoch != 0 or version.local is not None:
-        msg = "project.version must not contain an epoch or local version segment"
-        raise ValueError(msg)
-    if len(version.release) > _BUILD_VERSION_SEGMENTS:
-        msg = "project.version has too many release segments for a Flet build version"
-        raise ValueError(msg)
-
-    release = (*version.release, 0, 0)[:_BUILD_VERSION_SEGMENTS]
-    build_version = ".".join(str(segment) for segment in release)
     if version_text == "0.0.0":
         release_mode = "edge"
-    elif version.is_prerelease or version.is_devrelease:
+    elif match.group("prerelease"):
         release_mode = "prerelease"
     else:
         release_mode = "latest"
     return VersionMetadata(
         project_version=version_text,
-        build_version=build_version,
+        build_version=match.group("release"),
         git_version=f"v{version_text}",
         release_mode=release_mode,
     )
@@ -77,10 +62,10 @@ def _write_github_output(*, path: Path, metadata: VersionMetadata) -> None:
 def main(*, argv: Sequence[str] | None = None) -> int:
     """Write validated metadata to the GitHub Actions output file."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--pyproject", type=Path, default=Path("pyproject.toml"))
+    parser.add_argument("--version-file", type=Path, default=Path("VERSION"))
     parser.add_argument("--github-output", type=Path, required=True)
     args = parser.parse_args(argv)
-    metadata = read_version_metadata(pyproject_path=args.pyproject)
+    metadata = read_version_metadata(version_path=args.version_file)
     _write_github_output(path=args.github_output, metadata=metadata)
     return 0
 

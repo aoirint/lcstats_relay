@@ -113,7 +113,7 @@ def _validate_build_identity(
 
 def write_release_files(*, plan: ReleasePlan) -> None:
     """Validate release identity and write one manifest plus checksum list."""
-    metadata = read_version_metadata(pyproject_path=plan.pyproject_path)
+    metadata = read_version_metadata(version_path=plan.pyproject_path.parent / "VERSION")
     if metadata.release_mode == "edge":
         msg = "project version 0.0.0 cannot be released"
         raise ValueError(msg)

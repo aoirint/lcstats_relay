@@ -19,8 +19,9 @@ _WORKFLOW_URL = "https://github.com/aoirint/lcstats_relay/actions/runs/123"
 
 def _write_metadata(*, tmp_path: Path, version: str = "1.2.3") -> tuple[Path, Path, Path]:
     pyproject_path = tmp_path / "pyproject.toml"
+    (tmp_path / "VERSION").write_text(f"{version}\n", encoding="ascii", newline="\n")
     pyproject_path.write_text(
-        f'[project]\nname = "lcstats-relay"\nversion = "{version}"\n',
+        '[project]\nname = "lcstats-relay"\nversion = "0.0.0"\n',
         encoding="utf-8",
     )
     python_version_path = tmp_path / ".python-version"
