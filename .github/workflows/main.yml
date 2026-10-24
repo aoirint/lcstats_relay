@@ -203,7 +203,7 @@ jobs:
           UV_VERSION: ${{ steps.setup.outputs.uv_version }}
           WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          uv run --locked python scripts/release_manifest.py \
+          uv run --locked python -m scripts.release_manifest \
             --artifact "windows=artifacts/lcstats-relay-${PROJECT_VERSION}-windows.zip" \
             --build-number "${BUILD_NUMBER}" \
             --source-commit "${SOURCE_COMMIT}" \
@@ -227,16 +227,19 @@ jobs:
           ' CHANGELOG.md > release-notes.md
           test -s release-notes.md
 
-      - name: Verify immutable release setting
+      - name: Verify or create the exact source tag
         env:
           GH_TOKEN: ${{ github.token }}
+          SOURCE_COMMIT: ${{ needs.plan.outputs.source_commit }}
+          TAG: ${{ needs.plan.outputs.git_version }}
         run: |
-          enabled="$(gh api \
-            --header "X-GitHub-Api-Version: 2026-03-10" \
-            "repos/${GITHUB_REPOSITORY}/immutable-releases" \
-            --jq '.enabled')"
-          if [[ "${enabled}" != "true" ]]; then
-            echo "Immutable releases must be enabled before publication." >&2
+          if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" >/dev/null 2>&1; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f "ref=refs/tags/${TAG}" -f "sha=${SOURCE_COMMIT}" >/dev/null
+          fi
+          remote_commit="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${TAG}" --jq '.sha')"
+          if [[ "${remote_commit}" != "${SOURCE_COMMIT}" ]]; then
+            echo "Release tag does not identify the reviewed source commit." >&2
             exit 1
           fi
 
@@ -269,17 +272,7 @@ jobs:
             if [[ "${RELEASE_MODE}" == "prerelease" ]]; then
               create_args+=(--prerelease --latest=false)
             fi
-            if remote_commit="$(gh api \
-              "repos/${GITHUB_REPOSITORY}/commits/${TAG}" \
-              --jq '.sha' 2>/dev/null)"; then
-              if [[ "${remote_commit}" != "${SOURCE_COMMIT}" ]]; then
-                echo "Existing release tag identifies another source commit." >&2
-                exit 1
-              fi
-              create_args+=(--verify-tag)
-            else
-              create_args+=(--target "${SOURCE_COMMIT}")
-            fi
+            create_args+=(--verify-tag)
             gh release create "${create_args[@]}"
           fi
 
