@@ -5,10 +5,8 @@ from __future__ import annotations
 import flet as ft
 
 from lcstats_relay.composition.application import create_monitor_controller
-from lcstats_relay.infrastructure.diagnostics import DiagnosticLog, default_log_dir
+from lcstats_relay.infrastructure.diagnostics import logging_session
 from lcstats_relay.ui.monitor import MonitorView
-
-_diagnostics = DiagnosticLog(directory=default_log_dir())
 
 
 async def main(page: ft.Page) -> None:  # noqa: PLR0917 -- keyword-only-exception: Flet target ABI
@@ -19,20 +17,12 @@ async def main(page: ft.Page) -> None:  # noqa: PLR0917 -- keyword-only-exceptio
     page.padding = 8
 
     controller = create_monitor_controller()
-    view = MonitorView(
-        page=page,
-        controller=controller,
-        diagnostics=lambda: _diagnostics.describe(data_dir=controller.settings.data_dir),
-        diagnostic_failure=lambda: _diagnostics.failed,
-    )
+    view = MonitorView(page=page, controller=controller)
     page.on_close = view.close
     page.add(view.build())
 
 
 def run() -> None:
     """Start the Flet desktop runtime."""
-    _diagnostics.start()
-    try:
+    with logging_session():
         ft.run(main)
-    finally:
-        _diagnostics.close()

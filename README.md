@@ -78,11 +78,10 @@ longer needed.
 
 ## Troubleshooting
 
-Open **設定** and find the actual absolute paths under **保存先**.
-Operational logs follow reception, archive, GAS delivery, and retries without
-copying player data or credentials. See
-[diagnostic logging and safe sharing](docs/operations/data-and-recovery.md#diagnostic-logs)
-for retention, failure categories, and sharing instructions.
+Operational logs retain reception, archive, GAS delivery and retry events across
+restarts using Python's standard logging handlers. There is no logging UI or
+destination setting. See [diagnostic logging and safe sharing](docs/operations/data-and-recovery.md#diagnostic-logs)
+for the fixed path and inspection procedure.
 
 - A receiver error means the configured LCStatsTracker endpoint could not
   provide an accepted payload. Confirm that one tracker instance is running and

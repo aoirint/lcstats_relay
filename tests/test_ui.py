@@ -559,33 +559,3 @@ def test_full_window_view_save_errors_keep_active_view(*, tmp_path: Path) -> Non
     view.submit_gas_auth()
     assert _active_heading(view=view) == "GAS認証"
     assert view.error.value == "GAS URLにはscript.google.comのHTTPS URLを指定してください"
-
-
-def test_diagnostic_status_and_paths_refresh_in_monitor(*, tmp_path: Path) -> None:
-    """Keep failed logging visible and show actual destination changes locally."""
-    page = _FakePage()
-    controller = _controller_for(manager=_FakeManager(), store=_settings_store(tmp_path=tmp_path))
-    failed = False
-    view = MonitorView(
-        page=page,
-        controller=controller,
-        diagnostics=lambda: str(controller.settings.data_dir.resolve()),
-        diagnostic_failure=lambda: failed,
-    )
-    view.build()
-    assert view.settings_button.icon == ft.Icons.SETTINGS
-    assert view.diagnostics not in view.root_view.controls
-    failed = True
-    assert view.save_settings(tracker_url="http://localhost:2145/", data_dir=str(tmp_path / "new"))
-    assert view.settings_button.icon == ft.Icons.ERROR_OUTLINE
-    assert view.settings_button.tooltip == "診断ログ書き込み失敗: 保存先を確認してください"
-    assert str((tmp_path / "new").resolve()) in (view.diagnostics.value or "")
-    view.open_settings()
-    settings_body = next(c for c in view.root_view.controls if isinstance(c, ft.Column))
-    storage_section = next(
-        control
-        for control in settings_body.controls
-        if isinstance(control, ft.Column) and view.data_dir_field in control.controls
-    )
-    assert view.diagnostics in storage_section.controls
-    assert view.diagnostics.selectable

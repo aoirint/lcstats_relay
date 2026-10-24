@@ -2,10 +2,13 @@
 
 ## Current ownership
 
-`MonitorView` currently owns one active manager, persisted non-secret settings,
-an in-memory GAS token, and all Flet controls. It renders three full-window
+`MonitorController` owns the active manager, persisted non-secret settings and
+an in-memory GAS token. `MonitorView` owns the Flet controls. It renders three full-window
 views inside one root container: monitor, general settings, and GAS
 authentication.
+
+Logging adds no view or configuration fields; the existing storage setting
+controls archive/queue data only. See the [logging decision](relay-output.md#operational-diagnostics).
 
 The manager owns receiver and retry tasks. `RelayStateStore` emits copied
 snapshots through the callback supplied by the view; output state objects in a

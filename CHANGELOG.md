@@ -12,8 +12,8 @@ This is the canonical development and GitHub release history. Versions follow
   retry failed deliveries from a durable queue.
 - Provide connection status, receive/delivery counts, configuration and
   memory-only GAS authentication in a desktop monitor.
-- Write bounded private diagnostic logs with correlation IDs and display
-  resolved log, archive and queue locations.
+- Retain operational traces and payload correlation IDs across restarts with
+  Python standard logging and file rotation.
 - Define release identity in the root `VERSION` file and maintain this history.
 
 ### Fixed

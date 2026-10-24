@@ -85,13 +85,45 @@ peers of the existing Google Apps Script output.
 
 ## Operational diagnostics
 
-Application orchestration emits structured events through the dedicated
-`lcstats_relay.events` logger. The infrastructure sink validates an allowlisted
-schema and does not attach to the root logger or retain third-party logs.
-Success/failure receipts remain UI values; they are never logged because they
-can contain paths or adapter details. Each receipt belongs to a random payload
-correlation ID, persisted in queue records and new archive filenames.
-The entry point owns the rotating handler from startup through runtime cleanup;
-the UI receives only local diagnostic descriptions and a failure-status callback.
-See [Data and recovery](../operations/data-and-recovery.md) for retention,
-locations, event interpretation, and disclosure limits.
+The requirement is to trace reception, archiving, GAS delivery and retries after
+an incident, including after restarting Relay. Logging has no dedicated view,
+user-selectable destination or UI status model.
+
+Use Python's standard `logging` API and `RotatingFileHandler`. The entry point
+owns one `logging_session` around `ft.run`; it appends to a fixed per-user file
+and releases the handler on exit. No third-party logging library, custom log
+manager or serialization framework is required.
+
+Flet also uses Python logging and captures packaged stdout/stderr in
+`console.log`. That file alone was considered: the inspected
+[Flet 1.0.4 template](https://github.com/flet-dev/flet/releases/tag/v1.0.4),
+`lib/python.dart`, opens it with `w+` at startup. It therefore cannot preserve
+an earlier run after a restart. A standard rotating file handler supplies that
+missing retention behavior. Rotation is capacity-based: it bounds disk use,
+not the number of complete runs retained.
+
+Keeping previous `console.log` files per launch was also considered. The file
+is opened before the app module runs, so that design needs a custom Flet
+bootstrap template. The selected standard-handler configuration avoids owning
+that framework startup modification. See the official [Flet logging guide](https://flet.dev/docs/cookbook/logging/)
+and [packaged console output contract](https://flet.dev/docs/publish/#console-output).
+
+The dedicated `lcstats_relay.events` logger records UTC time, severity, fixed
+event names, payload correlation IDs and optional output/category/HTTP status.
+Callers supply only that metadata: never URLs, tokens, raw payloads, player
+identities, response bodies or exception text. HTTPX/Flet loggers are not
+attached to this file handler. There is no general-purpose redaction layer;
+maintainers must preserve this boundary when adding events. The receiver-to-
+archive-to-queue integration test verifies it with private fixture data.
+
+A random payload correlation ID is retained in queue records and new archive
+filenames, allowing a failed delivery and its later retry to be joined. Startup
+and shutdown events delimit runs. Ordinary source runs and packaged apps use
+the same operational logger; Flet's console remains available for framework
+and unexpected-runtime diagnostics.
+
+If opening the file fails, standard console logging records
+`log_file_unavailable` and subsequent events. Later write errors use Python's
+standard logging error handling. Logging does not change delivery decisions or
+consume unexpected application exceptions. Retention and inspection commands
+are owned by [Data and recovery](../operations/data-and-recovery.md#diagnostic-logs).
