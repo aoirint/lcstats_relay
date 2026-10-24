@@ -6,6 +6,8 @@ This is the canonical development and GitHub release history. Versions follow
 
 ## Unreleased
 
+## 0.1.0-alpha.1 - 2026-10-24
+
 ### Added
 
 - Relay local tracker events to Google Sheets, retain local JSON archives, and
