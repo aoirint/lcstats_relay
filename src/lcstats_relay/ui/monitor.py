@@ -45,8 +45,11 @@ class MonitorView:
         *,
         page: PagePort,
         controller: MonitorController,
+        credential_store_name: str = "OSの認証情報ストア",
     ) -> None:
         """Create controls and bind them to a Flet-free controller."""
+        self._editing_gas_token = False
+        self._closed = False
         self._page = page
         self._controller = controller
 
@@ -81,16 +84,33 @@ class MonitorView:
         self.health_icon = ft.Icon(ft.Icons.ERROR_OUTLINE, size=30, color=ft.Colors.RED_700)
         self.receive_count = ft.Text("0")
         self.last_received = ft.Text("-")
-        self.error = ft.Text("", color=ft.Colors.RED_700, selectable=True)
+        self.error = ft.Text(self._controller.error, color=ft.Colors.RED_700, selectable=True)
         self.tracker_url_field = ft.TextField(label="LCStatsTracker URL", expand=True)
         self.data_dir_field = ft.TextField(label="ローカル保存先ディレクトリ", expand=True)
-        self.gas_url_field = ft.TextField(label="GAS Web App URL", expand=True)
+        self.gas_url_field = ft.TextField(
+            label="GAS Web App URL", expand=True, on_change=self._gas_url_changed
+        )
         self.gas_token_field = ft.TextField(
             label="GAS Token",
+            helper=f"{credential_store_name}に保存します",
             password=True,
             can_reveal_password=True,
             expand=True,
         )
+        self.gas_token_status = ft.Text(f"{credential_store_name}に保存済み")
+        self.gas_token_change_button = ft.TextButton("変更", on_click=self.change_gas_token)
+        self.gas_saved_row = ft.Row(
+            [
+                ft.Icon(ft.Icons.CHECK_CIRCLE, color=ft.Colors.GREEN_700),
+                self.gas_token_status,
+                self.gas_token_change_button,
+            ],
+            wrap=True,
+        )
+        self.gas_save_button = ft.FilledButton(
+            "保存", icon=ft.Icons.SAVE, on_click=self.submit_gas_auth
+        )
+        self.gas_delete_button = ft.TextButton("保存トークンを削除", on_click=self.delete_gas_token)
         self.output_destinations = ft.Column([], spacing=4)
         self.root_view = ft.Column([], spacing=8, expand=True, scroll=ft.ScrollMode.AUTO)
         self.root_container = ft.Container(
@@ -120,17 +140,19 @@ class MonitorView:
         self, _event: object | None = None
     ) -> None:
         """Switch to the full-window Google Apps Script settings view."""
+        self._editing_gas_token = False
         self.gas_url_field.value = self._controller.settings.gas_url
         self.gas_token_field.value = ""
+        self._refresh_credential_controls()
         self._show_gas_auth_view()
 
     def save_settings(self, *, tracker_url: str, data_dir: str) -> bool:
         """Validate and persist tracker plus local storage settings."""
         return self._controller.save_settings(tracker_url=tracker_url, data_dir=data_dir)
 
-    def save_gas_auth(self, *, gas_url: str, gas_token: str) -> bool:
-        """Validate and persist the GAS destination while keeping the token in memory."""
-        return self._controller.save_gas_auth(gas_url=gas_url, gas_token=gas_token)
+    async def save_gas_auth(self, *, gas_url: str, gas_token: str) -> bool:
+        """Persist the GAS destination and its OS credential."""
+        return await self._controller.save_gas_auth(gas_url=gas_url, gas_token=gas_token)
 
     async def start(  # keyword-only-exception: Flet event callback ABI
         self, _event: object | None = None
@@ -151,6 +173,7 @@ class MonitorView:
         self, _event: object | None = None
     ) -> None:
         """Stop background work when the desktop window closes."""
+        self._closed = True
         await self._controller.close()
 
     def update_state(self, *, state: ConnectionState) -> None:
@@ -163,8 +186,8 @@ class MonitorView:
         self.status.value = relay.status_label
         self.receive_count.value = relay.receive_count
         self.last_received.value = relay.last_received
-        self.error.value = relay.error
-        self.error.visible = bool(relay.error)
+        self.error.value = self._controller.error or relay.error
+        self.error.visible = bool(self.error.value)
         self.health.value = relay.health.label
         self.health.color = _TONE_COLORS[relay.health.tone]
         self.health_icon.icon = _STATUS_ICONS[relay.health.glyph]
@@ -275,15 +298,14 @@ class MonitorView:
     def _show_gas_auth_view(self) -> None:
         self.root_view.controls = [
             self._full_view_title(title="GAS認証"),
+            self.error,
             self.gas_url_field,
+            self.gas_saved_row,
             self.gas_token_field,
             ft.Row(
                 [
-                    ft.FilledButton(
-                        "保存",
-                        icon=ft.Icons.SAVE,
-                        on_click=self.submit_gas_auth,
-                    ),
+                    self.gas_save_button,
+                    self.gas_delete_button,
                 ],
                 wrap=True,
             ),
@@ -306,6 +328,9 @@ class MonitorView:
     def _close_full_view(  # keyword-only-exception: Flet event callback ABI
         self, _event: object | None = None
     ) -> None:
+        if self._controller.credentials_busy:
+            return
+        self.gas_token_field.value = ""
         self._show_monitor_view(update=True)
 
     def submit_settings(  # keyword-only-exception: Flet event callback ABI
@@ -319,16 +344,53 @@ class MonitorView:
             return
         self._show_monitor_view(update=True)
 
-    def submit_gas_auth(  # keyword-only-exception: Flet event callback ABI
+    async def submit_gas_auth(  # keyword-only-exception: Flet event callback ABI
         self, _event: object | None = None
     ) -> None:
         """Validate the visible GAS fields and return to settings on success."""
-        if not self.save_gas_auth(
+        if not await self.save_gas_auth(
             gas_url=self.gas_url_field.value or "",
             gas_token=self.gas_token_field.value or "",
         ):
             return
-        self.open_settings()
+        self.gas_token_field.value = ""
+        if not self._closed:
+            self.open_settings()
+
+    async def delete_gas_token(  # keyword-only-exception: Flet event callback ABI
+        self, _event: object | None = None
+    ) -> None:
+        """Forget the saved credential without erasing the destination URL."""
+        if await self._controller.delete_gas_token():
+            self.gas_token_field.value = ""
+            if not self._closed:
+                self._page.update()
+
+    def change_gas_token(  # keyword-only-exception: Flet event callback ABI
+        self, _event: object | None = None
+    ) -> None:
+        """Reveal an empty replacement field without retrieving the saved secret."""
+        self._editing_gas_token = True
+        self._refresh_credential_controls()
+        self._page.update()
+
+    def _gas_url_changed(  # keyword-only-exception: Flet event callback ABI
+        self, _event: object | None = None
+    ) -> None:
+        self._refresh_credential_controls()
+        self._page.update()
+
+    def _refresh_credential_controls(self) -> None:
+        busy = self._controller.credentials_busy or self._controller.active
+        self.gas_save_button.disabled = busy
+        self.gas_url_field.disabled = busy
+        self.gas_token_field.disabled = busy
+        unchanged = (self.gas_url_field.value or "").strip() == self._controller.settings.gas_url
+        saved = unchanged and self._controller.gas_token_configured
+        self.gas_delete_button.disabled = busy or not saved
+        self.gas_saved_row.visible = saved
+        self.gas_token_change_button.disabled = busy or self._editing_gas_token
+        self.gas_token_field.visible = not saved or self._editing_gas_token
 
     def _refresh_settings_summary(self) -> None:
         settings, gas = settings_summaries(
@@ -344,11 +406,12 @@ class MonitorView:
         self._apply_relay(state=self._controller.relay_state)
         self.error.value = self._controller.error
         self.error.visible = bool(self._controller.error)
-        self.start_button.disabled = self._controller.active
+        self.start_button.disabled = self._controller.active or self._controller.credentials_busy
         self.stop_button.disabled = not self._controller.active
-        self.settings_button.disabled = self._controller.active
-        self.gas_auth_button.disabled = self._controller.active
+        self.settings_button.disabled = self._controller.active or self._controller.credentials_busy
+        self.gas_auth_button.disabled = self._controller.active or self._controller.credentials_busy
         self._refresh_settings_summary()
+        self._refresh_credential_controls()
         self._page.update()
 
     def _global_alert_panel(self) -> ft.Container:

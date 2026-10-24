@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import flet as ft
 import pytest
+from credential_fakes import MemoryTokens
 
 from lcstats_relay.application.relay import PayloadCallback
 from lcstats_relay.application.settings import DEFAULT_TRACKER_URL, RelaySettings
@@ -79,6 +80,7 @@ def _settings_store(*, tmp_path: Path) -> SettingsStore:
 def _controller_for(*, manager: _FakeManager, store: SettingsStore) -> MonitorController:
     return MonitorController(
         settings_gateway=store,
+        token_store=MemoryTokens(),
         manager_factory=_factory_for(manager=manager),
     )
 
@@ -203,11 +205,12 @@ def test_start_replaces_manager_and_stop_unlocks_settings(*, tmp_path: Path) -> 
             page=page,
             controller=MonitorController(
                 settings_gateway=_settings_store(tmp_path=tmp_path),
+                token_store=MemoryTokens(),
                 manager_factory=factory,
             ),
         )
         view.save_settings(tracker_url=DEFAULT_TRACKER_URL, data_dir=str(tmp_path))
-        view.save_gas_auth(
+        await view.save_gas_auth(
             gas_url="https://script.google.com/macros/s/id/exec",
             gas_token="secret",  # noqa: S106 - inert test fixture, not a credential.
         )
@@ -257,7 +260,7 @@ def test_close_stops_active_manager(*, tmp_path: Path) -> None:
             page=page,
             controller=_controller_for(manager=manager, store=_settings_store(tmp_path=tmp_path)),
         )
-        view.save_gas_auth(gas_url="https://script.google.com/macros/s/id/exec", gas_token="")
+        await view.save_gas_auth(gas_url="https://script.google.com/macros/s/id/exec", gas_token="")
         await view.start()
         updates_before_close = page.update_count
 
@@ -516,7 +519,7 @@ def test_settings_view_links_to_full_window_gas_auth_view(*, tmp_path: Path) -> 
     assert _active_heading(view=view) == "GAS認証"
     view.gas_url_field.value = "https://script.google.com/macros/s/id/exec"
     view.gas_token_field.value = "secret"
-    view.submit_gas_auth()
+    asyncio.run(view.submit_gas_auth())
     assert _active_heading(view=view) == "設定"
 
     view.tracker_url_field.value = "http://localhost:2145/"
@@ -550,12 +553,12 @@ def test_full_window_view_save_errors_keep_active_view(*, tmp_path: Path) -> Non
     assert view.error.value == "ローカル保存先ディレクトリを指定してください"
 
     view.open_gas_auth()
-    view.submit_gas_auth()
+    asyncio.run(view.submit_gas_auth())
     assert _active_heading(view=view) == "設定"
     assert view.error.value == ""
 
     view.open_gas_auth()
     view.gas_url_field.value = "https://example.com/macros/s/id/exec"
-    view.submit_gas_auth()
+    asyncio.run(view.submit_gas_auth())
     assert _active_heading(view=view) == "GAS認証"
     assert view.error.value == "GAS URLにはscript.google.comのHTTPS URLを指定してください"

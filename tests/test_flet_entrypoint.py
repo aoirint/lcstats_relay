@@ -22,6 +22,8 @@ class _FakeWindow:
 
 class _FakePage:
     def __init__(self) -> None:
+        self.platform = ft.PagePlatform.WINDOWS
+        self.web = False
         self.title: str | None = None
         self.window = _FakeWindow()
         self.padding: int | None = None
@@ -34,8 +36,11 @@ class _FakePage:
         self.controls.extend(controls)
 
 
-def test_main_configures_and_mounts_monitor(*, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_configures_and_mounts_monitor(
+    *, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Configure the window, close handler, and root monitor control."""
+    monkeypatch.setenv("APPDATA", str(tmp_path))
     page = _FakePage()
     root = ft.Column()
 

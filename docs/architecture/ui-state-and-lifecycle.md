@@ -3,7 +3,7 @@
 ## Current ownership
 
 `MonitorController` owns the active manager, persisted non-secret settings and
-an in-memory GAS token. `MonitorView` owns the Flet controls. It renders three full-window
+the current GAS token loaded from an OS credential store. `MonitorView` owns the Flet controls. It renders three full-window
 views inside one root container: monitor, general settings, and GAS
 authentication.
 
@@ -13,6 +13,41 @@ controls archive/queue data only. See the [logging decision](relay-output.md#ope
 The manager owns receiver and retry tasks. `RelayStateStore` emits copied
 snapshots through the callback supplied by the view; output state objects in a
 snapshot are not shared with the mutable store.
+
+## Credential persistence decision
+
+Tokens must survive application restarts without entering settings JSON. Use
+Flet's official `flet-secure-storage` 1.0.4 service, aligned with Flet 1.0.4,
+through the Flet-free `GasTokenStore` port. This avoids another third-party
+Python keyring library or a custom Win32 implementation. Memory-only storage
+does not meet the restart requirement; plaintext settings are excluded.
+
+The reviewed Windows backend, `flutter_secure_storage_windows` 4.1.0, calls
+`CredReadW`, `CredWriteW`, and `CredDeleteW`, with machine-persistent credentials
+for the current user. Windows backward-compatibility migration is disabled.
+See the [official Flet source](https://github.com/flet-dev/flet/tree/v1.0.4/sdk/python/packages/flet-secure-storage)
+and [reviewed Windows backend](https://pub.dev/packages/flutter_secure_storage_windows/versions/4.1.0).
+
+Credential names combine an app prefix and a SHA-256 digest of the validated GAS
+URL. A token saved for one destination is never implicitly used for another.
+Release versions and installation paths do not enter the credential name.
+Startup restores the token before mounting editable controls. Stored values
+are never populated into controls: show the platform store name and saved
+status, and reveal an empty replacement field only after **変更**. Deletion
+removes the current destination's saved entry and memory copy, leaving its URL.
+
+OS calls have a ten-second timeout. Only Flet's documented RPC `RuntimeError`
+and `TimeoutError` are translated at the service boundary; failures show a
+fixed error and emit metadata without backend exception text. Edits and Start
+are blocked during writes/deletions. Closing a page prevents late UI updates.
+Browser storage is rejected; there is no plaintext fallback.
+
+A token write precedes settings persistence, and accepted in-process settings
+change only after both succeed. These two stores are not transactional: a JSON
+write failure can leave an OS entry for the proposed destination. Retrying Save
+can reuse that entry. Clearing a destination disables its output but does not
+silently erase saved credentials. The trust boundary is the current OS account;
+this does not isolate secrets from other programs running as that account.
 
 ## Start, stop, and close
 
@@ -49,7 +84,7 @@ When lifecycle or presentation is split into smaller modules:
 - unexpected background-task termination must become an observable error;
 - close must await owned background work;
 - settings remain locked while the active generation is running;
-- the GAS token remains memory-only and absent from persisted settings, logs,
+- the GAS token persists only in the OS credential store and stays absent from settings, logs,
   state snapshots, and displayed URLs;
 - Flet-specific controls remain at the outer presentation boundary.
 

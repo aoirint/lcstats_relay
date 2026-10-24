@@ -6,6 +6,7 @@ from pathlib import Path
 
 import httpx
 
+from lcstats_relay.application.credentials import GasTokenStore
 from lcstats_relay.application.ports import OutputPolicy, RetrySemantics
 from lcstats_relay.application.relay import ConnectionManager, PayloadCallback
 from lcstats_relay.application.state import StateCallback
@@ -26,10 +27,11 @@ from lcstats_relay.infrastructure.storage import ArchiveWriter, RetryQueue
 from lcstats_relay.presentation.controller import MonitorController
 
 
-def create_monitor_controller() -> MonitorController:
+def create_monitor_controller(*, token_store: GasTokenStore) -> MonitorController:
     """Compose the Flet-free monitor owner with production adapters."""
     return MonitorController(
         settings_gateway=SettingsStore(),
+        token_store=token_store,
         manager_factory=create_connection_manager,
     )
 
