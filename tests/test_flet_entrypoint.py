@@ -80,7 +80,10 @@ def test_main_configures_and_mounts_monitor(
     asyncio.run(main(cast("ft.Page", page)))
 
     assert page.title == "LCStats Relay"
-    assert page.fonts == {"NotoSansJP": "fonts/NotoSansJP.ttf"}
+    assert set(page.fonts) == {"NotoSansJP"}
+    font = Path(page.fonts["NotoSansJP"])
+    assert font.is_absolute()
+    assert font.is_file()
     assert page.theme is not None
     assert page.theme.font_family == "NotoSansJP"
     assert page.dark_theme is not None

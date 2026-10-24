@@ -36,7 +36,8 @@ async def verify_native_startup(
             await _probe_credentials(
                 store=token_store, phase=phase, value=os.environ["LCSTATS_RELAY_PROBE_VALUE"]
             )
-        png = await screenshot.capture(delay=200)
+        # Custom font loading is asynchronous and can finish after window readiness.
+        png = await screenshot.capture(delay=1000)
         if not png.startswith(b"\x89PNG\r\n\x1a\n"):
             msg = "Native startup did not return a PNG render"
             raise ValueError(msg)
