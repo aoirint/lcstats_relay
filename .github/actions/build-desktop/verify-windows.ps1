@@ -34,7 +34,7 @@ try {
     foreach ($taskPhase in $taskPhases) {
         $env:LCSTATS_RELAY_PROBE_PHASE = $taskPhase
         if (Test-Path -LiteralPath $taskMarker) { Remove-Item -LiteralPath $taskMarker }
-        $taskProcess = Start-Process -FilePath (Join-Path $taskBundle "lcstats-relay.exe") -WorkingDirectory $taskBundle -WindowStyle Hidden -PassThru
+        $taskProcess = Start-Process -FilePath (Join-Path $taskBundle "lcstats-relay.exe") -WorkingDirectory $taskBundle -WindowStyle Hidden -RedirectStandardOutput (Join-Path $taskProbe "native-stdout.log") -RedirectStandardError (Join-Path $taskProbe "native-stderr.log") -PassThru
         try {
             $null = $taskProcess.Handle
             if (-not $taskProcess.WaitForExit(45000)) { throw "Native startup timed out" }

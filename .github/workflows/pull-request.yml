@@ -77,11 +77,22 @@ jobs:
           retention-days: 3
 
       - name: Upload native render evidence
+        if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-native-evidence
           path: |
             build/native-probe/startup.png
+            build/native-probe/**/*.log
             build/windows/runtime-report.json
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 3
+
+      - name: Retain failed startup bundle for diagnosis
+        if: ${{ failure() && !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-unverified-diagnostic-bundle
+          path: build/windows/
+          if-no-files-found: ignore
+          retention-days: 1
