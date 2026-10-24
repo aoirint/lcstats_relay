@@ -30,7 +30,8 @@ def _write_metadata(*, tmp_path: Path, version: str = "1.2.3") -> tuple[Path, Pa
 
 
 def _write_artifacts(*, tmp_path: Path) -> list[ReleaseArtifact]:
-    windows_path = tmp_path / "app-windows.zip"
+    version = (tmp_path / "VERSION").read_text(encoding="ascii").strip()
+    windows_path = tmp_path / f"lcstats-relay-v{version}-windows-amd64.zip"
     with zipfile.ZipFile(windows_path, "w") as archive:
         for name in (
             "LICENSE",
@@ -337,3 +338,21 @@ def test_release_rejects_unverified_or_mismatched_packaged_runtime(
             archive.writestr(name, data)
     with pytest.raises(ValueError, match="matching native startup"):
         write_release_files(plan=plan)
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "lcstats-relay-1.2.3-windows.zip",
+        "lcstats-relay-v1.2.3-windows-x64.zip",
+        "lcstats-relay-v1.2.3-Windows-amd64.zip",
+        "lcstats-relay-v1.2.4-windows-amd64.zip",
+    ],
+)
+def test_release_rejects_mismatched_archive_identity(*, tmp_path: Path, filename: str) -> None:
+    """Do not publish archives with the wrong version, OS or architecture spelling."""
+    plan = _build_plan(tmp_path=tmp_path)
+    artifact = plan.artifacts[0]
+    renamed = artifact.path.rename(tmp_path / filename)
+    with pytest.raises(ValueError, match="release artifact must be named"):
+        write_release_files(plan=replace(plan, artifacts=[replace(artifact, path=renamed)]))

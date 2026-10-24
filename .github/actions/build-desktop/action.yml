@@ -57,6 +57,6 @@ runs:
         & (Join-Path $env:ACTION_DIRECTORY "build-windows.ps1") `
           -Version $env:PROJECT_VERSION -BuildVersion $env:BUILD_VERSION `
           -BuildNumber $env:BUILD_NUMBER -OutputDirectory $env:OUTPUT_DIRECTORY
-        $name = "lcstats-relay-$($env:PROJECT_VERSION)-windows.zip"
+        $name = "lcstats-relay-v$($env:PROJECT_VERSION)-windows-amd64.zip"
         "name=$name" >> $env:GITHUB_OUTPUT
         "path=$($env:OUTPUT_DIRECTORY)/$name" >> $env:GITHUB_OUTPUT

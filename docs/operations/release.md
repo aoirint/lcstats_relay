@@ -89,6 +89,12 @@ publication.
    require actual immutability and verify the release attestation. Do not rebuild
    the artifact.
 
+New archives use `lcstats-relay-v{VERSION}-{OS}-{ARCH}.{EXT}`. OS labels are
+`windows`, `linux` and `macos`; architecture labels are `amd64` and `arm64`.
+These labels define naming, not additional supported build targets. The current
+Windows archive is `lcstats-relay-v{VERSION}-windows-amd64.zip`. Previously
+published immutable releases retain their original asset names.
+
 A release contains the Windows ZIP, `SHA256SUMS` and `release-manifest.json`.
 The ZIP includes `VERSION`, `runtime-report.json`, licenses and the application.
 Alpha releases are marked prerelease and do not replace Latest.

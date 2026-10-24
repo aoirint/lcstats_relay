@@ -136,6 +136,10 @@ def write_release_files(*, plan: ReleasePlan) -> None:
     if not artifact.path.is_file():
         msg = "every release artifact path must be an existing file"
         raise ValueError(msg)
+    expected_name = f"lcstats-relay-v{metadata.project_version}-windows-amd64.zip"
+    if artifact.path.name != expected_name:
+        msg = f"release artifact must be named {expected_name}"
+        raise ValueError(msg)
     minor = verify_desktop_archive(
         archive_path=artifact.path, target="windows", launcher_name="lcstats-relay.exe"
     )
