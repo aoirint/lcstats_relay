@@ -240,6 +240,22 @@ jobs:
             exit 1
           fi
 
+      - name: Verify or create the exact source tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_COMMIT: ${{ needs.plan.outputs.source_commit }}
+          TAG: ${{ needs.plan.outputs.git_version }}
+        run: |
+          if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" >/dev/null 2>&1; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f "ref=refs/tags/${TAG}" -f "sha=${SOURCE_COMMIT}" >/dev/null
+          fi
+          remote_commit="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${TAG}" --jq '.sha')"
+          if [[ "${remote_commit}" != "${SOURCE_COMMIT}" ]]; then
+            echo "Release tag does not identify the reviewed source commit." >&2
+            exit 1
+          fi
+
       - name: Prepare mutable draft
         id: draft
         env:
@@ -269,17 +285,7 @@ jobs:
             if [[ "${RELEASE_MODE}" == "prerelease" ]]; then
               create_args+=(--prerelease --latest=false)
             fi
-            if remote_commit="$(gh api \
-              "repos/${GITHUB_REPOSITORY}/commits/${TAG}" \
-              --jq '.sha' 2>/dev/null)"; then
-              if [[ "${remote_commit}" != "${SOURCE_COMMIT}" ]]; then
-                echo "Existing release tag identifies another source commit." >&2
-                exit 1
-              fi
-              create_args+=(--verify-tag)
-            else
-              create_args+=(--target "${SOURCE_COMMIT}")
-            fi
+            create_args+=(--verify-tag)
             gh release create "${create_args[@]}"
           fi
 
