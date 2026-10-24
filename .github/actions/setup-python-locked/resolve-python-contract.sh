@@ -16,7 +16,9 @@ main() {
 
   {
     printf 'python_version=%s\n' "$python_version"
-    printf 'uv_version=0.12.3\n'
+    # Security exception: uv 0.13.5 removes compromised CA trust and supplies
+    # repaired managed Python builds. Normal seven-day eligibility: 2026-10-29.
+    printf 'uv_version=0.13.5\n'
   } >>"$GITHUB_OUTPUT"
 }
 

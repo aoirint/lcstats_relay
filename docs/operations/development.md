@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Python 3.14, matching `.python-version`
+- Python 3.14.9, matching `.python-version`
 - [uv](https://docs.astral.sh/uv/)
 - [APM](https://github.com/microsoft/apm) for repository-local Agent Skills
 
@@ -52,3 +52,33 @@ cancellation, and stale asynchronous completion where those behaviors apply.
 When dependencies intentionally change, run `uv lock`, review the complete lock
 diff and artifact sources, then repeat the locked checks. Do not use an unlocked
 test run as release evidence.
+
+## Security update review (2026-10-24)
+
+The maintainer authorized exact cooldown exceptions for verified security fixes.
+The seven-day default remains active for every other dependency.
+
+- [certifi GHSA-6q48-6c7w-9gw2](https://github.com/advisories/GHSA-6q48-6c7w-9gw2):
+  pin `certifi==2026.10.19` to remove the compromised emSign trust anchor.
+  Its artifacts were uploaded on 2026-10-20; remove only its cooldown waiver
+  after 2026-10-27T02:24:16Z. Keep the patched version floor when unpinning.
+- [uv 0.13.5](https://github.com/astral-sh/uv/releases/tag/0.13.5):
+  published 2026-10-22, removes compromised CA trust and includes repaired
+  managed Python builds. Normal eligibility begins 2026-10-29.
+- [Python 3.14.9](https://www.python.org/downloads/release/python-3149/):
+  the 2026-10-21 security release replaces the affected bundled pip CA store.
+  Its managed build is delivered by the reviewed uv release; the source-run
+  and CI Python patch is pinned in `.python-version`.
+- `urllib3>=2.8.0` addresses
+  [chunked streaming](https://github.com/advisories/GHSA-vxq7-64xx-v4gw),
+  [proxy TLS configuration](https://github.com/advisories/GHSA-8988-9cw3-xx77), and
+  [deflate streaming](https://github.com/advisories/GHSA-gh4c-6fx4-qh6g).
+  `oauthlib>=4.0.0` addresses
+  [PKCE comparison](https://github.com/advisories/GHSA-xpv3-w29h-x7cv) and
+  [revocation JSONP](https://github.com/advisories/GHSA-hj66-6f7g-4r5v).
+  Both releases have completed cooldown. They are transitive Flet dependencies;
+  Relay uses HTTPX directly and does not expose OAuth authorization endpoints.
+
+These changes cover the locked source environment and CI builder. A new native
+Flet bundle has not been built or inspected, so its embedded interpreter and
+trust store are not yet verified by this change.
