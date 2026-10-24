@@ -6,6 +6,7 @@ import asyncio
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 
+from lcstats_relay.application.diagnostics import emit
 from lcstats_relay.application.ports import (
     BoundOutput,
     OutputDeliveryError,
@@ -56,6 +57,7 @@ class OutputDispatcher:
             )
             for output in self._outputs
         }
+        emit(event="queue_loaded")
         self._state.pending_counts_loaded(counts=counts)
 
     async def retry_pending(self) -> None:
@@ -63,12 +65,32 @@ class OutputDispatcher:
         for item in await asyncio.to_thread(self._queue.pending):
             output = self._by_key.get(item.output_key)
             if output is None:
+                emit(event="retry_skipped", correlation_id=item.payload.correlation_id)
                 continue
+            emit(
+                event="retry_started",
+                correlation_id=item.payload.correlation_id,
+                output=output.policy.key,
+            )
             succeeded = await self._deliver(
                 output=output, payload=item.payload, queue_on_failure=False
             )
             if succeeded:
-                await asyncio.to_thread(self._queue.remove, item=item)
+                try:
+                    await asyncio.to_thread(self._queue.remove, item=item)
+                except OSError:
+                    emit(
+                        event="retry_remove_failed",
+                        correlation_id=item.payload.correlation_id,
+                        category="queue",
+                        failed=True,
+                    )
+                    raise
+                emit(
+                    event="retry_removed",
+                    correlation_id=item.payload.correlation_id,
+                    output=output.policy.key,
+                )
                 await self._refresh_pending(key=output.policy.key)
 
     async def _deliver(
@@ -79,10 +101,12 @@ class OutputDispatcher:
         queue_on_failure: bool,
     ) -> bool:
         key = output.policy.key
+        emit(event="output_started", correlation_id=payload.correlation_id, output=key)
         self._state.output_started(key=key, at=self._clock())
         try:
             receipt = await output.sink.deliver(payload=payload)
         except asyncio.CancelledError:
+            emit(event="output_cancelled", correlation_id=payload.correlation_id, output=key)
             raise
         except OutputDeliveryError as exc:
             await self._handle_failure(
@@ -92,6 +116,7 @@ class OutputDispatcher:
                 queue_on_failure=queue_on_failure,
             )
             return False
+        emit(event="output_succeeded", correlation_id=payload.correlation_id, output=key)
         await self._handle_success(key=key, receipt=receipt)
         return True
 
@@ -112,6 +137,14 @@ class OutputDispatcher:
         queue_on_failure: bool,
     ) -> None:
         policy = output.policy
+        emit(
+            event="output_failed",
+            correlation_id=payload.correlation_id,
+            output=policy.key,
+            category=error.category,
+            status_code=error.status_code,
+            failed=True,
+        )
         queued = False
         message = error.message
         if (
@@ -126,8 +159,15 @@ class OutputDispatcher:
                     payload=payload,
                     queued_at=self._clock(),
                 )
+                emit(event="queue_saved", correlation_id=payload.correlation_id, output=policy.key)
                 queued = True
             except OSError:
+                emit(
+                    event="queue_save_failed",
+                    correlation_id=payload.correlation_id,
+                    category="queue",
+                    failed=True,
+                )
                 message = f"{message} / 再送キューの保存にも失敗しました"
         self._state.output_failed(
             key=policy.key,

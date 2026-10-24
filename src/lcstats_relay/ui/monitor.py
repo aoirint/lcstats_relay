@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Protocol
 
 import flet as ft
@@ -45,10 +46,16 @@ class MonitorView:
         *,
         page: PagePort,
         controller: MonitorController,
+        diagnostics: Callable[[], str] = lambda: "",
+        diagnostic_failure: Callable[[], bool] = lambda: False,
     ) -> None:
         """Create controls and bind them to a Flet-free controller."""
         self._page = page
         self._controller = controller
+        self._diagnostics = diagnostics
+        self._diagnostic_failure = diagnostic_failure
+        self.diagnostics_status = ft.Text("診断ログと保存先")
+        self.diagnostics = ft.Text(selectable=True)
 
         self.settings_summary = ft.Text(selectable=True)
         self.gas_summary = ft.Text(selectable=True)
@@ -92,7 +99,7 @@ class MonitorView:
             expand=True,
         )
         self.output_destinations = ft.Column([], spacing=4)
-        self.root_view = ft.Column([], spacing=8, expand=True)
+        self.root_view = ft.Column([], spacing=8, expand=True, scroll=ft.ScrollMode.AUTO)
         self.root_container = ft.Container(
             content=self.root_view,
             expand=True,
@@ -195,6 +202,7 @@ class MonitorView:
                 wrap=True,
             ),
             self.error,
+            ft.ExpansionTile(title=self.diagnostics_status, controls=[self.diagnostics]),
             ft.Divider(),
             ft.Row(
                 [
@@ -209,11 +217,13 @@ class MonitorView:
             self._page.update()
 
     def _show_settings_view(self) -> None:
+        self._refresh_settings_summary()
         self.root_view.controls = [
             self._full_view_title(title="設定"),
             ft.Column(
                 [
                     self.error,
+                    self.diagnostics,
                     self._settings_section(
                         title="接続元",
                         controls=[
@@ -229,7 +239,6 @@ class MonitorView:
                     ),
                 ],
                 spacing=12,
-                expand=True,
             ),
             ft.Row(
                 [
@@ -334,6 +343,12 @@ class MonitorView:
         self.open_settings()
 
     def _refresh_settings_summary(self) -> None:
+        self.diagnostics.value = self._diagnostics()
+        self.diagnostics_status.value = (
+            "診断ログ書き込み失敗: 保存先を確認してください"
+            if self._diagnostic_failure()
+            else "診断ログと保存先"
+        )
         settings, gas = settings_summaries(
             tracker_url=self._controller.settings.tracker_url,
             data_dir=str(self._controller.settings.data_dir),

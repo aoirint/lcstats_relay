@@ -9,6 +9,7 @@ from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Protocol
 
+from lcstats_relay.application.diagnostics import emit
 from lcstats_relay.application.dispatcher import OutputDispatcher
 from lcstats_relay.application.ports import (
     OutputPolicy,
@@ -88,6 +89,7 @@ class RetryWorker:
             except asyncio.CancelledError:
                 raise
             except (OSError, TypeError, ValueError) as exc:
+                emit(event="queue_read_failed", category="queue", failed=True)
                 self._state.receiver_error(
                     message=_safe_error(operation="再送キュー読込", error=exc)
                 )
@@ -133,6 +135,7 @@ class ConnectionManager:
         """Start the manager once; repeated calls while running are ignored."""
         if self._task is not None and not self._task.done():
             return
+        emit(event="connection_started")
         self._state.start()
         self._task = asyncio.create_task(self._run())
 
@@ -143,6 +146,7 @@ class ConnectionManager:
             with suppress(asyncio.CancelledError):
                 await self._task
             self._task = None
+        emit(event="connection_stopped")
         self._state.stop()
 
     async def _run(self) -> None:
@@ -156,6 +160,7 @@ class ConnectionManager:
             try:
                 await dispatcher.load_pending_counts()
             except (OSError, TypeError, ValueError) as exc:
+                emit(event="queue_read_failed", category="queue", failed=True)
                 self._state.receiver_error(
                     message=_safe_error(operation="再送キュー読込", error=exc)
                 )
@@ -178,12 +183,20 @@ class ConnectionManager:
         dispatcher: OutputDispatcher,
     ) -> None:
         while True:
+            emit(event="receive_waiting")
             self._state.waiting()
             try:
                 raw_json = await receiver.receive_once()
             except asyncio.CancelledError:
                 raise
             except ReceiverError as exc:
+                emit(
+                    event="receive_failed",
+                    category="http" if exc.status_code else "transport",
+                    status_code=exc.status_code,
+                    failed=True,
+                )
+                emit(event="reconnect_scheduled")
                 message = _safe_error(operation="受信", error=exc)
                 self._state.receiver_error(
                     message=message, retry_after_seconds=self._reconnect_delay
@@ -194,6 +207,14 @@ class ConnectionManager:
             now = self._clock()
             self._state.received(at=now, preview=preview_payload(raw_json=raw_json))
             payload = self._build_payload(raw_json=raw_json, received_at=now)
+            emit(event="payload_received", correlation_id=payload.correlation_id)
+            if payload.parse_error is not None:
+                emit(
+                    event="payload_parse_failed",
+                    correlation_id=payload.correlation_id,
+                    category="json_parse",
+                    failed=True,
+                )
             if payload.parse_error is None:
                 self._on_payload(payload=payload.payload)
             await dispatcher.dispatch(payload=payload)

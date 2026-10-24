@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from lcstats_relay.application.ports import RetryItem
 from lcstats_relay.domain.payload import JSONValue, RelayPayload, parse_json
@@ -19,10 +19,13 @@ class ArchiveWriter:
         """Use the archive directory beneath the supplied application data root."""
         self._root = data_dir / "archive"
 
-    def write(self, *, raw_json: str, received_at: datetime) -> Path:
+    def write(
+        self, *, raw_json: str, received_at: datetime, correlation_id: str | None = None
+    ) -> Path:
         """Write the exact received JSON and return its archive path."""
         date_dir = self._root / received_at.strftime("%Y-%m-%d")
-        filename = f"{received_at:%Y-%m-%dT%H-%M-%S-%f}-{uuid4().hex[:8]}.json"
+        suffix = UUID(hex=correlation_id).hex if correlation_id else uuid4().hex[:8]
+        filename = f"{received_at:%Y-%m-%dT%H-%M-%S-%f}-{suffix}.json"
         archive_path = date_dir / filename
         write_text_atomic(path=archive_path, content=f"{raw_json}\n")
         return archive_path
@@ -46,6 +49,7 @@ class RetryQueue:
         filename = f"{queued_at:%Y-%m-%dT%H-%M-%S-%f}-{uuid4().hex[:8]}.json"
         queue_path = self._root / filename
         record: dict[str, JSONValue] = {
+            "correlation_id": payload.correlation_id,
             "queued_at": queued_at.isoformat(),
             "output_key": output_key,
             "received_at": payload.received_at.isoformat(),
@@ -70,7 +74,17 @@ class RetryQueue:
             if not isinstance(record, dict):
                 msg = f"Retry queue record must be an object: {path.name}"
                 raise TypeError(msg)
-            if "payload" not in record:
+            if (
+                not {
+                    "output_key",
+                    "received_at",
+                    "raw_json",
+                    "payload",
+                    "parse_error",
+                    "correlation_id",
+                }
+                <= record.keys()
+            ):
                 msg = f"Retry queue record is missing required fields: {path.name}"
                 raise ValueError(msg)
             items.append(self._load_item(path=path, record=record))
@@ -90,13 +104,12 @@ class RetryQueue:
 
     @staticmethod
     def _load_item(*, path: Path, record: dict[str, JSONValue]) -> RetryItem:
-        output_key = record.get("output_key", "gas")
+        output_key = record["output_key"]
         if not isinstance(output_key, str):
             msg = f"Retry queue output key must be a string: {path.name}"
             raise TypeError(msg)
 
-        queued_at = record.get("queued_at")
-        received_at = record.get("received_at", queued_at)
+        received_at = record["received_at"]
         if not isinstance(received_at, str):
             msg = f"Retry queue timestamp must be a string: {path.name}"
             raise TypeError(msg)
@@ -106,21 +119,31 @@ class RetryQueue:
             msg = f"Retry queue timestamp is invalid: {path.name}"
             raise ValueError(msg) from exc
 
-        payload = record["payload"]
-        raw_json = record.get("raw_json")
+        raw_json = record["raw_json"]
         if not isinstance(raw_json, str):
-            raw_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-        parse_error = record.get("parse_error")
+            msg = f"Retry queue raw JSON must be a string: {path.name}"
+            raise TypeError(msg)
+        parse_error = record["parse_error"]
         if parse_error is not None and not isinstance(parse_error, str):
             msg = f"Retry queue parse error must be a string or null: {path.name}"
             raise TypeError(msg)
+        correlation_id = record["correlation_id"]
+        if not isinstance(correlation_id, str):
+            msg = f"Retry queue correlation ID must be a string: {path.name}"
+            raise TypeError(msg)
+        try:
+            correlation_id = UUID(hex=correlation_id).hex
+        except ValueError as exc:
+            msg = f"Retry queue correlation ID is invalid: {path.name}"
+            raise ValueError(msg) from exc
         return RetryItem(
             storage_key=str(path),
             output_key=output_key,
             payload=RelayPayload(
                 raw_json=raw_json,
-                payload=payload,
+                payload=record["payload"],
                 received_at=received_datetime,
                 parse_error=parse_error,
+                correlation_id=correlation_id,
             ),
         )

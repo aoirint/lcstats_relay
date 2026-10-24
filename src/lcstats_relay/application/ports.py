@@ -14,11 +14,20 @@ from lcstats_relay.domain.payload import RelayPayload
 class OutputDeliveryError(Exception):
     """An output failure carrying safe UI text and retry eligibility."""
 
-    def __init__(self, *, message: str, retryable: bool) -> None:
+    def __init__(
+        self,
+        *,
+        message: str,
+        retryable: bool,
+        category: str = "delivery",
+        status_code: int | None = None,
+    ) -> None:
         """Retain a user-facing message without sensitive boundary details."""
         super().__init__(message)
         self.message = message
         self.retryable = retryable
+        self.category = category
+        self.status_code = status_code
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
@@ -101,15 +110,16 @@ class ReceiverPort(Protocol):
 class ReceiverError(Exception):
     """A receive-boundary failure containing only presentation-safe detail."""
 
-    def __init__(self, *, detail: str) -> None:
+    def __init__(self, *, detail: str, status_code: int | None = None) -> None:
         """Retain a stable safe detail without leaking request data."""
         super().__init__(detail)
         self.detail = detail
+        self.status_code = status_code
 
     @classmethod
     def from_http_status(cls, *, status_code: int) -> ReceiverError:
         """Build a safe error from an HTTP response status."""
-        return cls(detail=f"HTTP {status_code}")
+        return cls(detail=f"HTTP {status_code}", status_code=status_code)
 
     @classmethod
     def from_transport_error(cls, *, error: Exception) -> ReceiverError:

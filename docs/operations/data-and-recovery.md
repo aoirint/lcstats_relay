@@ -2,7 +2,7 @@
 
 ## Persisted data
 
-LCStats Relay writes three categories of local data:
+LCStats Relay writes four categories of local data:
 
 - Settings: `%APPDATA%/lcstats-relay/settings.json` when `APPDATA` exists,
   `$XDG_CONFIG_HOME/lcstats-relay/settings.json` when configured, otherwise
@@ -10,7 +10,11 @@ LCStats Relay writes three categories of local data:
 - Archive: `<data_dir>/archive/YYYY-MM-DD/*.json`, containing the exact received
   JSON text plus a final newline.
 - Retry queue: `<data_dir>/queue/*.json`, containing output identity, timestamps,
-  raw and parsed payloads, and any parse error needed for a later attempt.
+  raw and parsed payloads, a random correlation ID, and any parse error needed
+  for a later attempt.
+- Diagnostic logs: `relay.jsonl` and up to four rotated backups in
+  `%LOCALAPPDATA%/lcstats-relay/logs` on Windows, or `<default_data_dir>/logs`
+  on Linux. This location is independent of the configured archive directory.
 
 For new settings, the default `data_dir` is
 `%LOCALAPPDATA%/lcstats-relay/data` on Windows. On Linux it is
@@ -22,6 +26,66 @@ Settings and individual data records are written to a unique sibling temporary
 file, flushed to the filesystem, and atomically replaced. Unique names avoid
 collisions between concurrent writers. The application still does not claim
 whole-directory durability across sudden storage or operating-system failure.
+
+## Diagnostic logs
+
+Expand **診断ログと保存先** in the monitor, or open Settings, to see the actual
+absolute settings, archive, queue, and log paths. Existing relative `data_dir`
+values resolve against the current process working directory, which can be
+inside Flet's extracted application directory in older distributions.
+Changing that setting does not move old archives or queue entries. Record the
+old absolute path before changing it and preserve pending deliveries there.
+
+Each UTF-8 JSONL record contains a UTC timestamp, severity, process-session ID,
+and event name. Payload events also carry a random `correlation_id`. A new
+archive filename ends in that ID, and queue records retain it across retries
+and restarts. Queue records must contain the current fields, including a valid
+correlation ID. Incompatible or corrupt records produce a queue-read error and
+remain untouched; automatic migration and legacy-format fallback are not provided.
+IDs identify a received item, not a player or a content hash. Receiving the same
+JSON twice creates two IDs; this is not remote deduplication.
+
+Events cover application start/exit, settings load/save, connection start/stop,
+SSE waiting/connection/error/reconnect, payload receipt/parse failure, output
+attempt/success/failure/cancellation, queue save/read, and retry/removal. Filter
+by `session_id` for one run and `correlation_id` for one delivery. Look for
+`output_succeeded` with `output: archive` before the GAS attempt. A
+`retry_removed` event means the successful delivery was also removed locally.
+
+Failure records contain a bounded category and, for HTTP failures, the numeric
+status. Categories distinguish `authentication`, `http`, `transport`,
+`timeout`, `response_format`, `json_parse`, `application`, `archive`, `queue`, and
+`storage`. Authentication classification recognizes HTTP
+401/403 and the known non-JSON GAS response containing `Invalid token`.
+Other HTML errors are classified as `response_format` without storing the page.
+An unrecognized output failure uses `delivery`.
+
+Each log file is limited to 1 MiB, with four backups (`relay.jsonl.1` through
+`.4`), for approximately 5 MiB total. `.1` is the most recent backup. Old
+records expire by size, so copy relevant logs before extended troubleshooting.
+Use one Relay process per user log directory: rotation does not coordinate
+multiple processes. Records are flushed on each event, but logs are diagnostic
+evidence rather than a power-loss-durable transaction journal. Forced process
+termination can omit the final exit or delivery events.
+
+If creation, writing, rotation, or closing fails, Relay continues operating.
+The UI marks **診断ログ書き込み失敗** on its next state refresh; this warning
+remains for the process lifetime because some records may already be missing.
+Correct permissions/free space and restart. A final close failure may occur
+after the UI has closed. The error fallback never prints the failed record or
+exception traceback. Unexpected application errors retain their existing propagation
+behavior; logging does not convert them into handled connection errors.
+
+### Sharing diagnostics
+
+Share only the relevant `relay.jsonl*` files after reviewing them. The writer
+allows only fixed events/categories, numeric HTTP codes, timestamps, and UUIDs.
+It excludes tokens, URLs (including deployment identifiers), local paths,
+player IDs/names, payloads, response bodies, and exception text/tracebacks.
+Third-party HTTP/Flet logs are not copied into this sink. Timestamps and activity
+patterns are still operational information; choose an appropriate recipient.
+Do not bundle settings, archives, queue files, or screenshots of absolute paths:
+these can expose private endpoints, players, or the local account name.
 
 ## Secrets
 

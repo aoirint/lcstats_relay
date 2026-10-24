@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from lcstats_relay.domain.payload import RelayPayload, parse_json
+from lcstats_relay.domain.payload import JSONValue, RelayPayload, parse_json
 from lcstats_relay.infrastructure import filesystem as filesystem_module
 from lcstats_relay.infrastructure.storage import ArchiveWriter, RetryQueue
 
@@ -39,6 +39,10 @@ def test_retry_queue_round_trip(*, tmp_path: Path) -> None:
     assert item.storage_key == str(path)
     assert item.output_key == "gas"
     assert item.payload == payload
+    assert item.payload.correlation_id == payload.correlation_id
+    assert (
+        RetryQueue(data_dir=tmp_path).pending()[0].payload.correlation_id == payload.correlation_id
+    )
 
     queue.remove(item=item)
     queue.remove(item=item)
@@ -46,48 +50,40 @@ def test_retry_queue_round_trip(*, tmp_path: Path) -> None:
     assert queue.count() == 0
 
 
-def test_retry_queue_loads_legacy_record(*, tmp_path: Path) -> None:
-    """Keep compatibility with early queue files that lacked output metadata."""
-    queue_dir = tmp_path / "queue"
-    queue_dir.mkdir()
-    (queue_dir / "legacy.json").write_text(
-        json.dumps(
-            {
-                "queued_at": "2026-06-20T10:08:12",
-                "archive_file": "data/archive/payload.json",
-                "payload": {"Seed": 42},
-            },
-        ),
-        encoding="utf-8",
-    )
-
-    [item] = RetryQueue(data_dir=tmp_path).pending()
-
-    assert item.output_key == "gas"
-    assert item.payload.raw_json == '{"Seed":42}'
-    assert item.payload.payload == {"Seed": 42}
-    assert item.payload.received_at == datetime.fromisoformat("2026-06-20T10:08:12")
+_QUEUE_RECORD: dict[str, JSONValue] = {
+    "output_key": "gas",
+    "received_at": "2026-10-24T00:00:00+00:00",
+    "raw_json": "{}",
+    "payload": {},
+    "parse_error": None,
+    "correlation_id": "a" * 32,
+}
 
 
 @pytest.mark.parametrize(
     "record",
     [
         [],
-        {"queued_at": "2026-06-20T10:08:12"},
-        {"queued_at": "2026-06-20T10:08:12", "payload": {"Seed": 42}, "output_key": 123},
-        {"queued_at": 123, "payload": {"Seed": 42}},
-        {"queued_at": "not-a-date", "payload": {"Seed": 42}},
-        {"queued_at": "2026-06-20T10:08:12", "payload": {"Seed": 42}, "parse_error": 123},
+        {},
+        _QUEUE_RECORD | {"output_key": 123},
+        _QUEUE_RECORD | {"received_at": 123},
+        _QUEUE_RECORD | {"received_at": "not-a-date"},
+        _QUEUE_RECORD | {"raw_json": 123},
+        _QUEUE_RECORD | {"parse_error": 123},
+        _QUEUE_RECORD | {"correlation_id": 123},
+        _QUEUE_RECORD | {"correlation_id": "invalid"},
     ],
 )
 def test_retry_queue_rejects_invalid_record(*, tmp_path: Path, record: object) -> None:
-    """Reject malformed queue files instead of silently dropping deliveries."""
+    """Report incompatible or corrupt queue records without rewriting or deleting them."""
     queue_dir = tmp_path / "queue"
     queue_dir.mkdir()
-    (queue_dir / "invalid.json").write_text(json.dumps(record), encoding="utf-8")
-
+    path = queue_dir / "invalid.json"
+    path.write_text(json.dumps(record), encoding="utf-8")
+    original = path.read_bytes()
     with pytest.raises((TypeError, ValueError), match="Retry queue"):
         RetryQueue(data_dir=tmp_path).pending()
+    assert path.read_bytes() == original
 
 
 def test_parse_json_supports_scalar_values() -> None:

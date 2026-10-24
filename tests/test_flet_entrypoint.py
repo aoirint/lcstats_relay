@@ -1,12 +1,15 @@
 """Tests for the Flet runtime entry point."""
 
 import asyncio
+from pathlib import Path
 from typing import cast
 
 import flet as ft
 import pytest
 
+from lcstats_relay.entrypoints import flet_app
 from lcstats_relay.entrypoints.flet_app import main, run
+from lcstats_relay.infrastructure.diagnostics import DiagnosticLog
 from lcstats_relay.ui.monitor import MonitorView
 
 _WINDOW_MIN_WIDTH = 420
@@ -54,8 +57,9 @@ def test_main_configures_and_mounts_monitor(*, monkeypatch: pytest.MonkeyPatch) 
     assert page.controls == [root]
 
 
-def test_run_starts_flet_runtime(*, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_starts_flet_runtime(*, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Pass the async page target to the Flet runtime."""
+    monkeypatch.setattr(flet_app, "_diagnostics", DiagnosticLog(directory=tmp_path))
     targets: list[object] = []
     monkeypatch.setattr(ft, "run", targets.append)
 

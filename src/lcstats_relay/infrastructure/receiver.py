@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 
 import httpx
 
+from lcstats_relay.application.diagnostics import emit
 from lcstats_relay.application.ports import ReceiverError
 
 _MAX_SSE_LINE_BYTES = 1_048_576
@@ -37,6 +38,7 @@ class StatsReceiver:
         try:
             async with self._client.stream("GET", self._url, headers=headers) as response:
                 response.raise_for_status()
+                emit(event="receive_connected")
                 async for line in _bounded_lines(response=response):
                     if line.startswith(b"data:"):
                         try:

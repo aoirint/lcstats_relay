@@ -97,7 +97,7 @@ class _TransportHandler:
         if request.method == "POST":
             self.post_count += 1
             status = self.first_post_status if self.post_count == 1 else 200
-            return httpx.Response(status, request=request)
+            return httpx.Response(status, json={"ok": True}, request=request)
 
         self.get_count += 1
         if self.get_count == 1:
@@ -182,8 +182,8 @@ def test_archive_output_reports_safe_failure(
     async def scenario() -> None:
         writer = ArchiveWriter(data_dir=tmp_path)
 
-        def fail_write(*, raw_json: str, received_at: datetime) -> Path:
-            del raw_json, received_at
+        def fail_write(*, raw_json: str, received_at: datetime, correlation_id: str) -> Path:
+            del raw_json, received_at, correlation_id
             msg = "disk full"
             raise OSError(msg)
 
@@ -809,3 +809,30 @@ def test_app_composition_omits_gas_output_when_url_is_empty(*, tmp_path: Path) -
 
     assert isinstance(manager, ConnectionManager)
     assert list(manager.state.outputs) == ["archive"]
+
+
+def test_manager_preserves_unexpected_runtime_failure(*, tmp_path: Path) -> None:
+    """Keep unexpected adapter failures visible to the lifecycle owner."""
+
+    async def scenario() -> None:
+        attempted = asyncio.Event()
+        failure = RuntimeError("runtime initialization failed")
+
+        def fail_runtime() -> RelayRuntime:
+            attempted.set()
+            raise failure
+
+        manager = ConnectionManager(
+            output_policies=[],
+            runtime_factory=fail_runtime,
+            retry_queue=RetryQueue(data_dir=tmp_path),
+            on_state=_ignore_state,
+            on_payload=_ignore_payload,
+        )
+        manager.start()
+        await asyncio.wait_for(attempted.wait(), timeout=1)
+        with pytest.raises(RuntimeError, match="runtime initialization failed") as caught:
+            await manager.stop()
+        assert caught.value is failure
+
+    asyncio.run(scenario())
