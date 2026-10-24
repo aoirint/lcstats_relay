@@ -1,8 +1,6 @@
 """Tests for release artifact manifests and checksums."""
 
-import io
 import json
-import tarfile
 import zipfile
 from dataclasses import replace
 from operator import attrgetter
@@ -13,7 +11,7 @@ import pytest
 from scripts.release_manifest import ReleaseArtifact, ReleasePlan, main, write_release_files
 
 _COMMIT = "0123456789abcdef0123456789abcdef01234567"
-_SCHEMA_VERSION = 2
+_SCHEMA_VERSION = 3
 _WORKFLOW_URL = "https://github.com/aoirint/lcstats_relay/actions/runs/123"
 
 
@@ -27,39 +25,36 @@ def _write_metadata(*, tmp_path: Path, version: str = "1.2.3") -> tuple[Path, Pa
     python_version_path = tmp_path / ".python-version"
     python_version_path.write_text("3.14\n", encoding="utf-8")
     lock_path = tmp_path / "uv.lock"
-    lock_path.write_text('[[package]]\nname = "flet"\nversion = "0.85.3"\n', encoding="utf-8")
+    lock_path.write_text('[[package]]\nname = "flet"\nversion = "1.0.4"\n', encoding="utf-8")
     return pyproject_path, python_version_path, lock_path
 
 
 def _write_artifacts(*, tmp_path: Path) -> list[ReleaseArtifact]:
     windows_path = tmp_path / "app-windows.zip"
-    linux_path = tmp_path / "app-linux.tar.gz"
     with zipfile.ZipFile(windows_path, "w") as archive:
         for name in (
             "LICENSE",
             "THIRD_PARTY_NOTICES.md",
             "lcstats-relay.exe",
             "data/flutter_assets/app.so",
-            "python312.dll",
+            "python314.dll",
         ):
             archive.writestr(name, name.encode())
-    with tarfile.open(linux_path, "w:gz") as archive:
-        for name, mode in (
-            ("LICENSE", 0o644),
-            ("THIRD_PARTY_NOTICES.md", 0o644),
-            ("lcstats-relay", 0o755),
-            ("data/flutter_assets/app.so", 0o644),
-            ("python3.12/__future__.pyc", 0o644),
-        ):
-            value = name.encode()
-            info = tarfile.TarInfo(name)
-            info.mode = mode
-            info.size = len(value)
-            archive.addfile(info, io.BytesIO(value))
-    return [
-        ReleaseArtifact(target="windows", path=windows_path),
-        ReleaseArtifact(target="linux", path=linux_path),
-    ]
+        version = (tmp_path / "VERSION").read_text(encoding="ascii").strip()
+        archive.writestr("VERSION", version)
+        archive.writestr(
+            "runtime-report.json",
+            json.dumps(
+                {
+                    "version": version,
+                    "python_version": "3.14.8",
+                    "flet_version": "1.0.4",
+                    "credential_restart_check": True,
+                    "credential_phases": ["write", "read-delete", "absent"],
+                }
+            ),
+        )
+    return [ReleaseArtifact(target="windows", path=windows_path)]
 
 
 def _build_plan(*, tmp_path: Path, version: str = "1.2.3") -> ReleasePlan:
@@ -124,17 +119,16 @@ def test_write_release_files_records_sorted_provenance(*, tmp_path: Path) -> Non
     assert manifest["schema_version"] == _SCHEMA_VERSION
     assert manifest["project"] == {"name": "lcstats-relay", "version": "1.2.3"}
     assert manifest["build"] == {
-        "flet_version": "0.85.3",
+        "flet_version": "1.0.4",
         "number": 42,
         "builder_python_version": "3.14",
         "source_commit": _COMMIT,
         "uv_version": "0.12.3",
         "workflow_url": _WORKFLOW_URL,
     }
-    assert [record["target"] for record in manifest["artifacts"]] == ["linux", "windows"]
+    assert [record["target"] for record in manifest["artifacts"]] == ["windows"]
     assert [record["python_runtime_version"] for record in manifest["artifacts"]] == [
-        "3.12",
-        "3.12",
+        "3.14.8",
     ]
     assert [record["size"] for record in manifest["artifacts"]] == [
         artifact.path.stat().st_size
@@ -154,7 +148,7 @@ def test_write_release_files_records_sorted_provenance(*, tmp_path: Path) -> Non
         ("workflow_host", "HTTPS github.com"),
         ("workflow_path", "HTTPS github.com"),
         ("uv_version", "must not be empty"),
-        ("artifacts", "exactly one linux"),
+        ("artifacts", "exactly one windows"),
     ],
 )
 def test_write_release_files_rejects_invalid_identity(
@@ -186,36 +180,12 @@ def test_write_release_files_rejects_empty_python_version(*, tmp_path: Path) -> 
         )
 
 
-def test_write_release_files_rejects_duplicate_file_names(*, tmp_path: Path) -> None:
-    """Keep release asset lookup unambiguous across target archives."""
-    first_directory = tmp_path / "first"
-    second_directory = tmp_path / "second"
-    first_directory.mkdir()
-    second_directory.mkdir()
-    first_path = first_directory / "desktop.zip"
-    second_path = second_directory / "desktop.zip"
-    first_path.write_bytes(b"first")
-    second_path.write_bytes(b"second")
-
-    with pytest.raises(ValueError, match="file names must be unique"):
-        _write_release(
-            tmp_path=tmp_path,
-            plan=replace(
-                _build_plan(tmp_path=tmp_path),
-                artifacts=[
-                    ReleaseArtifact(target="linux", path=first_path),
-                    ReleaseArtifact(target="windows", path=second_path),
-                ],
-            ),
-        )
-
-
-def test_write_release_files_rejects_duplicate_targets(*, tmp_path: Path) -> None:
+def test_write_release_files_rejects_unsupported_target(*, tmp_path: Path) -> None:
     """Require one archive for each supported desktop target."""
     plan = _build_plan(tmp_path=tmp_path)
     duplicate_targets = [replace(artifact, target="linux") for artifact in plan.artifacts]
 
-    with pytest.raises(ValueError, match="exactly one linux"):
+    with pytest.raises(ValueError, match="exactly one windows"):
         _write_release(tmp_path=tmp_path, plan=replace(plan, artifacts=duplicate_targets))
 
 
@@ -320,8 +290,6 @@ def test_main_writes_release_files(*, tmp_path: Path) -> None:
                 str(lock_path),
                 "--artifact",
                 f"windows={artifacts[0].path}",
-                "--artifact",
-                f"linux={artifacts[1].path}",
                 "--build-number",
                 "42",
                 "--source-commit",
@@ -340,3 +308,32 @@ def test_main_writes_release_files(*, tmp_path: Path) -> None:
     )
     assert manifest_path.is_file()
     assert checksums_path.is_file()
+
+
+@pytest.mark.parametrize(
+    "case", ["version", "python", "python_type", "flet", "credentials", "phases"]
+)
+def test_release_rejects_unverified_or_mismatched_packaged_runtime(
+    *, tmp_path: Path, case: str
+) -> None:
+    """Never publish a bundle with stale runtime identity or incomplete restart evidence."""
+    plan = _build_plan(tmp_path=tmp_path)
+    path = plan.artifacts[0].path
+    with zipfile.ZipFile(path) as archive:
+        files = {name: archive.read(name) for name in archive.namelist()}
+    report = json.loads(files["runtime-report.json"])
+    key, value = {
+        "version": ("version", "9.9.9"),
+        "python": ("python_version", "3.13.1"),
+        "python_type": ("python_version", None),
+        "flet": ("flet_version", "0.0.0"),
+        "credentials": ("credential_restart_check", False),
+        "phases": ("credential_phases", ["write"]),
+    }[case]
+    report[key] = value
+    files["runtime-report.json"] = json.dumps(report).encode()
+    with zipfile.ZipFile(path, "w") as archive:
+        for name, data in files.items():
+            archive.writestr(name, data)
+    with pytest.raises(ValueError, match="matching native startup"):
+        write_release_files(plan=plan)

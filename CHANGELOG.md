@@ -16,6 +16,9 @@ This is the canonical development and GitHub release history. Versions follow
   Python standard logging and file rotation.
 - Save GAS tokens through the official Flet OS credential service, restore them
   after restart, and support explicit replacement and deletion.
+- Build a locked Windows x64 portable bundle in PR and main CI, verify native
+  rendering and OS credential persistence across process restarts, and retain
+  runtime provenance and third-party notices before publication.
 - Define release identity in the root `VERSION` file and maintain this history.
 
 ### Fixed

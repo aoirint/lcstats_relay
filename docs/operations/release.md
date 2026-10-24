@@ -1,108 +1,92 @@
 # Release desktop artifacts
 
-## Scope
+## Scope and version identity
 
-This procedure publishes Windows and Linux desktop archives to a GitHub Release.
-The repository's immutable-release setting protects the tag and assets after
-publication, and GitHub generates a release attestation for the published asset
-set.
+The first release profile is **Windows x64**, distributed as a portable ZIP.
+Linux source checks remain in CI; native Linux release verification is deferred.
+The immutable-release setting protects a published tag and asset set.
 
-The root `VERSION` file is the canonical desktop release request. It contains
-one bare SemVer, optionally followed by one LF: for example `0.1.0-alpha.1` or
-`0.1.0`. Prefixes, whitespace, leading zeroes and build metadata are rejected.
-`0.0.0` reserves the unreleased development state. The workflow derives the
-exact `v<VERSION>` tag from the merged `main` commit. The Python package version
-is a source-package placeholder and does not request a desktop release.
+The root `VERSION` contains one bare SemVer, optionally followed by one LF.
+`0.0.0` reserves unreleased development and never creates a GitHub Release.
+Use `0.1.0-alpha.N` while validating distribution, then `0.1.0` after target
+verification. Tags and archive names retain the full SemVer; Flutter receives
+its numeric three-part version. `pyproject.toml` stays at the source-package
+placeholder `0.0.0` and is not the desktop release authority.
 
-Maintain the canonical [CHANGELOG](../../CHANGELOG.md) with `Unreleased` first
-and dated UTC entries for each intended release. Start initial validation with
-`0.1.0-alpha.1`, increment the alpha number for fixes, and promote to `0.1.0`
-only after the installed Windows artifact works. Retain published alpha history.
+`CHANGELOG.md` is the canonical history. A release request adds a dated heading
+such as `## 0.1.0-alpha.1 - 2026-10-24`. Publication selects that section as the
+release body. Keep `Unreleased` for subsequent work.
 
-## Prerequisites
+## Reviewed build inputs
 
-- Prepare and merge the intended release changes through the normal pull request
-  and required-check process.
-- Set `VERSION` to the intended non-`0.0.0` release version in that
-  reviewed commit. Do not create the release tag manually.
-- Confirm that the Check and Test pull request checks pass before merge. The
-  Main workflow runs only after a push to `main` and repeats their quality
-  gates against the exact merged source commit before publication.
-- Confirm that immutable releases remain enabled in the GitHub repository
-  settings. The workflow checks this again before creating or publishing a
-  release.
+[`packaging/windows-toolchain.json`](../../packaging/windows-toolchain.json)
+pins artifact URLs and SHA-256 digests for Flutter 3.44.8, Flet's 1.0.4 template,
+serious_python's compatible embedded CPython 3.14.8 and dart_bridge 1.10.0.
+Their releases satisfy the seven-day cooldown. The official template receives
+the reviewed Dart lock; runtime/bootstrap code is unchanged.
 
-## Publish
+The source/CI builder uses Python 3.14.9 and uv 0.13.5. Runtime wheels are
+exported from `uv.lock` and downloaded with hash enforcement using the repaired
+builder pip. Flet's packaging interpreter installs only those local wheels,
+under exact constraints, with indexes and pip version checks disabled. The
+embedded runtime contains no pip/ensurepip and carries certifi 2026.10.19.
+The [Python security release](https://www.python.org/downloads/release/python-3149/)
+addresses bundled pip's trust store; builder and embedded identities are
+recorded separately rather than claiming they share a patch version.
 
-Merge the version change and intended release contents into `main`. The push to
-`main` starts the Main workflow, which owns the complete build-and-release
-sequence. It performs these state-changing actions in order:
+The Dart graph in `packaging/pubspec.lock` contains 135 reviewed hosted
+packages. Enforce its hashes before build execution and reject hosted graph
+changes after Flet registers its official SecureStorage extension. Updating
+these pins requires a fresh provenance, compatibility and cooldown review.
 
-1. Reads the canonical SemVer from `VERSION`. Version `0.0.0`
-   completes without release work. An already-published immutable version does
-   so only after its exact asset set and attestation pass again.
-2. Runs workflow lint, pin cooldown, Markdown lint, Ruff, strict mypy, and the
-   full-coverage test suite against the resolved merged source commit.
-3. Builds Windows and Linux from that same commit through the local desktop
-   build Composite Action.
-4. Packages the Windows bundle as ZIP and the Linux bundle as tar.gz so Unix
-   executable permissions survive extraction.
-5. Creates `release-manifest.json` and `SHA256SUMS`, binding the artifacts to the
-   source commit, workflow run, build number, builder Python, per-target packaged
-   Python runtime, Flet, and uv versions.
-6. Creates the version tag and mutable draft from the merged source commit, or
-   resumes a matching draft, then uploads and checks the complete asset set.
-7. Publishes the draft last. GitHub then makes the release tag and assets
-   immutable and generates the release attestation.
-
-The expected release assets are:
-
-- `lcstats-relay-<version>-windows.zip`
-- `lcstats-relay-<version>-linux.tar.gz`
-- `release-manifest.json`
-- `SHA256SUMS`
-
-## Verify
-
-Wait for the Main workflow to pass, then verify the release and each
-downloaded artifact:
+For a local Windows development build, restore the locked environment and run
+PowerShell 7.4 or newer from the repository root, with Visual Studio's Desktop
+C++ workload and ATL installed. For the unreleased `VERSION` value `0.0.0`:
 
 ```powershell
-gh release view v1.2.3 --json tagName,isDraft,isPrerelease,isImmutable,assets
-gh release verify v1.2.3
-gh release download v1.2.3 --dir dist
-gh release verify-asset v1.2.3 dist/lcstats-relay-1.2.3-windows.zip
-gh release verify-asset v1.2.3 dist/lcstats-relay-1.2.3-linux.tar.gz
+./.github/actions/build-desktop/build-windows.ps1 `
+  -Version 0.0.0 -BuildVersion 0.0.0 -BuildNumber 1
 ```
 
-Confirm that `isDraft` is `false`, `isImmutable` is `true`, the expected four
-assets are present, and the downloaded archive digests match both
-`release-manifest.json` and `SHA256SUMS`.
+Use the actual root version and its numeric build version for other candidates.
+The script uses a workspace build directory when `RUNNER_TEMP` is unset. Its
+first run downloads the reviewed SDK and runtime artifacts. It does not request
+publication.
 
-Release automation verifies the expected root launcher, license and notices,
-absence of source-control/development content and unsafe paths, Linux executable
-mode, checksums, and provenance. It does not replace target runtime checks.
-Before announcing a release, launch the Windows and Linux bundles on their
-supported target class and verify first run, configuration, tracker connection,
-archive output, network failure, clean shutdown, and retained data after an
-upgrade.
+## Verification and publication
+
+1. PR source checks and the full test suite run with read-only permissions.
+2. The Windows job builds, launches the actual bundled executable, captures its
+   rendered first page and records actual Python/Flet/TLS versions.
+3. Three separate launches save an inert credential for a reserved-domain key,
+   read it after restart and delete it, then confirm its absence. Temporary
+   settings and logs are isolated from production data. No live GAS request
+   is made.
+4. Retain Python package licenses, Flutter notices and versioned Dart source
+   references. Exclude unused Tk, debug/test artifacts and caches; reject media
+   runtimes outside this profile.
+5. Package and inspect the same verified directory. Main repeats the gate for
+   its exact commit even when `VERSION` remains `0.0.0`.
+6. For a release request, publication downloads that job's artifact, creates
+   checksums and schema-3 provenance, selects the dated changelog entry and
+   prepares a mutable draft. Verify source/tag identity and immutability before
+   publishing, then verify the release attestation. Do not rebuild the artifact.
+
+A release contains the Windows ZIP, `SHA256SUMS` and `release-manifest.json`.
+The ZIP includes `VERSION`, `runtime-report.json`, licenses and the application.
+Alpha releases are marked prerelease and do not replace Latest.
+
+Before promoting an alpha, verify configuration, OS credential persistence,
+tracker receipt, archive output, network-failure behavior, clean shutdown and
+retained data on the target installation. The native CI probe supplements
+these operational checks. It does not claim live destination authentication.
 
 ## Failure and recovery
 
-- A validation or build failure creates no published release. Correct the source
-  through a new pull request. A new `main` push reruns the version decision.
-- An upload failure leaves a mutable draft. Re-running the failed workflow may
-  replace the draft assets before publication when the source commit is
-  unchanged.
-- If another `main` commit lands with the same version while a draft exists, the
-  workflow refuses to move its tag. Prefer a reviewed version bump; if the draft
-  was never intended for publication, remove that mutable draft and tag through
-  an explicit maintainer recovery action before rerunning.
-- If the tag moves away from the commit built by the workflow, publication
-  stops. Do not publish artifacts from a different commit under the same
-  version.
-- A published release is immutable. Do not attempt to replace its assets or move
-  its tag. Correct a published defect with a new VERSION value and release.
-
-Update this procedure whenever the version source, supported targets, archive
-formats, manifest schema, repository release controls, or workflow changes.
+A source, build, startup or credential failure creates no published release.
+Correct the candidate through a follow-up commit/PR and repeat the gates. An
+upload failure can leave a mutable draft; retries may replace its assets only
+when the source commit is unchanged. If its tag identifies another commit,
+use a reviewed version bump or explicitly authorized draft recovery. Correct a
+published immutable release with a new version, never by replacing its assets
+or moving its tag.

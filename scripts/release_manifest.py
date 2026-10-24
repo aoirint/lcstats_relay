@@ -7,9 +7,9 @@ import hashlib
 import json
 import re
 import tomllib
+import zipfile
 from collections.abc import Sequence
 from dataclasses import dataclass
-from operator import attrgetter
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -17,8 +17,7 @@ from urllib.parse import urlparse
 from scripts.verify_desktop_archive import verify_desktop_archive
 from scripts.version_metadata import read_version_metadata
 
-_REQUIRED_TARGETS = frozenset({"linux", "windows"})
-_SCHEMA_VERSION = 2
+_SCHEMA_VERSION = 3
 _SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 
 
@@ -129,43 +128,47 @@ def write_release_files(*, plan: ReleasePlan) -> None:
         msg = "Python version file must not be empty"
         raise ValueError(msg)
 
-    if (
-        len(plan.artifacts) != len(_REQUIRED_TARGETS)
-        or {artifact.target for artifact in plan.artifacts} != _REQUIRED_TARGETS
-    ):
-        msg = "release must contain exactly one linux and one windows artifact"
+    flet_version = _read_resolved_package_version(lock_path=plan.lock_path, package_name="flet")
+    if len(plan.artifacts) != 1 or plan.artifacts[0].target != "windows":
+        msg = "release must contain exactly one windows artifact"
         raise ValueError(msg)
-    artifact_names = [artifact.path.name for artifact in plan.artifacts]
-    if len(set(artifact_names)) != len(artifact_names):
-        msg = "release artifact file names must be unique"
-        raise ValueError(msg)
-    if any(not artifact.path.is_file() for artifact in plan.artifacts):
+    artifact = plan.artifacts[0]
+    if not artifact.path.is_file():
         msg = "every release artifact path must be an existing file"
         raise ValueError(msg)
-
-    artifact_records = []
-    for artifact in sorted(plan.artifacts, key=attrgetter("target")):
-        launcher_name = "lcstats-relay.exe" if artifact.target == "windows" else "lcstats-relay"
-        runtime_version = verify_desktop_archive(
-            archive_path=artifact.path,
-            target=artifact.target,
-            launcher_name=launcher_name,
-        )
-        artifact_records.append(
-            {
-                "file": artifact.path.name,
-                "python_runtime_version": runtime_version,
-                "sha256": _sha256(path=artifact.path),
-                "size": artifact.path.stat().st_size,
-                "target": artifact.target,
-            }
-        )
+    minor = verify_desktop_archive(
+        archive_path=artifact.path, target="windows", launcher_name="lcstats-relay.exe"
+    )
+    with zipfile.ZipFile(artifact.path) as archive:
+        report = json.loads(archive.read("runtime-report.json"))
+        packaged_version = archive.read("VERSION").decode("ascii").strip()
+    python_runtime = report.get("python_version")
+    if (
+        packaged_version != metadata.project_version
+        or report.get("version") != metadata.project_version
+        or report.get("flet_version") != flet_version
+        or not isinstance(python_runtime, str)
+        or not re.fullmatch(rf"{re.escape(minor)}\.\d+", python_runtime)
+        or report.get("credential_restart_check") is not True
+        or report.get("credential_phases") != ["write", "read-delete", "absent"]
+    ):
+        msg = "artifact lacks matching native startup and credential verification"
+        raise ValueError(msg)
+    artifact_records = [
+        {
+            "file": artifact.path.name,
+            "python_runtime_version": python_runtime,
+            "native_startup_verified": True,
+            "credential_restart_verified": True,
+            "sha256": _sha256(path=artifact.path),
+            "size": artifact.path.stat().st_size,
+            "target": "windows",
+        }
+    ]
     manifest: dict[str, Any] = {
         "artifacts": artifact_records,
         "build": {
-            "flet_version": _read_resolved_package_version(
-                lock_path=plan.lock_path, package_name="flet"
-            ),
+            "flet_version": flet_version,
             "number": plan.build_number,
             "builder_python_version": builder_python_version,
             "source_commit": plan.source_commit,

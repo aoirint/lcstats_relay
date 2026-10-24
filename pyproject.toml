@@ -5,7 +5,7 @@ description = "Relay local Lethal Company statistics to durable archives and Goo
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "flet[all]>=1.0.4,<1.1.0",
+    "flet>=1.0.4,<1.1.0",
     "flet-secure-storage==1.0.4",
     "httpx>=0.28.1,<0.29.0",
 ]
@@ -33,9 +33,23 @@ exclude-newer-package = { certifi = false }
 product = "LCStats Relay"
 org = "com.aoirint"
 
+[tool.flet.flutter.pubspec.dependencies.flet_secure_storage]
+path = "../flutter-packages/flet_secure_storage"
+
+[tool.flet.flutter.pubspec.dependency_overrides]
+serious_python_platform_interface = "5.0.0"
+serious_python_windows = "5.0.0"
+serious_python_linux = "5.0.0"
+serious_python_darwin = "5.0.0"
+serious_python_android = "5.0.0"
+
 [tool.flet.app]
 path = "src"
 module = "main"
+
+[tool.flet.cleanup]
+# Retain installed distribution metadata and upstream license files.
+packages = false
 
 [tool.flet.windows]
 artifact = "lcstats-relay"
@@ -45,6 +59,9 @@ artifact = "lcstats-relay"
 
 [dependency-groups]
 dev = [
+    "flet-cli>=1.0.4,<1.1.0",
+    "flet-desktop>=1.0.4,<1.1.0",
+    "flet-web>=1.0.4,<1.1.0",
     "mypy>=2.4.0,<3.0.0",
     "packaging>=26.2,<27.0",
     "pytest>=9.1.1,<10.0.0",

@@ -1,0 +1,47 @@
+{
+  "flutter": "3.44.8",
+  "flet": "1.0.4",
+  "serious_python": "5.0.0",
+  "embedded_python": "3.14.8",
+  "python_build": "20261016",
+  "compiler_build": "20261001",
+  "certifi": "2026.10.19",
+  "inputs": [
+    {
+      "name": "flutter",
+      "url": "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.44.8-stable.zip",
+      "sha256": "095c108a08e0377d8a6501fed65aeb288908a070ed3f135e525dc6431c7686e4",
+      "cache": null
+    },
+    {
+      "name": "template",
+      "url": "https://github.com/flet-dev/flet/releases/download/v1.0.4/flet-build-template.zip",
+      "sha256": "de7be8917a29dc7eec31ab58ed3fc4a4f84e82533a2455559f1c3c3e1d3685c2",
+      "cache": null
+    },
+    {
+      "name": "python",
+      "url": "https://github.com/flet-dev/python-build/releases/download/20261016/python-windows-for-dart-3.14.8.zip",
+      "sha256": "c421d3d487c3c146300d63e462cc4b08adbe3175d175c51e3d152b9cc11fff5c",
+      "cache": "python-build/v3.14.8-20261016/python-windows-for-dart-3.14.8.zip"
+    },
+    {
+      "name": "compiler",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261001/cpython-3.14.8%2B20261001-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "sha256": "b7ff8b700995379e425b39abce9b087d84a45aa265ea465c0069c2747ea5b2ea",
+      "cache": "python-build-standalone/20261001/cpython-3.14.8+20261001-x86_64-pc-windows-msvc-install_only_stripped.tar.gz"
+    },
+    {
+      "name": "bridge",
+      "url": "https://github.com/flet-dev/dart-bridge/releases/download/v1.10.0/dart_bridge-windows-x86_64.dll",
+      "sha256": "2e5f80d62e71a70b5bdb92925f7107e9b340fbd6c6ae9f63429f6a9aa5043ff1",
+      "cache": "dart-bridge/v1.10.0/dart_bridge-windows-x86_64.dll"
+    },
+    {
+      "name": "bridge-debug",
+      "url": "https://github.com/flet-dev/dart-bridge/releases/download/v1.10.0/dart_bridge_d-windows-x86_64.dll",
+      "sha256": "0e61d5951758bee42b9e09e9bac25c8c83598c1e750da2bf8cba3f5a7777c86d",
+      "cache": "dart-bridge/v1.10.0/dart_bridge_d-windows-x86_64.dll"
+    }
+  ]
+}
