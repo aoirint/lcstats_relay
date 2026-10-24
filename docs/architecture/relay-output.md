@@ -52,6 +52,13 @@ If the archive write fails, later outputs are not attempted for that payload.
 The Google Sheets output posts the parsed JSON payload to a configured Google
 Apps Script Web App URL.
 
+Delivery succeeds only after a successful HTTP status, an `application/json`
+media type, and an object containing the Boolean `"ok": true`. HTML errors with
+HTTP 200, malformed JSON, and negative/missing acknowledgements remain failures
+and are eligible for the existing retry queue. Response bodies never enter
+diagnostic logs or UI error messages. A remote script returning another success
+shape must be updated to acknowledge this contract.
+
 Authentication data is provided through a separate authentication component.
 The token is not embedded in the URL by the UI and is not saved to the settings
 file. The GAS destination URL is saved with the rest of the non-secret settings.
@@ -75,3 +82,16 @@ does not share that finite read deadline.
 
 The queue is output-oriented so that future output surfaces can be retried as
 peers of the existing Google Apps Script output.
+
+## Operational diagnostics
+
+Application orchestration emits structured events through the dedicated
+`lcstats_relay.events` logger. The infrastructure sink validates an allowlisted
+schema and does not attach to the root logger or retain third-party logs.
+Success/failure receipts remain UI values; they are never logged because they
+can contain paths or adapter details. Each receipt belongs to a random payload
+correlation ID, persisted in queue records and new archive filenames.
+The entry point owns the rotating handler from startup through runtime cleanup;
+the UI receives only local diagnostic descriptions and a failure-status callback.
+See [Data and recovery](../operations/data-and-recovery.md) for retention,
+locations, event interpretation, and disclosure limits.

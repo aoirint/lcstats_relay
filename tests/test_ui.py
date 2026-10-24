@@ -309,8 +309,13 @@ def test_build_and_state_update_render_monitor(*, tmp_path: Path) -> None:
     view.update_state(state=state)
 
     assert isinstance(control, ft.Container)
-    monitor_row = cast("ft.Row", view.root_view.controls[4])
-    output_panel = cast("ft.Container", monitor_row.controls[1])
+    output_panel = next(
+        child
+        for row in view.root_view.controls
+        if isinstance(row, ft.Row)
+        for child in row.controls
+        if isinstance(child, ft.Container) and child.content is view.output_destinations
+    )
     assert output_panel.border is None
     assert view.status.value == "出力処理中"
     assert view.receive_count.value == "4"
@@ -492,7 +497,11 @@ def test_settings_view_links_to_full_window_gas_auth_view(*, tmp_path: Path) -> 
     view.data_dir_field.value = str(tmp_path / "archive-root")
 
     settings_body = cast("ft.Column", view.root_view.controls[1])
-    output_section = cast("ft.Column", settings_body.controls[2])
+    output_section = next(
+        section
+        for section in settings_body.controls
+        if isinstance(section, ft.Column) and view.data_dir_field in section.controls
+    )
     output_row_container = cast("ft.Container", output_section.controls[2])
     output_row = cast("ft.Row", output_row_container.content)
     gas_button = cast("Any", output_row.controls[1])
@@ -544,3 +553,25 @@ def test_full_window_view_save_errors_keep_active_view(*, tmp_path: Path) -> Non
     view.submit_gas_auth()
     assert _active_heading(view=view) == "GAS認証"
     assert view.error.value == "GAS URLにはscript.google.comのHTTPS URLを指定してください"
+
+
+def test_diagnostic_status_and_paths_refresh_in_monitor(*, tmp_path: Path) -> None:
+    """Keep failed logging visible and show actual destination changes locally."""
+    page = _FakePage()
+    controller = _controller_for(manager=_FakeManager(), store=_settings_store(tmp_path=tmp_path))
+    failed = False
+    view = MonitorView(
+        page=page,
+        controller=controller,
+        diagnostics=lambda: str(controller.settings.data_dir.resolve()),
+        diagnostic_failure=lambda: failed,
+    )
+    view.build()
+    assert view.diagnostics_status.value == "診断ログと保存先"
+    failed = True
+    assert view.save_settings(tracker_url="http://localhost:2145/", data_dir=str(tmp_path / "new"))
+    assert "書き込み失敗" in (view.diagnostics_status.value or "")
+    assert view.diagnostics.value == str((tmp_path / "new").resolve())
+    view.open_settings()
+    settings_body = next(c for c in view.root_view.controls if isinstance(c, ft.Column))
+    assert view.diagnostics in settings_body.controls

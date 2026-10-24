@@ -97,7 +97,7 @@ class _TransportHandler:
         if request.method == "POST":
             self.post_count += 1
             status = self.first_post_status if self.post_count == 1 else 200
-            return httpx.Response(status, request=request)
+            return httpx.Response(status, json={"ok": True}, request=request)
 
         self.get_count += 1
         if self.get_count == 1:
@@ -182,8 +182,8 @@ def test_archive_output_reports_safe_failure(
     async def scenario() -> None:
         writer = ArchiveWriter(data_dir=tmp_path)
 
-        def fail_write(*, raw_json: str, received_at: datetime) -> Path:
-            del raw_json, received_at
+        def fail_write(*, raw_json: str, received_at: datetime, correlation_id: str) -> Path:
+            del raw_json, received_at, correlation_id
             msg = "disk full"
             raise OSError(msg)
 

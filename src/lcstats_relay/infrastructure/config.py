@@ -8,6 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from lcstats_relay.application.diagnostics import emit
 from lcstats_relay.application.settings import (
     DEFAULT_TRACKER_URL,
     RelaySettings,
@@ -52,6 +53,16 @@ class SettingsStore:
         self.path = path or default_config_path()
 
     def load(self) -> RelaySettings:
+        """Report settings loading without recording configuration values."""
+        try:
+            settings = self._load()
+        except OSError, TypeError, ValueError:
+            emit(event="settings_failed", category="storage", failed=True)
+            raise
+        emit(event="settings_loaded")
+        return settings
+
+    def _load(self) -> RelaySettings:
         """Load settings, returning defaults when no file exists yet."""
         if not self.path.exists():
             return RelaySettings(data_dir=default_data_dir())
@@ -76,10 +87,15 @@ class SettingsStore:
         """Persist settings atomically as readable JSON."""
         payload = asdict(settings)
         payload["data_dir"] = str(settings.data_dir)
-        write_text_atomic(
-            path=self.path,
-            content=f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n",
-        )
+        try:
+            write_text_atomic(
+                path=self.path,
+                content=f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n",
+            )
+        except OSError:
+            emit(event="settings_failed", category="storage", failed=True)
+            raise
+        emit(event="settings_saved")
 
 
 def _string_value(*, raw: dict[str, Any], key: str, default: str) -> str:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from lcstats_relay.application.ports import RetryItem
 from lcstats_relay.domain.payload import JSONValue, RelayPayload, parse_json
@@ -19,10 +19,13 @@ class ArchiveWriter:
         """Use the archive directory beneath the supplied application data root."""
         self._root = data_dir / "archive"
 
-    def write(self, *, raw_json: str, received_at: datetime) -> Path:
+    def write(
+        self, *, raw_json: str, received_at: datetime, correlation_id: str | None = None
+    ) -> Path:
         """Write the exact received JSON and return its archive path."""
         date_dir = self._root / received_at.strftime("%Y-%m-%d")
-        filename = f"{received_at:%Y-%m-%dT%H-%M-%S-%f}-{uuid4().hex[:8]}.json"
+        suffix = UUID(hex=correlation_id).hex if correlation_id else uuid4().hex[:8]
+        filename = f"{received_at:%Y-%m-%dT%H-%M-%S-%f}-{suffix}.json"
         archive_path = date_dir / filename
         write_text_atomic(path=archive_path, content=f"{raw_json}\n")
         return archive_path
@@ -46,6 +49,7 @@ class RetryQueue:
         filename = f"{queued_at:%Y-%m-%dT%H-%M-%S-%f}-{uuid4().hex[:8]}.json"
         queue_path = self._root / filename
         record: dict[str, JSONValue] = {
+            "correlation_id": payload.correlation_id,
             "queued_at": queued_at.isoformat(),
             "output_key": output_key,
             "received_at": payload.received_at.isoformat(),
@@ -122,5 +126,20 @@ class RetryQueue:
                 payload=payload,
                 received_at=received_datetime,
                 parse_error=parse_error,
+                correlation_id=_queue_correlation_id(record=record, path=path),
             ),
         )
+
+
+def _queue_correlation_id(*, record: dict[str, JSONValue], path: Path) -> str:
+    value = record.get("correlation_id")
+    if isinstance(value, str):
+        try:
+            return UUID(hex=value).hex
+        except ValueError:
+            pass
+    # Legacy records have no ID. Persist a random one once so restarts retain it.
+    value = uuid4().hex
+    record["correlation_id"] = value
+    write_text_atomic(path=path, content=f"{json.dumps(record, ensure_ascii=False, indent=2)}\n")
+    return value

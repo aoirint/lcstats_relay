@@ -67,13 +67,19 @@ can remain in an at-least-once retry queue, so the receiver must tolerate a
 duplicate submission after an uncertain timeout or connection failure.
 
 [Data and recovery](docs/operations/data-and-recovery.md) lists the exact
-settings, archive, and queue locations and the recovery procedure for each
+settings, archive, queue, and diagnostic log locations and the recovery procedure for each
 failure mode. To remove the app after running from source, stop it, remove the
 source checkout or uv environment, and separately remove the documented user
 settings/data directories only if their archives and pending deliveries are no
 longer needed.
 
 ## Troubleshooting
+
+Expand **診断ログと保存先** in the monitor to find the actual absolute paths.
+Operational logs follow reception, archive, GAS delivery, and retries without
+copying player data or credentials. See
+[diagnostic logging and safe sharing](docs/operations/data-and-recovery.md#diagnostic-logs)
+for retention, failure categories, and sharing instructions.
 
 - A receiver error means the configured LCStatsTracker endpoint could not
   provide an accepted payload. Confirm that one tracker instance is running and
