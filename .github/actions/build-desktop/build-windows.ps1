@@ -12,7 +12,7 @@ $PSNativeCommandUseErrorActionPreference = $true
 $ProgressPreference = "SilentlyContinue"
 $taskRoot = (Get-Location).Path
 $taskBuild = Join-Path $taskRoot "build"
-$taskTools = if ($env:RUNNER_TEMP) { Join-Path $env:RUNNER_TEMP "lcstats-build" } else { Join-Path $taskBuild "native-tools" }
+$taskTools = if ($env:RUNNER_TEMP) { Join-Path $env:RUNNER_TEMP "lcstats-build" } else { Join-Path $taskRoot ".venv/native-tools" }
 $taskProfile = Get-Content -LiteralPath "packaging/windows-toolchain.json" -Raw | ConvertFrom-Json
 New-Item -ItemType Directory -Force -Path $taskTools | Out-Null
 $taskDownloads = Join-Path $taskTools "downloads"
@@ -82,26 +82,10 @@ $env:SERIOUS_PYTHON_FULL_VERSION = $taskProfile.embedded_python
 $env:SERIOUS_PYTHON_BUILD_DATE = $taskProfile.python_build
 $env:SERIOUS_PYTHON_DIST_RELEASE = $taskProfile.compiler_build
 
-# Stage the same official extension that the Python packager will later discover.
-# Its relative path keeps the reviewed lock free of workstation/runner paths.
-$env:LCSTATS_BUILD_WHEELS = $taskWheels
-@'
-from pathlib import Path
-import os, shutil, zipfile
-wheel = next(Path(os.environ["LCSTATS_BUILD_WHEELS"]).glob("flet_secure_storage-*.whl"))
-with zipfile.ZipFile(wheel) as archive:
-    prefix = "flutter/flet_secure_storage/"
-    for name in archive.namelist():
-        if name.startswith(prefix) and not name.endswith("/"):
-            relative = Path(name.removeprefix(prefix))
-            assert not relative.is_absolute() and ".." not in relative.parts
-            target = Path("build/flutter-packages/flet_secure_storage") / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(archive.read(name))
-Path("build/flutter").mkdir(parents=True, exist_ok=True)
-for name in ("pubspec.yaml", "pubspec.lock"):
-    shutil.copyfile(Path("packaging") / name, Path("build/flutter") / name)
-'@ | uv run --locked python -
+# Reference the uv-locked extension installed outside Flet's regenerated output.
+if (-not (Test-Path -LiteralPath ".venv/Lib/site-packages/flutter/flet_secure_storage/pubspec.yaml")) { throw "Official SecureStorage extension missing" }
+New-Item -ItemType Directory -Force -Path (Join-Path $taskBuild "flutter") | Out-Null
+Copy-Item -LiteralPath packaging/pubspec.yaml, packaging/pubspec.lock -Destination (Join-Path $taskBuild "flutter")
 & $taskDart pub get --enforce-lockfile --directory (Join-Path $taskBuild "flutter")
 
 # Add only the reviewed lock to the official template. Runtime/bootstrap code stays intact.

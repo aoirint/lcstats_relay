@@ -186,7 +186,7 @@ packages:
   flet_secure_storage:
     dependency: direct main
     description:
-      path: ../flutter-packages/flet_secure_storage
+      path: ../../.venv/Lib/site-packages/flutter/flet_secure_storage
       relative: true
     source: path
     version: 0.1.0

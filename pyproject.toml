@@ -34,7 +34,7 @@ product = "LCStats Relay"
 org = "com.aoirint"
 
 [tool.flet.flutter.pubspec.dependencies.flet_secure_storage]
-path = "../flutter-packages/flet_secure_storage"
+path = "../../.venv/Lib/site-packages/flutter/flet_secure_storage"
 
 [tool.flet.flutter.pubspec.dependency_overrides]
 serious_python_platform_interface = "5.0.0"
