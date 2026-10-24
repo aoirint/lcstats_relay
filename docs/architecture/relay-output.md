@@ -99,7 +99,13 @@ Flet also uses Python logging and captures packaged stdout/stderr in
 [Flet 1.0.4 template](https://github.com/flet-dev/flet/releases/tag/v1.0.4),
 `lib/python.dart`, opens it with `w+` at startup. It therefore cannot preserve
 an earlier run after a restart. A standard rotating file handler supplies that
-missing retention behavior. See the official [Flet logging guide](https://flet.dev/docs/cookbook/logging/)
+missing retention behavior. Rotation is capacity-based: it bounds disk use,
+not the number of complete runs retained.
+
+Keeping previous `console.log` files per launch was also considered. The file
+is opened before the app module runs, so that design needs a custom Flet
+bootstrap template. The selected standard-handler configuration avoids owning
+that framework startup modification. See the official [Flet logging guide](https://flet.dev/docs/cookbook/logging/)
 and [packaged console output contract](https://flet.dev/docs/publish/#console-output).
 
 The dedicated `lcstats_relay.events` logger records UTC time, severity, fixed
