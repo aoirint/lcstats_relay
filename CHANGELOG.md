@@ -6,6 +6,11 @@ This is the canonical development and release history. Versions follow
 
 ## Unreleased
 
+### Added
+
+- Build Linux amd64 desktop archives and verify rendering and GNOME Keyring
+  credential persistence across separate application launches.
+
 ### Changed
 
 - Include the `v` version prefix, lowercase OS and CPU architecture in release

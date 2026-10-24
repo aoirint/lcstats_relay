@@ -22,6 +22,10 @@ runs:
       shell: bash
       run: actionlint -color
 
+    - name: Lint desktop build scripts
+      shell: bash
+      run: shellcheck .github/actions/build-desktop/*.sh
+
     - name: Verify immutable GitHub Actions pins
       shell: bash
       env:

@@ -1,0 +1,43 @@
+{
+  "flutter": "3.44.8",
+  "flet": "1.0.4",
+  "serious_python": "5.0.0",
+  "embedded_python": "3.14.8",
+  "python_build": "20261016",
+  "compiler_build": "20261001",
+  "certifi": "2026.10.19",
+  "inputs": [
+    {
+      "name": "flutter",
+      "url": "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.44.8-stable.tar.xz",
+      "sha256": "672089e001571a9fbb209a495c583580c0c6c73ef98999264ba07fa93ace332d",
+      "cache": null
+    },
+    {
+      "name": "template",
+      "url": "https://github.com/flet-dev/flet/releases/download/v1.0.4/flet-build-template.zip",
+      "sha256": "de7be8917a29dc7eec31ab58ed3fc4a4f84e82533a2455559f1c3c3e1d3685c2",
+      "cache": null
+    },
+    {
+      "name": "python",
+      "url": "https://github.com/flet-dev/python-build/releases/download/20261016/python-linux-dart-3.14.8-x86_64.tar.gz",
+      "sha256": "80e88ef90bb42cd83afe2fed0ee8bd90002edfd708bb60ccb8af043b116132aa",
+      "cache": "python-build/v3.14.8-20261016/python-linux-dart-3.14.8-x86_64.tar.gz"
+    },
+    {
+      "name": "compiler",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261001/cpython-3.14.8%2B20261001-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "sha256": "b373a4a4e4e70fc05f368c9b53d7738bf37637682b650d96c742805d2da26c32",
+      "cache": "python-build-standalone/20261001/cpython-3.14.8+20261001-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
+    },
+    {
+      "name": "bridge",
+      "url": "https://github.com/flet-dev/dart-bridge/releases/download/v1.10.0/libdart_bridge-linux-x86_64.so",
+      "sha256": "f89a2694fea152e4291f719657ee9f506ddbad271b1d769c739d6c65f0d42c15",
+      "cache": "dart-bridge/v1.10.0/libdart_bridge-linux-x86_64.so"
+    }
+  ],
+  "builder_pip": "26.2.2",
+  "architecture": "amd64"
+}

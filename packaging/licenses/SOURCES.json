@@ -23,5 +23,11 @@
     "file": "DART-BRIDGE-LICENSE.txt",
     "source": "https://github.com/flet-dev/dart-bridge/blob/v1.10.0/LICENSE",
     "sha256": "b7150f41f2912b5289ad687eb160b3f3b3e4f55cad82e98069b4d97c895aae83"
+  },
+  {
+    "file": "PYTHON-LINUX-LICENSE.txt",
+    "source": "https://github.com/flet-dev/python-build/releases/download/20261016/python-linux-dart-3.14.8-x86_64.tar.gz",
+    "member": "./lib/python3.14/LICENSE.txt",
+    "sha256": "b0e25a78cffb43f4d92de8b61ccfa1f1f98ecbc22330b54b5251e7b6ba010231"
   }
 ]
