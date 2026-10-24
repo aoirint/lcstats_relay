@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Protocol
 
 import flet as ft
@@ -46,15 +45,10 @@ class MonitorView:
         *,
         page: PagePort,
         controller: MonitorController,
-        diagnostics: Callable[[], str] = lambda: "",
-        diagnostic_failure: Callable[[], bool] = lambda: False,
     ) -> None:
         """Create controls and bind them to a Flet-free controller."""
         self._page = page
         self._controller = controller
-        self._diagnostics = diagnostics
-        self._diagnostic_failure = diagnostic_failure
-        self.diagnostics = ft.Text(size=11, selectable=True)
 
         self.settings_summary = ft.Text(selectable=True)
         self.gas_summary = ft.Text(selectable=True)
@@ -232,7 +226,6 @@ class MonitorView:
                         title="保存先",
                         controls=[
                             self.data_dir_field,
-                            self.diagnostics,
                         ],
                     ),
                     self._settings_section(
@@ -338,13 +331,6 @@ class MonitorView:
         self.open_settings()
 
     def _refresh_settings_summary(self) -> None:
-        failed = self._diagnostic_failure()
-        warning = "診断ログ書き込み失敗: 保存先を確認してください"
-        paths = self._diagnostics()
-        self.diagnostics.value = f"{warning}\n{paths}" if failed else paths
-        self.settings_button.tooltip = warning if failed else "設定"
-        self.settings_button.icon = ft.Icons.ERROR_OUTLINE if failed else ft.Icons.SETTINGS
-        self.settings_button.style = ft.ButtonStyle(color=ft.Colors.RED_700 if failed else None)
         settings, gas = settings_summaries(
             tracker_url=self._controller.settings.tracker_url,
             data_dir=str(self._controller.settings.data_dir),

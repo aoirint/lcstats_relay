@@ -12,7 +12,7 @@ LCStats Relay writes four categories of local data:
 - Retry queue: `<data_dir>/queue/*.json`, containing output identity, timestamps,
   raw and parsed payloads, a random correlation ID, and any parse error needed
   for a later attempt.
-- Diagnostic logs: `relay.jsonl` and up to four rotated backups in
+- Diagnostic logs: `relay.log` and up to four rotated backups in
   `%LOCALAPPDATA%/lcstats-relay/logs` on Windows, or `<default_data_dir>/logs`
   on Linux. This location is independent of the configured archive directory.
 
@@ -29,64 +29,50 @@ whole-directory durability across sudden storage or operating-system failure.
 
 ## Diagnostic logs
 
-Open **設定** and look under **保存先** to see the actual
-absolute settings, archive, queue, and log paths. Existing relative `data_dir`
-values resolve against the current process working directory, which can be
-inside Flet's extracted application directory in older distributions.
-Changing that setting does not move old archives or queue entries. Record the
-old absolute path before changing it and preserve pending deliveries there.
+Relay writes operational events with Python's standard logging handlers. The
+fixed location is independent of the editable archive directory:
 
-Each UTF-8 JSONL record contains a UTC timestamp, severity, process-session ID,
-and event name. Payload events also carry a random `correlation_id`. A new
-archive filename ends in that ID, and queue records retain it across retries
-and restarts. Queue records must contain the current fields, including a valid
-correlation ID. Incompatible or corrupt records produce a queue-read error and
-remain untouched; automatic migration and legacy-format fallback are not provided.
-IDs identify a received item, not a player or a content hash. Receiving the same
-JSON twice creates two IDs; this is not remote deduplication.
+- Windows: `%LOCALAPPDATA%\lcstats-relay\logs\relay.log`
+- Linux: `$XDG_DATA_HOME/lcstats-relay/logs/relay.log`, or
+  `~/.local/share/lcstats-relay/logs/relay.log` when XDG_DATA_HOME is unset.
 
-Events cover application start/exit, settings load/save, connection start/stop,
-SSE waiting/connection/error/reconnect, payload receipt/parse failure, output
-attempt/success/failure/cancellation, queue save/read, and retry/removal. Filter
-by `session_id` for one run and `correlation_id` for one delivery. Look for
-`output_succeeded` with `output: archive` before the GAS attempt. A
-`retry_removed` event means the successful delivery was also removed locally.
+There is no logging UI or destination setting. To inspect recent Windows
+activity, run:
 
-Failure records contain a bounded category and, for HTTP failures, the numeric
-status. Categories distinguish `authentication`, `http`, `transport`,
-`timeout`, `response_format`, `json_parse`, `application`, `archive`, `queue`, and
-`storage`. Authentication classification recognizes HTTP
-401/403 and the known non-JSON GAS response containing `Invalid token`.
-Other HTML errors are classified as `response_format` without storing the page.
-An unrecognized output failure uses `delivery`.
+```powershell
+Get-Content "$env:LOCALAPPDATA/lcstats-relay/logs/relay.log" -Tail 100
+```
 
-Each log file is limited to 1 MiB, with four backups (`relay.jsonl.1` through
-`.4`), for approximately 5 MiB total. `.1` is the most recent backup. Old
-records expire by size, so copy relevant logs before extended troubleshooting.
-Use one Relay process per user log directory: rotation does not coordinate
-multiple processes. Records are flushed on each event, but logs are diagnostic
-evidence rather than a power-loss-durable transaction journal. Forced process
-termination can omit the final exit or delivery events.
+Read the UTC time and `event=` value, then join lines with the same `id=`.
+`output_failed` carries a safe category and, when available, `http=` status.
+`authentication` includes GAS token rejection; `response_format` means the
+reply was not the expected JSON acknowledgement. `queue_saved` followed later
+by `retry_removed` shows that a pending delivery was retained and then cleared.
+The [architecture decision](../architecture/relay-output.md#operational-diagnostics)
+owns field selection and the reason for retaining this file alongside Flet's
+standard console log.
 
-If creation, writing, rotation, or closing fails, Relay continues operating.
-The **設定** button turns red and shows an error icon on its next state refresh; its tooltip
-reports **診断ログ書き込み失敗**. This warning
-remains for the process lifetime because some records may already be missing.
-Correct permissions/free space and restart. A final close failure may occur
-after the UI has closed. The error fallback never prints the failed record or
-exception traceback. Unexpected application errors retain their existing propagation
-behavior; logging does not convert them into handled connection errors.
+`RotatingFileHandler` appends across restarts and keeps a 1 MiB active file plus
+four backups (`relay.log.1` through `.4`), approximately 5 MiB total. Copy the
+relevant files before extended troubleshooting overwrites older records. Use
+one Relay process per user log directory; rotation does not coordinate multiple
+writers. Logs are flushed per event and are not a crash-durable transaction
+journal.
+
+If the file cannot open, events fall back to stderr with
+`event=log_file_unavailable`. In packaged apps Flet captures that output in its
+`console.log`; it is replaced on the next startup. Check file permissions and
+free space before restarting. Standard Python logging reports subsequent
+handler write failures to stderr; no separate UI error state is maintained.
 
 ### Sharing diagnostics
 
-Share only the relevant `relay.jsonl*` files after reviewing them. The writer
-allows only fixed events/categories, numeric HTTP codes, timestamps, and UUIDs.
-It excludes tokens, URLs (including deployment identifiers), local paths,
-player IDs/names, payloads, response bodies, and exception text/tracebacks.
-Third-party HTTP/Flet logs are not copied into this sink. Timestamps and activity
-patterns are still operational information; choose an appropriate recipient.
-Do not bundle settings, archives, queue files, or screenshots of absolute paths:
-these can expose private endpoints, players, or the local account name.
+Review the relevant `relay.log*` files before sharing. Operational event callers
+exclude credentials, URLs, payloads and exception text; the integration tests
+exercise that boundary. Flet's `console.log` can contain framework traces and
+is not covered by this application-event policy. Do not bundle settings,
+archives or queue files. Share only the files and time range needed for the
+incident.
 
 ## Secrets
 

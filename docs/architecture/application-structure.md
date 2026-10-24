@@ -20,7 +20,7 @@ current responsibility groups:
 - `ui/` constructs Flet controls, emits intents to the controller, and renders
   presentation state.
 - `infrastructure/` implements HTTP, authentication, settings, atomic files,
-  archives, and the retry queue.
+  archives, the retry queue, and standard logging configuration.
 - `entrypoints/flet_app.py` configures the Flet page and mounts the monitor.
 - `composition/application.py` is the production composition root. It selects
   outputs, authentication policy, persistence implementations, and the
