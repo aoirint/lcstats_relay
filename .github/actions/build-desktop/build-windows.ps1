@@ -167,5 +167,5 @@ assert Path("build/windows/data/flutter_assets/NOTICES.Z").is_file()
 '@ | uv run --locked python -
 
 & (Join-Path $PSScriptRoot "verify-windows.ps1") -Bundle $taskBundle -Version $Version -ToolchainFile (Join-Path $taskRoot "packaging/windows-toolchain.json")
-uv run --locked python scripts/package_desktop.py --build-directory $taskBundle --output-directory $OutputDirectory --artifact-name "lcstats-relay-$Version-windows" --format zip
-uv run --locked python scripts/verify_desktop_archive.py --target windows --archive "$OutputDirectory/lcstats-relay-$Version-windows.zip" --launcher lcstats-relay.exe
+uv run --locked python scripts/package_desktop.py --build-directory $taskBundle --output-directory $OutputDirectory --artifact-name "lcstats-relay-v$Version-windows-amd64" --format zip
+uv run --locked python scripts/verify_desktop_archive.py --target windows --archive "$OutputDirectory/lcstats-relay-v$Version-windows-amd64.zip" --launcher lcstats-relay.exe

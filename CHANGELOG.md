@@ -8,6 +8,9 @@ This is the canonical development and release history. Versions follow
 
 ### Changed
 
+- Include the `v` version prefix, lowercase OS and CPU architecture in release
+  archive names, for example `lcstats-relay-v0.1.1-windows-amd64.zip`.
+
 - Run desktop builds on main and on explicit candidate requests, keeping routine
   pull-request CI focused on source checks and tests.
 
