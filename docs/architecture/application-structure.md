@@ -23,6 +23,8 @@ current responsibility groups:
 - `infrastructure/` implements HTTP, authentication, settings, atomic files,
   archives, the retry queue, and standard logging configuration.
 - `entrypoints/flet_app.py` configures the Flet page and mounts the monitor.
+  An explicitly enabled CI launch delegates native rendering/runtime checks to
+  `ui/runtime_check.py`; ordinary launches do not run that probe.
 - `composition/application.py` is the production composition root. It selects
   outputs, authentication policy, persistence implementations, and the
   connection manager without requiring the UI to construct those details.

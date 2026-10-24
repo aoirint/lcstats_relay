@@ -106,7 +106,6 @@ jobs:
 
               expected_assets=(
                 "SHA256SUMS"
-                "lcstats-relay-${PROJECT_VERSION}-linux.tar.gz"
                 "lcstats-relay-${PROJECT_VERSION}-windows.zip"
                 "release-manifest.json"
               )
@@ -135,23 +134,12 @@ jobs:
       - check
       - test
       - plan
-    if: needs.plan.outputs.should_release == 'true'
     # Native artifact verification begins only after the exact main commit has
     # passed source checks and release planning.
-    name: Build release (${{ matrix.target }})
-    runs-on: ${{ matrix.runner }}
+    name: Windows binary
+    # Oldest supported GitHub-hosted GA Windows image.
+    runs-on: windows-2022
     timeout-minutes: 60
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Native artifacts use the oldest GitHub-supported GA image in each
-          # OS family to preserve the broadest supported runtime compatibility.
-          - runner: ubuntu-22.04
-            target: linux
-          - runner: windows-2022
-            target: windows
 
     steps:
       - name: Check out release source
@@ -165,12 +153,12 @@ jobs:
         uses: ./.github/actions/build-desktop
         with:
           build_number: ${{ github.run_number }}
-          target: ${{ matrix.target }}
+          target: windows
 
       - name: Upload release input
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: release-${{ matrix.target }}
+          name: release-windows
           path: ${{ steps.build.outputs.artifact_path }}
           if-no-files-found: error
           retention-days: 3
@@ -216,7 +204,6 @@ jobs:
           WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           uv run --locked python scripts/release_manifest.py \
-            --artifact "linux=artifacts/lcstats-relay-${PROJECT_VERSION}-linux.tar.gz" \
             --artifact "windows=artifacts/lcstats-relay-${PROJECT_VERSION}-windows.zip" \
             --build-number "${BUILD_NUMBER}" \
             --source-commit "${SOURCE_COMMIT}" \
@@ -224,6 +211,21 @@ jobs:
             --uv-version "${UV_VERSION}" \
             --manifest artifacts/release-manifest.json \
             --checksums artifacts/SHA256SUMS
+
+      - name: Select canonical release notes
+        env:
+          PROJECT_VERSION: ${{ needs.plan.outputs.project_version }}
+        run: |
+          awk -v version="${PROJECT_VERSION}" '
+            /^## / {
+              if (found) exit
+              found = index($0, "## " version " - ") == 1
+              next
+            }
+            found { print }
+            END { if (!found) exit 1 }
+          ' CHANGELOG.md > release-notes.md
+          test -s release-notes.md
 
       - name: Verify immutable release setting
         env:
@@ -261,7 +263,7 @@ jobs:
             create_args=(
               "${TAG}"
               --draft
-              --generate-notes
+              --notes-file release-notes.md
               --title "${TAG}"
             )
             if [[ "${RELEASE_MODE}" == "prerelease" ]]; then

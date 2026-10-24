@@ -393,13 +393,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/60/44/bfb1cbfd2b4ef3e12e2ae4f0bc76ff0eb56175fb6c90c35d1d8b40bf507e/flet-1.0.4-py3-none-any.whl", hash = "sha256:5e6ea0a75e10ff7143ca32dc2b84117fe7c964b4ec2270cb9910598acd9ffe67", size = 635815, upload-time = "2026-10-08T22:25:01.048Z" },
 ]
 
-[package.optional-dependencies]
-all = [
-    { name = "flet-cli" },
-    { name = "flet-desktop" },
-    { name = "flet-web" },
-]
-
 [[package]]
 name = "flet-cli"
 version = "1.0.4"
@@ -605,13 +598,16 @@ name = "lcstats-relay"
 version = "0.0.0"
 source = { editable = "." }
 dependencies = [
-    { name = "flet", extra = ["all"] },
+    { name = "flet" },
     { name = "flet-secure-storage" },
     { name = "httpx" },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "flet-cli" },
+    { name = "flet-desktop" },
+    { name = "flet-web" },
     { name = "mypy" },
     { name = "packaging" },
     { name = "pytest" },
@@ -621,13 +617,16 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "flet", extras = ["all"], specifier = ">=1.0.4,<1.1.0" },
+    { name = "flet", specifier = ">=1.0.4,<1.1.0" },
     { name = "flet-secure-storage", specifier = "==1.0.4" },
     { name = "httpx", specifier = ">=0.28.1,<0.29.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "flet-cli", specifier = ">=1.0.4,<1.1.0" },
+    { name = "flet-desktop", specifier = ">=1.0.4,<1.1.0" },
+    { name = "flet-web", specifier = ">=1.0.4,<1.1.0" },
     { name = "mypy", specifier = ">=2.4.0,<3.0.0" },
     { name = "packaging", specifier = ">=26.2,<27.0" },
     { name = "pytest", specifier = ">=9.1.1,<10.0.0" },
