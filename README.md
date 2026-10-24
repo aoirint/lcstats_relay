@@ -27,10 +27,12 @@ comes from the root `VERSION` file.
 
 ## Install and run
 
-No packaged release has been published yet. When a release is available, its
-Windows and Linux archives, checksums, manifest, and immutable-release
-attestation will appear on the repository's Releases page. Until then, run the
-current source with Python 3.14 and [uv](https://docs.astral.sh/uv/):
+Download the Windows x64 ZIP from the
+[Releases page](https://github.com/aoirint/lcstats_relay/releases/latest), extract
+it, and run `lcstats-relay.exe`. Python does not need to be installed separately.
+Checksums and a release manifest are provided alongside the ZIP.
+
+To run from source, use Python 3.14 and [uv](https://docs.astral.sh/uv/):
 
 ```powershell
 uv sync --locked --all-groups
@@ -57,11 +59,11 @@ entered.
 For the detailed loopback policy, see
 [Loopback connection policy](docs/domain/loopback-connection-policy.md).
 
-GAS tokens are entered separately from the URL. They are masked in the UI and are
-not saved to the settings file. The LCStatsTracker URL, GAS Web App URL, and
-local save directory are saved in the user settings file. Restarting the app
-clears the GAS token, so enter it again before reconnecting when authentication
-is required.
+GAS tokens are entered separately from the URL and masked in the UI. They are
+saved in the OS credential store (Windows Credential Manager on Windows) and
+restored after restart. Use GAS Auth to replace or delete a stored token.
+The LCStatsTracker URL, GAS Web App URL, and local save directory are saved in
+the user settings file; the token itself is not written there.
 
 ## Data, recovery, and removal
 
