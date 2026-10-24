@@ -90,7 +90,7 @@ jobs:
           TAG: ${{ steps.version.outputs.git_version }}
         run: |
           if [[ "${RELEASE_MODE}" == "edge" ]]; then
-            echo "The placeholder project version 0.0.0 has no release work."
+            echo "Development VERSION 0.0.0 has no release work."
             echo "should_release=false" >> "${GITHUB_OUTPUT}"
             exit 0
           fi

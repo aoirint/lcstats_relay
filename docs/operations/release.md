@@ -7,19 +7,26 @@ The repository's immutable-release setting protects the tag and assets after
 publication, and GitHub generates a release attestation for the published asset
 set.
 
-The canonical project version is `[project].version` in `pyproject.toml`.
-Version `0.0.0` is a development placeholder that produces no release. Stable
-and prerelease versions must be normalized PEP 440 versions. The workflow
-creates the exact `v<project-version>` Git tag from the merged `main` commit.
+The root `VERSION` file is the canonical desktop release request. It contains
+one bare SemVer, optionally followed by one LF: for example `0.1.0-alpha.1` or
+`0.1.0`. Prefixes, whitespace, leading zeroes and build metadata are rejected.
+`0.0.0` reserves the unreleased development state. The workflow derives the
+exact `v<VERSION>` tag from the merged `main` commit. The Python package version
+is a source-package placeholder and does not request a desktop release.
+
+Maintain the canonical [CHANGELOG](../../CHANGELOG.md) with `Unreleased` first
+and dated UTC entries for each intended release. Start initial validation with
+`0.1.0-alpha.1`, increment the alpha number for fixes, and promote to `0.1.0`
+only after the installed Windows artifact works. Retain published alpha history.
 
 ## Prerequisites
 
 - Prepare and merge the intended release changes through the normal pull request
   and required-check process.
-- Set `[project].version` to the intended non-`0.0.0` release version in that
+- Set `VERSION` to the intended non-`0.0.0` release version in that
   reviewed commit. Do not create the release tag manually.
-- Confirm that the Lint and Test pull request checks pass before merge. The
-  Build workflow runs only after a push to `main` and repeats their quality
+- Confirm that the Check and Test pull request checks pass before merge. The
+  Main workflow runs only after a push to `main` and repeats their quality
   gates against the exact merged source commit before publication.
 - Confirm that immutable releases remain enabled in the GitHub repository
   settings. The workflow checks this again before creating or publishing a
@@ -28,10 +35,10 @@ creates the exact `v<project-version>` Git tag from the merged `main` commit.
 ## Publish
 
 Merge the version change and intended release contents into `main`. The push to
-`main` starts the Build workflow, which owns the complete build-and-release
+`main` starts the Main workflow, which owns the complete build-and-release
 sequence. It performs these state-changing actions in order:
 
-1. Reads the normalized project version from `pyproject.toml`. Version `0.0.0`
+1. Reads the canonical SemVer from `VERSION`. Version `0.0.0`
    completes without release work. An already-published immutable version does
    so only after its exact asset set and attestation pass again.
 2. Runs workflow lint, pin cooldown, Markdown lint, Ruff, strict mypy, and the
@@ -57,7 +64,7 @@ The expected release assets are:
 
 ## Verify
 
-Wait for the Build workflow to pass, then verify the release and each
+Wait for the Main workflow to pass, then verify the release and each
 downloaded artifact:
 
 ```powershell
@@ -95,7 +102,7 @@ upgrade.
   stops. Do not publish artifacts from a different commit under the same
   version.
 - A published release is immutable. Do not attempt to replace its assets or move
-  its tag. Correct a published defect with a new project version and release.
+  its tag. Correct a published defect with a new VERSION value and release.
 
 Update this procedure whenever the version source, supported targets, archive
 formats, manifest schema, repository release controls, or workflow changes.

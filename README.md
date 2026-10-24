@@ -22,6 +22,9 @@ outputs are not attempted for that payload.
 The [developer documentation map](docs/README.md) separates external contracts,
 application architecture, and maintenance procedures.
 
+See [CHANGELOG.md](CHANGELOG.md) for release history. Desktop release identity
+comes from the root `VERSION` file.
+
 ## Install and run
 
 No packaged release has been published yet. When a release is available, its

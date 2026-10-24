@@ -1,15 +1,15 @@
 name: Generate project version metadata
-description: Extract and validate canonical build metadata from pyproject.toml.
+description: Extract and validate canonical SemVer build metadata from VERSION.
 
 inputs:
-  pyproject_file:
-    description: Path to the canonical pyproject.toml file.
+  version_file:
+    description: Path to the canonical VERSION file.
     required: false
-    default: pyproject.toml
+    default: VERSION
 
 outputs:
   project_version:
-    description: Normalized PEP 440 project version.
+    description: Canonical SemVer release version.
     value: ${{ steps.metadata.outputs.project_version }}
   build_version:
     description: Three-segment version accepted by Flet and Flutter desktop builds.
@@ -30,5 +30,5 @@ runs:
       shell: bash
       run: |
         uv run --locked python scripts/version_metadata.py \
-          --pyproject "${{ inputs.pyproject_file }}" \
+          --version-file "${{ inputs.version_file }}" \
           --github-output "${GITHUB_OUTPUT}"

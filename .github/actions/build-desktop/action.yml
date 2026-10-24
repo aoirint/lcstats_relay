@@ -15,7 +15,7 @@ inputs:
 
 outputs:
   project_version:
-    description: Normalized PEP 440 project version.
+    description: Canonical SemVer release version.
     value: ${{ steps.version.outputs.project_version }}
   git_version:
     description: Git tag derived from the canonical project version.
@@ -100,7 +100,7 @@ runs:
       env:
         FLET_CLI_NO_RICH_OUTPUT: "1"
       run: |
-        # Use the canonical PEP 440 version for artifact identity while
+        # Use the canonical SemVer for artifact identity while
         # passing Flet the required three-segment Flutter build version.
         uv run --locked flet build "${{ inputs.target }}" \
           --build-number "${{ inputs.build_number }}" \

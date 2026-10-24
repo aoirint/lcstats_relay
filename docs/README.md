@@ -36,6 +36,6 @@ The root [README](../README.md) remains the concise user entry point.
   failure recovery.
 
 Windows and Linux desktop bundles are validated in CI. A push to `main` reads
-the version from `pyproject.toml` and starts the automated draft-first
+the version from root `VERSION` and starts the automated draft-first
 publication procedure when that version has not been released, although no
 packaged release has been published yet.

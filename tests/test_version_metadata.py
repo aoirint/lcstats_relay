@@ -1,4 +1,4 @@
-"""Tests for pyproject-based Flet build version metadata."""
+"""Release identity tests for canonical SemVer and native build versions."""
 
 from pathlib import Path
 
@@ -11,66 +11,65 @@ from scripts.version_metadata import main, read_version_metadata
     ("version", "build_version", "release_mode"),
     [
         ("0.0.0", "0.0.0", "edge"),
-        ("1.2", "1.2.0", "latest"),
-        ("1.2.3", "1.2.3", "latest"),
-        ("1.2.3a1", "1.2.3", "prerelease"),
-        ("1.2.3.dev1", "1.2.3", "prerelease"),
+        ("0.1.0-alpha.1", "0.1.0", "prerelease"),
+        ("0.1.0-alpha.12", "0.1.0", "prerelease"),
+        ("0.1.0", "0.1.0", "latest"),
+        ("1.2.3-rc.1", "1.2.3", "prerelease"),
     ],
 )
-def test_read_version_metadata(
-    *,
-    tmp_path: Path,
-    version: str,
-    build_version: str,
-    release_mode: str,
+def test_release_identity(
+    *, tmp_path: Path, version: str, build_version: str, release_mode: str
 ) -> None:
-    """Preserve PEP 440 identity while deriving Flet's x.y.z build value."""
-    pyproject = tmp_path / "pyproject.toml"
-    pyproject.write_text(f'[project]\nversion = "{version}"\n', encoding="utf-8")
-
-    metadata = read_version_metadata(pyproject_path=pyproject)
-
+    """Keep SemVer in tags/archives while deriving Flutter's numeric version."""
+    path = tmp_path / "VERSION"
+    path.write_text(f"{version}\n", encoding="ascii", newline="\n")
+    metadata = read_version_metadata(version_path=path)
     assert metadata.project_version == version
-    assert metadata.build_version == build_version
     assert metadata.git_version == f"v{version}"
+    assert metadata.build_version == build_version
     assert metadata.release_mode == release_mode
 
 
 @pytest.mark.parametrize(
-    ("document", "message"),
+    "document",
     [
-        ("[build-system]\nrequires = []\n", "must define"),
-        ('[project]\nversion = "not a version"\n', "PEP 440"),
-        ('[project]\nversion = "1.0RC1"\n', "must be normalized"),
-        ('[project]\nversion = "1.0.0.0"\n', "too many release segments"),
-        ('[project]\nversion = "1!1.0.0"\n', "epoch or local"),
-        ('[project]\nversion = "1.0.0+local"\n', "epoch or local"),
+        "",
+        "v0.1.0\n",
+        "0.1\n",
+        "0.1.0a1\n",
+        "01.1.0\n",
+        "0.1.0-alpha.01\n",
+        "0.1.0+build.1\n",
+        " 0.1.0\n",
+        "0.1.0 \n",
+        "0.1.0\n\n",
+        "0.1.0\r\n",
+        "0.1.0\nother\n",
     ],
 )
-def test_read_version_metadata_rejects_unsupported_versions(
-    *,
-    tmp_path: Path,
-    document: str,
-    message: str,
-) -> None:
-    """Reject identities that cannot remain consistent across build surfaces."""
-    pyproject = tmp_path / "pyproject.toml"
-    pyproject.write_text(document, encoding="utf-8")
+def test_reject_noncanonical_release(*, tmp_path: Path, document: str) -> None:
+    """Reject ambiguous identities before they become immutable tags."""
+    path = tmp_path / "VERSION"
+    path.write_bytes(document.encode("ascii"))
+    with pytest.raises(ValueError, match="canonical SemVer"):
+        read_version_metadata(version_path=path)
 
-    with pytest.raises(ValueError, match=message):
-        read_version_metadata(pyproject_path=pyproject)
+
+def test_missing_version_file(*, tmp_path: Path) -> None:
+    """A missing release request must fail rather than choose a fallback."""
+    with pytest.raises(FileNotFoundError):
+        read_version_metadata(version_path=tmp_path / "VERSION")
 
 
 def test_main_writes_github_outputs(*, tmp_path: Path) -> None:
-    """Expose stable output names for the local Composite Action."""
-    pyproject = tmp_path / "pyproject.toml"
+    """Expose the same validated alpha identity to every CI consumer."""
+    path = tmp_path / "VERSION"
+    path.write_bytes(b"0.1.0-alpha.1")
     output = tmp_path / "github-output.txt"
-    pyproject.write_text('[project]\nversion = "1.2.3"\n', encoding="utf-8")
-
-    assert main(argv=["--pyproject", str(pyproject), "--github-output", str(output)]) == 0
-    assert output.read_text(encoding="utf-8").splitlines() == [
-        "project_version=1.2.3",
-        "build_version=1.2.3",
-        "git_version=v1.2.3",
-        "release_mode=latest",
+    assert main(argv=["--version-file", str(path), "--github-output", str(output)]) == 0
+    assert output.read_text().splitlines() == [
+        "project_version=0.1.0-alpha.1",
+        "build_version=0.1.0",
+        "git_version=v0.1.0-alpha.1",
+        "release_mode=prerelease",
     ]
