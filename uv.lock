@@ -446,6 +446,18 @@ wheels = [
 ]
 
 [[package]]
+name = "flet-secure-storage"
+version = "1.0.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flet" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ff/80/2a88d2ce58e425fda1bbe743daa2aab34d98adae69dde8f1a767e8cdd9ff/flet_secure_storage-1.0.4.tar.gz", hash = "sha256:77240d9a2f8d529d8bb50fffc1494ac1b7cad68d6c7517ebd6741d6ad59116d7", size = 15977, upload-time = "2026-10-08T22:25:53.044Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/47/74/f324dd2b6af478b9d6960fdfdd34c7a192fc30653ef83c97f55bf8d44071/flet_secure_storage-1.0.4-py3-none-any.whl", hash = "sha256:55db99b025ffaa9d811ab2c12cf4b689297ac47b48fcbccc0eeff615db9dfd72", size = 16669, upload-time = "2026-10-08T22:25:52.047Z" },
+]
+
+[[package]]
 name = "flet-web"
 version = "1.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -594,6 +606,7 @@ version = "0.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "flet", extra = ["all"] },
+    { name = "flet-secure-storage" },
     { name = "httpx" },
 ]
 
@@ -609,6 +622,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "flet", extras = ["all"], specifier = ">=1.0.4,<1.1.0" },
+    { name = "flet-secure-storage", specifier = "==1.0.4" },
     { name = "httpx", specifier = ">=0.28.1,<0.29.0" },
 ]
 

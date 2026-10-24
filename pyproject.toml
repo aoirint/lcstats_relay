@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "flet[all]>=1.0.4,<1.1.0",
+    "flet-secure-storage==1.0.4",
     "httpx>=0.28.1,<0.29.0",
 ]
 
@@ -181,3 +182,8 @@ exclude_also = ['if __name__ == "__main__":']
 fail_under = 100
 show_missing = true
 skip_covered = false
+
+# The official extension has annotations but does not ship py.typed.
+[[tool.mypy.overrides]]
+module = ["flet_secure_storage", "flet_secure_storage.*"]
+follow_untyped_imports = true

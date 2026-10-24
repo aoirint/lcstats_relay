@@ -764,12 +764,19 @@ def test_default_client_factory_uses_supplied_timeout() -> None:
 def test_app_composition_builds_standard_outputs(*, tmp_path: Path) -> None:
     """Assemble archive, GAS, and auth without putting those details in the UI."""
     handler = _TransportHandler()
+    delivered = asyncio.Event()
+
+    def on_state(*, state: ConnectionState) -> None:
+        gas = state.outputs.get("gas")
+        if gas is not None and gas.success_count:
+            delivered.set()
+
     manager = create_connection_manager(
         sse_url="http://localhost:2145/",
         gas_url="https://script.google.com/macros/s/id/exec",
         gas_token="secret",  # noqa: S106 - inert test fixture, not a credential.
         data_dir=tmp_path,
-        on_state=_ignore_state,
+        on_state=on_state,
         on_payload=_ignore_payload,
         client_factory=_client_factory(handler=handler),
     )
@@ -779,8 +786,10 @@ def test_app_composition_builds_standard_outputs(*, tmp_path: Path) -> None:
 
     async def scenario() -> None:
         manager.start()
-        await _wait_for(predicate=lambda: manager.state.outputs["gas"].success_count == 1)
-        await manager.stop()
+        try:
+            await asyncio.wait_for(delivered.wait(), timeout=10)
+        finally:
+            await manager.stop()
 
     asyncio.run(scenario())
     assert handler.post_count == 1

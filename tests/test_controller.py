@@ -3,6 +3,8 @@
 import asyncio
 from pathlib import Path
 
+from credential_fakes import MemoryTokens
+
 from lcstats_relay.application.relay import PayloadCallback
 from lcstats_relay.application.settings import RelaySettings
 from lcstats_relay.application.state import ConnectionState, RelayStatus, StateCallback
@@ -66,6 +68,7 @@ def test_controller_forwards_manager_state_payload_and_cleanup(*, tmp_path: Path
 
         controller = MonitorController(
             settings_gateway=settings,
+            token_store=MemoryTokens(),
             manager_factory=manager_factory,
         )
         controller.bind(

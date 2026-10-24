@@ -76,9 +76,24 @@ incident.
 
 ## Secrets
 
-The GAS token is intentionally not part of `RelaySettings`. It remains in
-memory for the current application process and is applied as a query parameter
-only to the outgoing GAS request. Restarting the app clears it.
+The GAS token is not part of `RelaySettings`. **設定 → Google Apps Script → 設定**
+opens GAS authentication. **保存** stores the token in the platform credential
+store; on Windows this is **Windows 資格情報マネージャー**. Restart restores it.
+A saved-status row replaces the input field until **変更** is selected. Entering
+a replacement updates that destination's credential; a blank replacement keeps
+its saved value. A destination without a saved token retains unauthenticated
+GAS behavior.
+
+**保存トークンを削除** removes the current destination's credential and memory copy.
+It is disabled while the URL field contains an unsaved edit. Clearing the GAS
+URL disables output but retains saved credentials: delete first when forgetting
+them is intended. An OS-store failure leaves accepted settings unchanged and
+shows an error; unlock or repair the store, then retry. No plaintext fallback
+is used. Architectural details belong to the
+[credential decision](../architecture/ui-state-and-lifecycle.md#credential-persistence-decision).
+
+The restored token remains in memory for outgoing GAS authentication and is
+applied as a query parameter only while preparing the request.
 
 Do not put the token in the GAS URL, settings file, tests, logs, screenshots,
 archive records, or retry records. Rotate the remote token if it is exposed.

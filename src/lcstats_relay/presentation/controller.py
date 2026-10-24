@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
+from lcstats_relay.application.credentials import CredentialStoreError, GasTokenStore
+from lcstats_relay.application.diagnostics import emit
 from lcstats_relay.application.relay import PayloadCallback
 from lcstats_relay.application.settings import RelaySettings
 from lcstats_relay.application.state import ConnectionState, StateCallback
@@ -63,9 +66,13 @@ class MonitorController:
         self,
         *,
         settings_gateway: SettingsGateway,
+        token_store: GasTokenStore,
         manager_factory: ManagerFactory,
     ) -> None:
         """Load settings and retain injected application boundaries."""
+        self._token_store = token_store
+        self._credentials_busy = False
+        self._closed = False
         self._settings_gateway = settings_gateway
         self._manager_factory = manager_factory
         self._settings = settings_gateway.load()
@@ -108,6 +115,8 @@ class MonitorController:
 
     def save_settings(self, *, tracker_url: str, data_dir: str) -> bool:
         """Validate and persist tracker plus local storage settings."""
+        if self._credentials_busy or self.active:
+            return False
         try:
             settings = RelaySettings(
                 tracker_url=validate_sse_url(value=tracker_url),
@@ -124,28 +133,87 @@ class MonitorController:
         self._notify()
         return True
 
-    def save_gas_auth(self, *, gas_url: str, gas_token: str) -> bool:
-        """Persist the GAS URL while retaining its token only in memory."""
+    @property
+    def credentials_busy(self) -> bool:
+        """Report an outstanding OS operation so edits cannot overlap."""
+        return self._credentials_busy
+
+    async def restore_gas_token(self) -> None:
+        """Restore before the editable view is mounted; settings contain no secret."""
+        if not self._settings.gas_url:
+            return
+        try:
+            url = validate_gas_url(value=self._settings.gas_url)
+            self._gas_token = await self._token_store.load(gas_url=url) or ""
+        except ValueError as exc:
+            self._form_error = str(exc)
+        except CredentialStoreError:
+            self._credential_failure(operation="load")
+
+    async def save_gas_auth(self, *, gas_url: str, gas_token: str) -> bool:
+        """Save the secret first, then accept its non-secret destination."""
+        if self._credentials_busy or self.active:
+            return False
         try:
             normalized_url = validate_gas_url(value=gas_url) if gas_url.strip() else ""
         except ValueError as exc:
             self._form_error = str(exc)
             self._notify()
             return False
-        settings = RelaySettings(
-            tracker_url=self._settings.tracker_url,
-            gas_url=normalized_url,
-            data_dir=self._settings.data_dir,
-        )
-        self._settings_gateway.save(settings=settings)
-        self._settings = settings
-        self._gas_token = gas_token.strip() if normalized_url else ""
-        self._form_error = ""
+        self._credentials_busy = True
         self._notify()
-        return True
+        try:
+            token = gas_token.strip() if normalized_url else ""
+            if normalized_url:
+                if token:
+                    await self._token_store.save(gas_url=normalized_url, token=token)
+                else:
+                    token = await self._token_store.load(gas_url=normalized_url) or ""
+            settings = RelaySettings(
+                tracker_url=self._settings.tracker_url,
+                gas_url=normalized_url,
+                data_dir=self._settings.data_dir,
+            )
+            await asyncio.to_thread(self._settings_gateway.save, settings=settings)
+            self._settings = settings
+            self._gas_token = token
+            self._form_error = ""
+        except CredentialStoreError:
+            self._credential_failure(operation="save")
+            return False
+        else:
+            return True
+        finally:
+            self._credentials_busy = False
+            self._notify()
+
+    async def delete_gas_token(self) -> bool:
+        """Forget the accepted destination's credential, including its memory copy."""
+        if self._credentials_busy or self.active or not self._settings.gas_url:
+            return False
+        self._credentials_busy = True
+        self._notify()
+        try:
+            await self._token_store.delete(gas_url=self._settings.gas_url)
+            self._gas_token = ""
+            self._form_error = ""
+        except CredentialStoreError:
+            self._credential_failure(operation="delete")
+            return False
+        else:
+            return True
+        finally:
+            self._credentials_busy = False
+            self._notify()
+
+    def _credential_failure(self, *, operation: str) -> None:
+        self._form_error = "OSの認証情報ストアを利用できません。設定から再試行してください"
+        emit(event=f"credential_{operation}_failed", category="credential_store", failed=True)
 
     async def start(self) -> bool:
         """Validate settings and replace the owned manager session."""
+        if self._credentials_busy:
+            return False
         try:
             tracker_url = validate_sse_url(value=self._settings.tracker_url)
             gas_url = (
@@ -190,6 +258,7 @@ class MonitorController:
 
     async def close(self) -> None:
         """Stop background work without notifying an unmounting UI."""
+        self._closed = True
         if self._manager is not None:
             await self._manager.stop()
             self._manager = None
@@ -203,4 +272,5 @@ class MonitorController:
         self._on_payload(payload=payload)
 
     def _notify(self) -> None:
-        self._on_change()
+        if not self._closed:
+            self._on_change()

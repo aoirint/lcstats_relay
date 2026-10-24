@@ -11,9 +11,11 @@ This is the canonical development and GitHub release history. Versions follow
 - Relay local tracker events to Google Sheets, retain local JSON archives, and
   retry failed deliveries from a durable queue.
 - Provide connection status, receive/delivery counts, configuration and
-  memory-only GAS authentication in a desktop monitor.
+  GAS authentication in a desktop monitor.
 - Retain operational traces and payload correlation IDs across restarts with
   Python standard logging and file rotation.
+- Save GAS tokens through the official Flet OS credential service, restore them
+  after restart, and support explicit replacement and deletion.
 - Define release identity in the root `VERSION` file and maintain this history.
 
 ### Fixed

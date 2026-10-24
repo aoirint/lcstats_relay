@@ -18,7 +18,8 @@ current responsibility groups:
 - `presentation/` owns Flet-free validation, immutable presentation models,
   presenters, settings, and connection lifecycle coordination.
 - `ui/` constructs Flet controls, emits intents to the controller, and renders
-  presentation state.
+  presentation state. Its official Flet service adapter implements the OS
+  credential port; the entry point constructs it inside the active page context.
 - `infrastructure/` implements HTTP, authentication, settings, atomic files,
   archives, the retry queue, and standard logging configuration.
 - `entrypoints/flet_app.py` configures the Flet page and mounts the monitor.
@@ -34,7 +35,7 @@ application, and presentation modules do not import Flet.
 ## Runtime flow
 
 1. `entrypoints/flet_app.py` creates `MonitorView` with a production
-   `MonitorController`.
+   `MonitorController`, restores its saved OS credential, then mounts controls.
 2. The user supplies a loopback tracker URL, a data directory, and optionally a
    GAS destination and token.
 3. `composition/application.py` builds a required archive output and, when
@@ -75,8 +76,8 @@ The current layout still has bounded limitations:
 - `ConnectionManager` owns the session task but does not expose an unexpected
   terminal task failure as a distinct lifecycle result.
 - Settings load/save remains a synchronous presentation gateway. Loading occurs
-  before a relay session is started and saving uses synchronous handler paths;
-  any future async settings path must offload the adapter explicitly.
+  before a relay session is started. General settings use synchronous handler
+  paths; asynchronous GAS settings explicitly offload the settings write.
 - LCStatsTracker values are validated as bounded UTF-8 JSON, but the relay does
   not own a versioned field-level payload schema.
 
