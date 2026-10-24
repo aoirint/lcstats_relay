@@ -39,6 +39,10 @@ def test_retry_queue_round_trip(*, tmp_path: Path) -> None:
     assert item.storage_key == str(path)
     assert item.output_key == "gas"
     assert item.payload == payload
+    assert item.payload.correlation_id == payload.correlation_id
+    assert (
+        RetryQueue(data_dir=tmp_path).pending()[0].payload.correlation_id == payload.correlation_id
+    )
 
     queue.remove(item=item)
     queue.remove(item=item)
@@ -46,13 +50,19 @@ def test_retry_queue_round_trip(*, tmp_path: Path) -> None:
     assert queue.count() == 0
 
 
-def test_retry_queue_loads_legacy_record(*, tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "diagnostic_fields", [{}, {"correlation_id": "invalid"}, {"correlation_id": 42}]
+)
+def test_retry_queue_loads_legacy_record(
+    *, tmp_path: Path, diagnostic_fields: dict[str, object]
+) -> None:
     """Keep compatibility with early queue files that lacked output metadata."""
     queue_dir = tmp_path / "queue"
     queue_dir.mkdir()
     (queue_dir / "legacy.json").write_text(
         json.dumps(
             {
+                **diagnostic_fields,
                 "queued_at": "2026-06-20T10:08:12",
                 "archive_file": "data/archive/payload.json",
                 "payload": {"Seed": 42},
@@ -61,7 +71,12 @@ def test_retry_queue_loads_legacy_record(*, tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    [item] = RetryQueue(data_dir=tmp_path).pending()
+    original = (queue_dir / "legacy.json").read_bytes()
+    queue = RetryQueue(data_dir=tmp_path)
+    assert queue.count(output_key="gas") == 1
+    [item] = queue.pending()
+    assert (queue_dir / "legacy.json").read_bytes() == original
+    assert item.payload.correlation_id == ""
 
     assert item.output_key == "gas"
     assert item.payload.raw_json == '{"Seed":42}'

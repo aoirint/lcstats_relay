@@ -126,20 +126,17 @@ class RetryQueue:
                 payload=payload,
                 received_at=received_datetime,
                 parse_error=parse_error,
-                correlation_id=_queue_correlation_id(record=record, path=path),
+                correlation_id=_queue_correlation_id(record=record),
             ),
         )
 
 
-def _queue_correlation_id(*, record: dict[str, JSONValue], path: Path) -> str:
+def _queue_correlation_id(*, record: dict[str, JSONValue]) -> str:
     value = record.get("correlation_id")
     if isinstance(value, str):
         try:
             return UUID(hex=value).hex
         except ValueError:
             pass
-    # Legacy records have no ID. Persist a random one once so restarts retain it.
-    value = uuid4().hex
-    record["correlation_id"] = value
-    write_text_atomic(path=path, content=f"{json.dumps(record, ensure_ascii=False, indent=2)}\n")
-    return value
+    # Older records remain readable without modifying persisted payloads for diagnostics.
+    return ""

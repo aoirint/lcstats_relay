@@ -39,9 +39,9 @@ old absolute path before changing it and preserve pending deliveries there.
 Each UTF-8 JSONL record contains a UTC timestamp, severity, process-session ID,
 and event name. Payload events also carry a random `correlation_id`. A new
 archive filename ends in that ID, and queue records retain it across retries
-and restarts. Legacy queue records receive a random ID on their first scan;
-this atomically updates only their diagnostic metadata. If that update fails,
-the scan reports a queue-read failure and leaves the original record intact.
+and restarts. Older queue records without a valid ID are read without modification.
+Their retry events omit the correlation ID, so cross-attempt correlation is
+available only for new records. Diagnostic metadata never triggers a migration.
 IDs identify a received item, not a player or a content hash. Receiving the same
 JSON twice creates two IDs; this is not remote deduplication.
 
@@ -54,8 +54,8 @@ by `session_id` for one run and `correlation_id` for one delivery. Look for
 
 Failure records contain a bounded category and, for HTTP failures, the numeric
 status. Categories distinguish `authentication`, `http`, `transport`,
-`timeout`, `response_format`, `json_parse`, `application`, `archive`, `queue`,
-`storage`, and `unexpected`. Authentication classification recognizes HTTP
+`timeout`, `response_format`, `json_parse`, `application`, `archive`, `queue`, and
+`storage`. Authentication classification recognizes HTTP
 401/403 and the known non-JSON GAS response containing `Invalid token`.
 Other HTML errors are classified as `response_format` without storing the page.
 An unrecognized output failure uses `delivery`.
@@ -73,8 +73,8 @@ The UI marks **診断ログ書き込み失敗** on its next state refresh; this 
 remains for the process lifetime because some records may already be missing.
 Correct permissions/free space and restart. A final close failure may occur
 after the UI has closed. The error fallback never prints the failed record or
-exception traceback. Unexpected connection-task failures stop that session and
-show a safe error; stop and reconnect after correcting the cause.
+exception traceback. Unexpected application errors retain their existing propagation
+behavior; logging does not convert them into handled connection errors.
 
 ### Sharing diagnostics
 

@@ -10,7 +10,6 @@ EVENTS = frozenset(
         "application_failed",
         "connection_started",
         "connection_stopped",
-        "connection_failed",
         "receive_waiting",
         "receive_connected",
         "receive_failed",
@@ -47,7 +46,6 @@ CATEGORIES = frozenset(
         "application",
         "queue",
         "storage",
-        "unexpected",
     ]
 )
 

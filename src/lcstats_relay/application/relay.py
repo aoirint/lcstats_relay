@@ -150,14 +150,6 @@ class ConnectionManager:
         self._state.stop()
 
     async def _run(self) -> None:
-        try:
-            await self._run_session()
-        except Exception:
-            # Never log exception text from adapters or task groups.
-            emit(event="connection_failed", category="unexpected", failed=True)
-            self._state.receiver_error(message="接続処理が停止しました。診断ログを確認してください")
-
-    async def _run_session(self) -> None:
         async with self._runtime_factory() as session:
             dispatcher = OutputDispatcher(
                 outputs=session.outputs,

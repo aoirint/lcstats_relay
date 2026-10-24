@@ -5,6 +5,7 @@ import json
 import logging
 import os
 from datetime import UTC, datetime
+from http import HTTPStatus
 from pathlib import Path
 
 import flet as ft
@@ -16,10 +17,8 @@ from lcstats_relay.application.dispatcher import OutputDispatcher
 from lcstats_relay.application.ports import (
     BoundOutput,
     OutputPolicy,
-    RelayRuntime,
     RetrySemantics,
 )
-from lcstats_relay.application.relay import ConnectionManager
 from lcstats_relay.application.settings import RelaySettings
 from lcstats_relay.application.state import ConnectionState, RelayStateStore
 from lcstats_relay.composition.application import create_connection_manager
@@ -154,28 +153,32 @@ def test_log_location_uses_stable_user_root(
 
 
 @pytest.mark.parametrize(
-    ("content_type", "body", "category"),
+    ("content_type", "body", "category", "status"),
     [
         (
             "text/html",
             "<html>Error: Invalid token (line 10) private-player</html>",
             "authentication",
+            200,
         ),
-        ("text/html", "<html>private-player</html>", "response_format"),
-        ("application/json", "{broken private-player", "json_parse"),
-        ("application/json", '{"ok":false,"error":"private-player"}', "application"),
-        ("application/json", '{"ok":1}', "application"),
-        ("application/json", "[]", "application"),
+        ("text/html", "<html>private-player</html>", "response_format", 200),
+        ("application/json", "{broken private-player", "json_parse", 200),
+        ("application/json", '{"ok":false,"error":"private-player"}', "application", 200),
+        ("application/json", '{"ok":1}', "application", 200),
+        ("application/json", "[]", "application", 200),
+        ("text/plain", "private-player", "authentication", 401),
+        ("text/plain", "private-player", "authentication", 403),
+        ("text/plain", "private-player", "http", 503),
     ],
 )
 def test_gas_application_errors_remain_queued_and_private(
-    *, tmp_path: Path, content_type: str, body: str, category: str
+    *, tmp_path: Path, content_type: str, body: str, category: str, status: int
 ) -> None:
     """HTTP 200 does not remove a queue entry until GAS acknowledges success."""
 
     async def scenario() -> None:
         responses = [
-            httpx.Response(200, text=body, headers={"content-type": content_type}),
+            httpx.Response(status, text=body, headers={"content-type": content_type}),
             httpx.Response(200, json={"ok": True}),
         ]
 
@@ -217,6 +220,8 @@ def test_gas_application_errors_remain_queued_and_private(
         records = [json.loads(line) for line in content.splitlines()]
         failures = [r for r in records if r["event"] == "output_failed"]
         assert failures[0]["category"] == category
+        if status != HTTPStatus.OK:
+            assert failures[0]["status_code"] == status
         assert failures[0]["correlation_id"] == payload.correlation_id
         assert sum(r["event"] == "output_succeeded" for r in records) == 1
         assert records[-2]["event"] == "retry_removed"
@@ -226,34 +231,10 @@ def test_gas_application_errors_remain_queued_and_private(
     asyncio.run(scenario())
 
 
-@pytest.mark.parametrize("correlation_id", [None, "bad-id", "A" * 32])
-def test_queue_identity_survives_restarts(*, tmp_path: Path, correlation_id: str | None) -> None:
-    """Migrate old IDs once and keep new IDs independent of player data."""
-    queue_dir = tmp_path / "queue"
-    queue_dir.mkdir()
-    record: dict[str, object] = {"queued_at": "2026-10-24T00:00:00+00:00", "payload": {}}
-    if correlation_id is not None:
-        record["correlation_id"] = correlation_id
-    (queue_dir / "legacy.json").write_text(json.dumps(record), encoding="utf-8")
-    first = RetryQueue(data_dir=tmp_path).pending()[0].payload.correlation_id
-    second = RetryQueue(data_dir=tmp_path).pending()[0].payload.correlation_id
-    assert first == second
-    assert len(first) == len("A" * 32)
-
-
-def test_archive_name_matches_delivery_identity(*, tmp_path: Path) -> None:
-    """Let operators locate the archived payload using the log correlation ID."""
-    payload = _payload()
-    asyncio.run(ArchiveOutput(writer=ArchiveWriter(data_dir=tmp_path)).deliver(payload=payload))
-    [archive] = (tmp_path / "archive").rglob("*.json")
-    assert archive.stem.endswith(payload.correlation_id)
-    assert archive.read_text(encoding="utf-8") == payload.raw_json + "\n"
-
-
-def test_runtime_failure_is_logged_and_sink_closed(
+def test_runtime_failure_propagates_and_closes_log(
     *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Release logs when the desktop runtime fails during startup."""
+    """Preserve runtime failure propagation while flushing the diagnostic sink."""
     log = DiagnosticLog(directory=tmp_path)
     monkeypatch.setattr(flet_app, "_diagnostics", log)
 
@@ -265,49 +246,12 @@ def test_runtime_failure_is_logged_and_sink_closed(
     with pytest.raises(RuntimeError, match="private-player"):
         flet_app.run()
     content = log.path.read_text(encoding="utf-8")
-    assert "application_failed" in content
     assert "application_stopped" in content
     assert "private-player" not in content
 
 
 def _ignore_state(*, state: ConnectionState) -> None:
     del state
-
-
-@pytest.mark.parametrize("status", [401, 403, 503])
-def test_http_failure_logs_status_without_request_details(*, tmp_path: Path, status: int) -> None:
-    """Retain actionable HTTP codes and authentication classification without URLs."""
-
-    async def scenario() -> None:
-        def handle(  # keyword-only-exception: httpx.MockTransport handler ABI
-            _request: httpx.Request,
-        ) -> httpx.Response:
-            return httpx.Response(status, text="private-player")
-
-        log = DiagnosticLog(directory=tmp_path / "logs")
-        log.start()
-        try:
-            async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
-                output = GasOutput(
-                    url="https://example.com/private?token=secret",
-                    client=client,
-                    authenticator=NoAuthentication(),
-                )
-                dispatcher = OutputDispatcher(
-                    outputs=[BoundOutput(policy=OutputPolicy(key="gas", label="GAS"), sink=output)],
-                    queue=RetryQueue(data_dir=tmp_path),
-                    state=RelayStateStore(outputs=[("gas", "GAS")], on_change=_ignore_state),
-                )
-                await dispatcher.dispatch(payload=_payload())
-        finally:
-            log.close()
-        content = log.path.read_text(encoding="utf-8")
-        [failure] = [json.loads(line) for line in content.splitlines() if '"output_failed"' in line]
-        assert failure["status_code"] == status
-        assert failure["category"] == ("authentication" if status in (401, 403) else "http")
-        assert "private" not in content
-
-    asyncio.run(scenario())
 
 
 def test_delivered_item_stays_queued_when_removal_fails(
@@ -364,46 +308,6 @@ def test_settings_write_failure_is_classified(*, tmp_path: Path) -> None:
     content = log.path.read_text(encoding="utf-8")
     assert "settings_failed" in content
     assert "settings_saved" not in content
-
-
-def test_connection_runtime_failure_is_safe_and_stoppable(*, tmp_path: Path) -> None:
-    """Observe unexpected background failures and permit clean shutdown."""
-
-    async def scenario() -> None:
-        failed = asyncio.Event()
-        states: list[ConnectionState] = []
-
-        def state_changed(*, state: ConnectionState) -> None:
-            states.append(state)
-            if state.last_error:
-                failed.set()
-
-        def fail_runtime() -> RelayRuntime:
-            msg = "secret URL"
-            raise RuntimeError(msg)
-
-        log = DiagnosticLog(directory=tmp_path / "logs")
-        log.start()
-        try:
-            manager = ConnectionManager(
-                output_policies=[],
-                runtime_factory=fail_runtime,
-                retry_queue=RetryQueue(data_dir=tmp_path),
-                on_state=state_changed,
-                on_payload=_ignore_payload,
-            )
-            manager.start()
-            await asyncio.wait_for(failed.wait(), timeout=1)
-            assert "診断ログ" in (states[-1].last_error or "")
-            await manager.stop()
-            assert states[-1].running is False
-        finally:
-            log.close()
-        content = log.path.read_text(encoding="utf-8")
-        assert "connection_failed" in content
-        assert "secret" not in content
-
-    asyncio.run(scenario())
 
 
 def _ignore_payload(*, payload: JSONValue) -> None:

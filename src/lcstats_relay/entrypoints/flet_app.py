@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import flet as ft
 
-from lcstats_relay.application.diagnostics import emit
 from lcstats_relay.composition.application import create_monitor_controller
 from lcstats_relay.infrastructure.diagnostics import DiagnosticLog, default_log_dir
 from lcstats_relay.ui.monitor import MonitorView
@@ -35,8 +34,5 @@ def run() -> None:
     _diagnostics.start()
     try:
         ft.run(main)
-    except Exception:
-        emit(event="application_failed", category="unexpected", failed=True)
-        raise
     finally:
         _diagnostics.close()
