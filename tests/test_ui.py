@@ -502,11 +502,15 @@ def test_settings_view_links_to_full_window_gas_auth_view(*, tmp_path: Path) -> 
     output_section = next(
         section
         for section in settings_body.controls
-        if isinstance(section, ft.Column) and view.data_dir_field in section.controls
+        if isinstance(section, ft.Column)
+        and any(isinstance(control, ft.Container) for control in section.controls)
     )
-    output_row_container = cast("ft.Container", output_section.controls[2])
+    output_row_container = next(
+        control for control in output_section.controls if isinstance(control, ft.Container)
+    )
     output_row = cast("ft.Row", output_row_container.content)
-    gas_button = cast("Any", output_row.controls[1])
+    assert view.gas_auth_button in output_row.controls
+    gas_button = cast("Any", view.gas_auth_button)
     gas_button.on_click(None)
 
     assert _active_heading(view=view) == "GAS認証"
@@ -569,17 +573,19 @@ def test_diagnostic_status_and_paths_refresh_in_monitor(*, tmp_path: Path) -> No
         diagnostic_failure=lambda: failed,
     )
     view.build()
-    assert view.diagnostics_button.icon == ft.Icons.ARTICLE_OUTLINED
+    assert view.settings_button.icon == ft.Icons.SETTINGS
     assert view.diagnostics not in view.root_view.controls
     failed = True
     assert view.save_settings(tracker_url="http://localhost:2145/", data_dir=str(tmp_path / "new"))
-    assert view.diagnostics_button.icon == ft.Icons.ERROR_OUTLINE
-    assert view.diagnostics_button.tooltip == "診断ログ書き込み失敗: 保存先を確認してください"
-    assert view.diagnostics.value == str((tmp_path / "new").resolve())
+    assert view.settings_button.icon == ft.Icons.ERROR_OUTLINE
+    assert view.settings_button.tooltip == "診断ログ書き込み失敗: 保存先を確認してください"
+    assert str((tmp_path / "new").resolve()) in (view.diagnostics.value or "")
     view.open_settings()
     settings_body = next(c for c in view.root_view.controls if isinstance(c, ft.Column))
-    assert view.diagnostics not in settings_body.controls
-    view.open_diagnostics()
-    assert _active_heading(view=view) == "ログと保存先"
-    assert view.diagnostics in view.root_view.controls
+    storage_section = next(
+        control
+        for control in settings_body.controls
+        if isinstance(control, ft.Column) and view.data_dir_field in control.controls
+    )
+    assert view.diagnostics in storage_section.controls
     assert view.diagnostics.selectable
