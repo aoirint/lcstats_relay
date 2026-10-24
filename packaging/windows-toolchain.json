@@ -43,5 +43,6 @@
       "sha256": "0e61d5951758bee42b9e09e9bac25c8c83598c1e750da2bf8cba3f5a7777c86d",
       "cache": "dart-bridge/v1.10.0/dart_bridge_d-windows-x86_64.dll"
     }
-  ]
+  ],
+  "builder_pip": "26.2.2"
 }

@@ -63,9 +63,14 @@ if ($taskFlutterMetadata.frameworkVersion -ne $taskProfile.flutter) { throw "Une
 $taskWheels = Join-Path $taskTools "wheels"
 $taskRequirements = Join-Path $taskTools "runtime-requirements.txt"
 $taskConstraints = Join-Path $taskTools "runtime-constraints.txt"
-uv export --locked --no-dev --no-default-groups --no-emit-project --no-header --no-annotate --output-file $taskRequirements
-uv export --locked --no-dev --no-default-groups --no-emit-project --no-header --no-annotate --no-hashes --output-file $taskConstraints
+uv export --locked --no-dev --no-default-groups --no-emit-project --no-header --no-annotate --output-file $taskRequirements | Out-Null
+uv export --locked --no-dev --no-default-groups --no-emit-project --no-header --no-annotate --no-hashes --output-file $taskConstraints | Out-Null
+if (-not $env:UV_PYTHON_INSTALL_DIR) { $env:UV_PYTHON_INSTALL_DIR = Join-Path $taskTools "python" }
+$env:UV_PYTHON_BIN_DIR = Join-Path $taskTools "python-bin"
+uv python install ((Get-Content -LiteralPath .python-version -Raw).Trim())
 $taskBuilder = uv python find --system --managed-python
+$taskPipVersion = & $taskBuilder -c "import pip; print(pip.__version__)"
+if ($taskPipVersion -ne $taskProfile.builder_pip) { throw "Unexpected packaging pip version" }
 & $taskBuilder -m pip download --disable-pip-version-check --require-hashes --only-binary=:all: --dest $taskWheels --requirement $taskRequirements
 $env:PIP_NO_INDEX = "1"
 $env:PIP_FIND_LINKS = ([Uri]$taskWheels).AbsoluteUri
