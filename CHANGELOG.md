@@ -27,8 +27,6 @@ This is the canonical development and release history. Versions follow
 - Display connection status and received/delivered counts in the desktop monitor.
 - Configure the tracker endpoint, local save directory and GAS authentication
   from the app.
-- Save GAS tokens in Windows Credential Manager and restore them after restart.
-  Support replacing and deleting stored tokens.
 - Keep diagnostic logs across sessions for troubleshooting.
 
 ### Notes

@@ -2,7 +2,10 @@
 
 LCStats Relay is an async Flet desktop app that receives local statistics JSON
 from LCStatsTracker, archives the original payload, and optionally forwards the
-parsed value to Google Sheets through a Google Apps Script Web App.
+parsed value to Google Sheets through a compatible receiver.
+The [LCStats Overlay reference integration](https://github.com/aoirint/lcstats_overlay)
+provides that receiver as an Apps Script web app, the spreadsheet layout and an
+OBS browser overlay.
 
 The app expects LCStatsTracker to return one statistics payload per HTTP
 response. After each payload is processed, LCStats Relay reconnects and waits for
@@ -14,7 +17,9 @@ LCStats Relay dispatches each received payload to registered output surfaces.
 The standard output surfaces are:
 
 - Local archive: stores the received JSON under the configured directory.
-- Google Sheets: posts the parsed JSON to a configured Google Apps Script Web App.
+- Google Sheets: posts parsed JSON to a receiver implementing the
+  [delivery contract](docs/architecture/relay-output.md#google-sheets-through-google-apps-script).
+  Start with [`lcstats_overlay/code.gs`](https://github.com/aoirint/lcstats_overlay/blob/main/code.gs).
 
 The local archive is the required durability boundary. If archiving fails, later
 outputs are not attempted for that payload.
@@ -47,7 +52,8 @@ In the app window:
   `http://127.0.0.1:2145/`, and the local save directory.
 - Open GAS Auth to configure the deployed
   `https://script.google.com/macros/s/.../exec` URL and the token value if the
-  Google Apps Script deployment validates one.
+  receiver requires one. The LCStats Overlay receiver requires its configured
+  `LCSTATS_TOKEN`; use that value in GAS Auth.
 - Start the connection and leave the app running while LCStatsTracker is
   producing statistics. Stop the connection before changing its endpoint or
   data directory.
