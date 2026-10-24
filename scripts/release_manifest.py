@@ -11,6 +11,7 @@ import tomllib
 import zipfile
 from collections.abc import Sequence
 from dataclasses import dataclass
+from operator import attrgetter
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -198,7 +199,7 @@ def write_release_files(*, plan: ReleasePlan) -> None:
         _artifact_record(
             artifact=artifact, version=metadata.project_version, flet_version=flet_version
         )
-        for artifact in sorted(plan.artifacts, key=lambda item: item.target)
+        for artifact in sorted(plan.artifacts, key=attrgetter("target"))
     ]
     manifest: dict[str, Any] = {
         "artifacts": artifact_records,
