@@ -6,20 +6,27 @@ This is the canonical development and release history. Versions follow
 
 ## Unreleased
 
+## 0.2.0 - 2026-10-24
+
 ### Added
 
-- Build and verify Linux arm64 desktop archives on a native ARM64 runner.
-
-- Build Linux amd64 desktop archives and verify rendering and GNOME Keyring
-  credential persistence across separate application launches.
+- Linux amd64 and arm64 portable desktop binaries.
 
 ### Changed
 
-- Include the `v` version prefix, lowercase OS and CPU architecture in release
-  archive names, for example `lcstats-relay-v0.1.1-windows-amd64.zip`.
-
+- Name release archives `lcstats-relay-v{VERSION}-{OS}-{ARCH}`, using lowercase
+  OS names and `amd64` or `arm64` architecture labels.
+- Bundle Noto Sans JP for Japanese text rendering, including Linux ARM64 where
+  the upstream engine lacks CJK system-font fallback.
 - Run desktop builds on main and on explicit candidate requests, keeping routine
   pull-request CI focused on source checks and tests.
+
+### Notes
+
+- Linux builds target Ubuntu 22.04 with X11 and GNOME Keyring providing Secret
+  Service. Linux amd64 requires an x86-64-v2 CPU.
+- Windows amd64 remains supported. Windows ARM64 is unavailable because the
+  current Flet runtime supports x64 Windows output only.
 
 ## 0.1.0 - 2026-10-24
 

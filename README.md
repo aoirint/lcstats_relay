@@ -38,15 +38,16 @@ comes from the root `VERSION` file.
 
 ## Install and run
 
-Download the Windows x64 ZIP from the
-[Releases page](https://github.com/aoirint/lcstats_relay/releases/latest), extract
-it, and run `lcstats-relay.exe`. Python does not need to be installed separately.
-Checksums and a release manifest are provided alongside the ZIP.
+Download the archive for your OS and CPU from the
+[Releases page](https://github.com/aoirint/lcstats_relay/releases/latest).
+Python does not need to be installed separately. Checksums and a release
+manifest accompany the archives.
 
-Linux amd64 and arm64 candidates are available from the manually run `Desktop Build`
-workflow until the next release. Extract the tar.gz and run `./lcstats-relay`.
+- Windows amd64: extract the ZIP and run `lcstats-relay.exe`.
+- Linux amd64 or arm64: extract the tar.gz and run `./lcstats-relay`.
+
 See [Linux runtime prerequisites](docs/operations/release.md#linux-runtime-prerequisites)
-for desktop and GNOME Keyring requirements.
+for desktop and GNOME Keyring requirements. Windows ARM64 is not supported.
 
 To run from source, use Python 3.14 and [uv](https://docs.astral.sh/uv/):
 
