@@ -36,7 +36,10 @@ and external executables, and `github-actions-quality-check` for workflow
 triggers, workflow-level `permissions:` declarations, runners, and action pins.
 Use `github-workflow` for repository settings and enforcement. Use
 `test-quality-check` for language-independent test design, classification,
-coverage policy, and overengineering audits.
+coverage policy, and overengineering audits. When the repository uses mise,
+use `mise-workflow` for mise's own version, managed tool pins, `mise.lock`, and
+task composition; this Skill continues to own Python compatibility and the uv,
+Ruff, mypy, pytest, coverage, and distribution commands behind those tasks.
 
 This Skill owns the Python-specific baseline. Framework Skills should add only
 their framework contracts and should not redefine weaker uv, Ruff, typing,

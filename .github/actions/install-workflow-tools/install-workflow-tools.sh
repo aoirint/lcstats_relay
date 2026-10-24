@@ -41,10 +41,10 @@ main() {
     8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8 \
     actionlint
   install_archive \
-    pinact 4.1.1 \
+    pinact 5.0.0 \
     pinact_linux_amd64.tar.gz \
-    https://github.com/suzuki-shunsuke/pinact/releases/download/v4.1.1/pinact_linux_amd64.tar.gz \
-    d1cffebe5704b74e2e5f8a864efb9f7e54768972dc686188c008033fb1797841 \
+    https://github.com/suzuki-shunsuke/pinact/releases/download/v5.0.0/pinact_linux_amd64.tar.gz \
+    d005bbb85da80dacdc07816f24a5da723a9f6d1e9f3d3e7e73df33f9caa1358f \
     pinact
 
   printf 'installation-directory=%s\n' "$workflow_tools_directory" >>"$GITHUB_OUTPUT"
