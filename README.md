@@ -11,6 +11,12 @@ The app expects LCStatsTracker to return one statistics payload per HTTP
 response. After each payload is processed, LCStats Relay reconnects and waits for
 the next one.
 
+## LCStatsTracker
+
+LCStatsTracker is the Lethal Company mod that supplies statistics for this
+integration. Get it from [Thunderstore](https://thunderstore.io/c/lethal-company/p/MikuOreo/LCStatsTracker/)
+and find its source on [GitHub](https://github.com/MakuAureo/LCStatsTracker).
+
 ## Behavior
 
 LCStats Relay dispatches each received payload to registered output surfaces.
