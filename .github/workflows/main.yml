@@ -203,7 +203,7 @@ jobs:
           UV_VERSION: ${{ steps.setup.outputs.uv_version }}
           WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          uv run --locked python scripts/release_manifest.py \
+          uv run --locked python -m scripts.release_manifest \
             --artifact "windows=artifacts/lcstats-relay-${PROJECT_VERSION}-windows.zip" \
             --build-number "${BUILD_NUMBER}" \
             --source-commit "${SOURCE_COMMIT}" \
