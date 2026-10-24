@@ -37,7 +37,10 @@ license does not replace them.
   library is public-domain code; retain `licenses/LIBLZMA-COPYING.txt`.
 - Linux CPython 3.14.8: retain the license shipped in the reviewed runtime
   archive as `licenses/PYTHON-LINUX-LICENSE.txt` and the versioned Python license
-  document. Linux links desktop and system libraries supplied by the target
+  document. Its native library matches the 20261013 python-build-standalone
+  x86-64-v2 distribution. Retain its embedded-library notices and provenance in
+  `licenses/python/`. Unused DBM and Tk extensions are excluded.
+  Linux links desktop and system libraries supplied by the target
   distribution; those system packages are not included in the app archive.
 - Flutter and Dart: retain their licenses and the generated Flutter
   `data/flutter_assets/NOTICES.Z` collection.

@@ -94,7 +94,7 @@ for path in bundle.rglob('__pycache__'):
     assert path.resolve().is_relative_to(bundle)
     shutil.rmtree(path)
 for path in bundle.rglob('*'):
-    if path.is_file() and path.name.startswith('_test') and path.suffix=='.so':path.unlink()
+    if path.is_file() and path.name.startswith(('_test','_dbm.','_tkinter.')) and path.suffix=='.so':path.unlink()
     assert not (path.is_file() and any(n in path.name.lower() for n in ('mpv','ffmpeg'))),'Unexpected media runtime'
 for relative in ('python3.14/ensurepip','site-packages/pip','site-packages/flet_cli','site-packages/flet_desktop','site-packages/flet_web'):
     assert not (bundle/relative).exists(),f'Unexpected runtime tooling: {relative}'
@@ -107,6 +107,11 @@ for source in sources:
     assert hashlib.sha256(path.read_bytes()).hexdigest()==source['sha256'],'License provenance mismatch'
     shutil.copyfile(path,licenses/path.name)
 (licenses/'SOURCES.json').write_text(json.dumps(sources,indent=2)+'\n')
+notice_root=Path('packaging/licenses/linux-python')
+for notice in json.loads((notice_root/'SOURCES.json').read_text())['files']:
+    assert hashlib.sha256((notice_root/notice['file']).read_bytes()).hexdigest()==notice['sha256']
+shutil.copytree(notice_root,licenses/'python',dirs_exist_ok=True)
+
 sdk=Path(os.environ['FLUTTER_ROOT'])
 shutil.copyfile(sdk/'LICENSE',licenses/'FLUTTER-LICENSE.txt')
 shutil.copyfile(sdk/'bin/cache/dart-sdk/LICENSE',licenses/'DART-LICENSE.txt')

@@ -4,7 +4,7 @@
 
 The verified build profiles are **windows-amd64** (portable ZIP) and
 **linux-amd64** (tar.gz, preserving executable modes and links). The Linux
-baseline is Ubuntu 22.04 with an X11 desktop and GNOME Keyring providing Secret
+baseline is Ubuntu 22.04 on an x86-64-v2 CPU, with an X11 desktop and GNOME Keyring providing Secret
 Service. Native builds use the corresponding oldest supported GA runner.
 Published 0.1.0 releases remain Windows-only; these profiles apply to candidates
 and subsequent releases.
