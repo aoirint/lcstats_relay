@@ -1,6 +1,6 @@
 # Changelog
 
-This is the canonical development and GitHub release history. Versions follow
+This is the canonical development and release history. Versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); entries use
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) categories.
 
@@ -8,63 +8,31 @@ This is the canonical development and GitHub release history. Versions follow
 
 ## 0.1.0 - 2026-10-24
 
-### Added
+### Changed
 
-- Initial stable Windows x64 portable release with a desktop monitor for local
-  tracker events, Google Sheets delivery, JSON archives and durable retries.
-- Save, restore, replace and delete GAS tokens through Windows Credential Manager
-  using the official Flet credential service.
-- Retain restart-spanning operational traces and correlation IDs with Python
-  standard logging and bounded file rotation.
-- Publish root-VERSION releases with native rendering, credential restart checks,
-  checksums, runtime provenance and bundled third-party notices.
-
-### Fixed
-
-- Require an HTTP success and Boolean `ok: true` acknowledgement before accepting
-  a GAS delivery; retain failed deliveries for retry.
-
-### Security
-
-- Ship the reviewed dependency set with patched TLS trust. GAS tokens are not
-  written to settings JSON or application logs.
+- Promote `0.1.0-alpha.1` to the first stable Windows x64 release.
 
 ### Notes
 
-- Existing queue records require the current schema and a valid correlation ID;
-  unsupported records report a read error and remain untouched.
+- Application features and platform support are unchanged from `0.1.0-alpha.1`.
 
 ## 0.1.0-alpha.1 - 2026-10-24
 
 ### Added
 
-- Relay local tracker events to Google Sheets, retain local JSON archives, and
-  retry failed deliveries from a durable queue.
-- Provide connection status, receive/delivery counts, configuration and
-  GAS authentication in a desktop monitor.
-- Retain operational traces and payload correlation IDs across restarts with
-  Python standard logging and file rotation.
-- Save GAS tokens through the official Flet OS credential service, restore them
-  after restart, and support explicit replacement and deletion.
-- Build a locked Windows x64 portable bundle in PR and main CI, verify native
-  rendering and OS credential persistence across process restarts, and retain
-  runtime provenance and third-party notices before publication.
-- Define release identity in the root `VERSION` file and maintain this history.
-
-### Fixed
-
-- Accept a GAS delivery only after an HTTP success and a JSON acknowledgement
-  with Boolean `ok: true`; queue rejected or unexpected responses.
-
-### Security
-
-- Update TLS trust and vulnerable HTTP dependencies. The exact certifi pin and
-  the Python/uv security updates use the maintainer-authorized cooldown
-  exceptions documented in the development guide.
+- First public Windows x64 portable desktop release of LCStats Relay.
+- Receive statistics from LCStatsTracker and save the original JSON locally.
+- Optionally forward statistics to Google Sheets through a Google Apps Script
+  web app, with persistent retries for failed deliveries.
+- Display connection status and received/delivered counts in the desktop monitor.
+- Configure the tracker endpoint, local save directory and GAS authentication
+  from the app.
+- Save GAS tokens in Windows Credential Manager and restore them after restart.
+  Support replacing and deleting stored tokens.
+- Keep diagnostic logs across sessions for troubleshooting.
 
 ### Notes
 
-- Initial binary validation uses `0.1.0-alpha.N` versions before `0.1.0`.
-- Existing queue records require the current schema and valid correlation ID;
-  unsupported records report a read error and remain untouched.
-- `VERSION` value `0.0.0` reserves the unreleased development state.
+- Windows x64 is the packaged platform for this initial release.
+- Google Sheets delivery requires a configured Google Apps Script web app.
+  See [setup instructions](README.md#configure-and-use).
