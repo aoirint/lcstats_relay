@@ -135,7 +135,8 @@ or moving its tag.
 
 The Linux archive bundles Python and the application, not the desktop session.
 On the supported Ubuntu baseline, install `libgtk-3-0`, `libsecret-1-0`,
-`libjsoncpp25`, `libstdc++6` and `gnome-keyring`. Run the app in a graphical user
+`libjsoncpp25`, `libstdc++6`, `gnome-keyring` and Japanese fonts such as
+`fonts-noto-cjk`. Run the app in a graphical user
 session with its Secret Service unlocked. The app reports a credential-store
 failure when that service is unavailable; it does not save plaintext tokens.
 

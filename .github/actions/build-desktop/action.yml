@@ -77,7 +77,7 @@ runs:
         sudo apt-get update
         sudo apt-get install --yes --no-install-recommends \
           clang cmake ninja-build libgtk-3-dev liblzma-dev libstdc++-12-dev \
-          libsecret-1-dev libjsoncpp-dev xvfb xauth dbus-x11 gnome-keyring
+          libsecret-1-dev libjsoncpp-dev xvfb xauth dbus-x11 gnome-keyring fonts-noto-cjk
         bash .github/actions/build-desktop/build-linux.sh \
           "$PROJECT_VERSION" "$BUILD_VERSION" "$BUILD_NUMBER" "$OUTPUT_DIRECTORY"
         name="lcstats-relay-v${PROJECT_VERSION}-linux-amd64.tar.gz"
