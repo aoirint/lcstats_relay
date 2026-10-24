@@ -39,9 +39,9 @@ old absolute path before changing it and preserve pending deliveries there.
 Each UTF-8 JSONL record contains a UTC timestamp, severity, process-session ID,
 and event name. Payload events also carry a random `correlation_id`. A new
 archive filename ends in that ID, and queue records retain it across retries
-and restarts. Older queue records without a valid ID are read without modification.
-Their retry events omit the correlation ID, so cross-attempt correlation is
-available only for new records. Diagnostic metadata never triggers a migration.
+and restarts. Queue records must contain the current fields, including a valid
+correlation ID. Incompatible or corrupt records produce a queue-read error and
+remain untouched; automatic migration and legacy-format fallback are not provided.
 IDs identify a received item, not a player or a content hash. Receiving the same
 JSON twice creates two IDs; this is not remote deduplication.
 
