@@ -53,7 +53,10 @@ $env:FLUTTER_ROOT = Join-Path $taskSdk "flutter"
 $env:PATH = "$(Join-Path $env:FLUTTER_ROOT 'bin');$env:PATH"
 $taskFlutter = Join-Path $env:FLUTTER_ROOT "bin/flutter.bat"
 $taskDart = Join-Path $env:FLUTTER_ROOT "bin/cache/dart-sdk/bin/dart.exe"
-$taskFlutterMetadata = & $taskFlutter --version --machine | ConvertFrom-Json
+# First invocation can emit bootstrap output before machine-readable JSON.
+& $taskFlutter --version
+$taskFlutterJson = & $taskFlutter --version --machine | Out-String
+$taskFlutterMetadata = $taskFlutterJson | ConvertFrom-Json
 if ($taskFlutterMetadata.frameworkVersion -ne $taskProfile.flutter) { throw "Unexpected Flutter SDK" }
 
 # Download only the uv-locked runtime wheels with the repaired builder's pip.
