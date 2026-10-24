@@ -79,9 +79,9 @@ incident.
 The GAS token is not part of `RelaySettings`. **設定 → Google Apps Script → 設定**
 opens GAS authentication. **保存** stores the token in the platform credential
 store; on Windows this is **Windows 資格情報マネージャー**. Restart restores it.
-A saved-status row replaces the input field until **変更** is selected. Entering
-a replacement updates that destination's credential; a blank replacement keeps
-its saved value. A destination without a saved token retains unauthenticated
+The token field shows a masked placeholder when a token is saved. Type a
+replacement to update it; leaving the field untouched keeps the saved value.
+A destination without a saved token retains unauthenticated
 GAS behavior.
 
 **保存トークンを削除** removes the current destination's credential and memory copy.

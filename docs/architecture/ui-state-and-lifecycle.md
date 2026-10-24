@@ -32,8 +32,9 @@ Credential names combine an app prefix and a SHA-256 digest of the validated GAS
 URL. A token saved for one destination is never implicitly used for another.
 Release versions and installation paths do not enter the credential name.
 Startup restores the token before mounting editable controls. Stored values
-are never populated into controls: show the platform store name and saved
-status, and reveal an empty replacement field only after **変更**. Deletion
+are never populated into controls. A masked placeholder in the password field
+indicates a saved token, and a short helper names the platform store. The mask
+is a hint, never the field value or a replacement credential. Deletion
 removes the current destination's saved entry and memory copy, leaving its URL.
 
 OS calls have a ten-second timeout. Only Flet's documented RPC `RuntimeError`
