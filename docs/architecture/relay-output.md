@@ -49,8 +49,21 @@ If the archive write fails, later outputs are not attempted for that payload.
 
 ### Google Sheets through Google Apps Script
 
-The Google Sheets output posts the parsed JSON payload to a configured Google
-Apps Script Web App URL.
+The Google Sheets output posts the parsed LCStatsTracker JSON payload to a
+configured Apps Script receiver. The reference integration is
+[`lcstats_overlay`](https://github.com/aoirint/lcstats_overlay): its `code.gs`
+ingests the payload into Google Sheets, and its spreadsheet formulas and
+`index.html` turn the results into an OBS overlay.
+
+Compatibility is defined by this delivery contract. Another receiver can be
+used if it implements the same request, authentication and acknowledgement
+behavior. An arbitrary Apps Script web app is not sufficient.
+
+The reference receiver requires its `LCSTATS_TOKEN` script property and receives
+the matching value through the `token` query parameter. Relay adds this parameter
+to the outgoing request through its authentication adapter. Receiver deployment
+and spreadsheet setup belong to the
+[reference integration's instructions](https://github.com/aoirint/lcstats_overlay#apps-script-ingestion-security).
 
 Delivery succeeds only after a successful HTTP status, an `application/json`
 media type, and an object containing the Boolean `"ok": true`. HTML errors with
