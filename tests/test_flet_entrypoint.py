@@ -6,6 +6,7 @@ import struct
 import sys
 from pathlib import Path
 from typing import cast
+from unittest.mock import Mock
 
 import flet as ft
 import pytest
@@ -45,6 +46,9 @@ class _FakePage:
         self.platform = ft.PagePlatform.WINDOWS
         self.web = False
         self.title: str | None = None
+        self.fonts: dict[str, str] = {}
+        self.theme: ft.Theme | None = None
+        self.dark_theme: ft.Theme | None = None
         self.window = _FakeWindow()
         self.padding: int | None = None
         self.on_close: object | None = None
@@ -76,6 +80,11 @@ def test_main_configures_and_mounts_monitor(
     asyncio.run(main(cast("ft.Page", page)))
 
     assert page.title == "LCStats Relay"
+    assert page.fonts == {"NotoSansJP": "fonts/NotoSansJP.ttf"}
+    assert page.theme is not None
+    assert page.theme.font_family == "NotoSansJP"
+    assert page.dark_theme is not None
+    assert page.dark_theme.font_family == "NotoSansJP"
     assert page.window.min_width == _WINDOW_MIN_WIDTH
     assert page.window.min_height == _WINDOW_MIN_HEIGHT
     assert page.padding == _PAGE_PADDING
@@ -86,12 +95,16 @@ def test_main_configures_and_mounts_monitor(
 def test_run_starts_flet_runtime(*, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Pass the async page target to the Flet runtime."""
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
-    targets: list[object] = []
-    monkeypatch.setattr(ft, "run", targets.append)
+    runner = Mock()
+    monkeypatch.setattr(ft, "run", runner)
 
     run()
 
-    assert targets == [main]
+    assert runner.call_count == 1
+    assert runner.call_args.args == (main,)
+    assets = Path(runner.call_args.kwargs["assets_dir"])
+    assert (assets / "fonts/NotoSansJP.ttf").is_file()
+    assert (assets / "fonts/OFL.txt").is_file()
 
 
 @pytest.mark.parametrize("valid_png", [True, False])

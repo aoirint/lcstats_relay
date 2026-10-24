@@ -52,3 +52,12 @@ license does not replace them.
 Source license copies and their provenance are recorded in
 `packaging/licenses/SOURCES.json`. Review build inputs and license collection
 again when the native dependency profile changes.
+
+## Noto Sans JP
+
+The Japanese UI uses the unmodified Noto Sans JP variable font from
+[Google Fonts](https://github.com/google/fonts/tree/66a36c8c94b1a5d992ee4e7f392fccfe4945767c/ofl/notosansjp).
+It is licensed under the SIL Open Font License 1.1. Its `OFL.txt` and provenance
+accompany the font in `src/assets/fonts/` and in distributed assets.
+The selected source commit was published on 2026-03-25 and satisfies the normal
+seven-day cooldown. The font is loaded locally at runtime.

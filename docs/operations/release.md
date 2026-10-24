@@ -141,8 +141,7 @@ or moving its tag.
 
 The Linux archive bundles Python and the application, not the desktop session.
 On the supported Ubuntu baseline, install `libgtk-3-0`, `libsecret-1-0`,
-`libjsoncpp25`, `libstdc++6`, `gnome-keyring` and Japanese fonts such as
-`fonts-noto-cjk`. Run the app in a graphical user
+`libjsoncpp25`, `libstdc++6` and `gnome-keyring`. Run the app in a graphical user
 session with its Secret Service unlocked. The app reports a credential-store
 failure when that service is unavailable; it does not save plaintext tokens.
 
@@ -157,3 +156,13 @@ bash .github/actions/build-desktop/build-linux.sh VERSION BUILD_VERSION BUILD_NU
 Replace the first three arguments with the actual root version, its numeric
 three-part build version and a positive build number. The same script runs the
 isolated native rendering and keyring checks before creating a tar.gz.
+
+## Japanese font assets
+
+The UI registers the bundled Noto Sans JP through Flet's standard font API.
+This avoids the official Linux ARM64 engine's missing CJK system-font fallback
+([upstream issue](https://github.com/flutter/flutter/issues/139293)).
+The font, OFL notice and pinned Google source provenance live in `src/assets/fonts/`.
+Flet includes that standard assets directory in native bundles; the Python wheel
+also installs it alongside the application package. Source and wheel launches
+pass its absolute path to Flet. No runtime download is required.

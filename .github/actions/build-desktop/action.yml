@@ -84,7 +84,7 @@ runs:
         sudo apt-get update
         sudo apt-get install --yes --no-install-recommends \
           clang cmake ninja-build libgtk-3-dev liblzma-dev libstdc++-12-dev \
-          libsecret-1-dev libjsoncpp-dev xvfb xauth dbus-x11 gnome-keyring fonts-noto-cjk \
+          libsecret-1-dev libjsoncpp-dev xvfb xauth dbus-x11 gnome-keyring \
           libgl1-mesa-dri libglx-mesa0
         bash .github/actions/build-desktop/build-linux.sh \
           "$PROJECT_VERSION" "$BUILD_VERSION" "$BUILD_NUMBER" "$OUTPUT_DIRECTORY"
