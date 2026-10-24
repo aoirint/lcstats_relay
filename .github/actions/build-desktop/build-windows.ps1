@@ -101,7 +101,7 @@ try {
     } finally { $taskStream.Dispose() }
 } finally { $taskZip.Dispose() }
 
-uv run --locked flet build windows --project lcstats_relay --arch x64 --python-version 3.14 --template $taskTemplate --build-version $BuildVersion --build-number $BuildNumber --yes --verbose
+uv run --locked flet build windows --project lcstats_relay --python-version 3.14 --template $taskTemplate --build-version $BuildVersion --build-number $BuildNumber --yes --verbose
 
 # Flet's extension registration changes its path spelling, not hosted resolutions.
 # Reject any change in the reviewed set, versions, archive hashes or sources.
