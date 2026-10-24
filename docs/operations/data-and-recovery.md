@@ -29,7 +29,7 @@ whole-directory durability across sudden storage or operating-system failure.
 
 ## Diagnostic logs
 
-Expand **診断ログと保存先** in the monitor, or open Settings, to see the actual
+Select **ログ** beside Settings in the monitor to see the actual
 absolute settings, archive, queue, and log paths. Existing relative `data_dir`
 values resolve against the current process working directory, which can be
 inside Flet's extracted application directory in older distributions.
@@ -69,7 +69,8 @@ evidence rather than a power-loss-durable transaction journal. Forced process
 termination can omit the final exit or delivery events.
 
 If creation, writing, rotation, or closing fails, Relay continues operating.
-The UI marks **診断ログ書き込み失敗** on its next state refresh; this warning
+The **ログ** button turns red and shows an error icon on its next state refresh; its tooltip
+reports **診断ログ書き込み失敗**. This warning
 remains for the process lifetime because some records may already be missing.
 Correct permissions/free space and restart. A final close failure may occur
 after the UI has closed. The error fallback never prints the failed record or

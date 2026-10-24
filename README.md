@@ -75,7 +75,7 @@ longer needed.
 
 ## Troubleshooting
 
-Expand **診断ログと保存先** in the monitor to find the actual absolute paths.
+Select **ログ** beside Settings to see the actual absolute paths.
 Operational logs follow reception, archive, GAS delivery, and retries without
 copying player data or credentials. See
 [diagnostic logging and safe sharing](docs/operations/data-and-recovery.md#diagnostic-logs)
