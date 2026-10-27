@@ -92,11 +92,11 @@ was removed; its patched floor is now 1.2.3.
 
 Actions use immutable release commits: setup-uv 10.3.0, upload-artifact 7.0.2,
 and download-artifact 8.0.2. Workflow checking uses pinact 5.0.0; its long CLI
-flags already use the required double-dash form. Shared Skills use the reviewed
-2026-09-01 commit recorded in the APM lock and third-party notices.
+flags already use the required double-dash form. Shared Skills use the exact reviewed
+commit recorded in the APM lock and third-party notices.
 
-APM remains at the repository-reviewed 0.28.0 bootstrap. The newer 0.33.0 CLI
-requires a separate bootstrap/lock-generator migration review; it was not
-substituted merely because it has completed cooldown. Python remains on the
+APM uses the repository-reviewed 0.34.0 bootstrap and its reviewed deployment
+ledger. Complete a new or rebuilt ledger before frozen verification as described
+in [AGENTS.md](../../AGENTS.md); ordinary restores remain frozen. Python remains on the
 3.14 line used by the native packaging contract. A Python 3.15 migration and
 native Flet 1.0.4 artifact verification remain separate validation work.

@@ -152,6 +152,9 @@ notes, also update the appropriate docs or changelog.
 - If verification is still impossible after setup, state the concrete blocker and the command that
   could not run.
 - Keep verification consistent across local fixes, commits, and review or handoff preparation.
+- Report serious findings discovered during normal review even when their repair is outside the
+  requested change. Distinguish the observed defect and any verification or release blocker from
+  a proposed unrelated repair; reporting the finding does not expand the implementation scope.
 - Record skipped checks with a concrete reason, not a generic "not run" note.
 
 ## Supply-Chain Baseline
