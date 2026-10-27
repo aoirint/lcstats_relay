@@ -37,8 +37,10 @@ use the applicable documentation-system or domain-specific skill.
    - User-facing.
    - Maintainer-facing.
    - External-contract text.
-2. Confirm the intended claim and factual source are known. If ownership or evidence is disputed,
-   stop prose-only revision at that boundary and report the gap.
+2. Confirm the purpose, intended claim, factual source, and destination for this edit.
+   Reuse context already supplied by the request or document; resolve only missing context that
+   could change the edit. If ownership or evidence is disputed, stop prose-only revision at that
+   boundary and report the gap.
 3. Identify overloaded prose:
    - Sentences carrying multiple ideas, conditions, time references, confidence levels, or
      relationships.
@@ -86,6 +88,8 @@ use the applicable documentation-system or domain-specific skill.
 8. Use as many short sentences or nested bullets as needed. Do not force a fixed sentence count
    when the content needs a different shape.
 9. Re-read the result as a whole and use the domain-specific skill when one owns the document type.
+   - Compare the actual edited destination and scope with the request and any wording or meaning
+     the user asked to retain.
    - Confirm it still answers the same question as the original wording.
    - Confirm each list or paragraph has one clear job.
    - Confirm the structure did not imply a stronger, weaker, broader, or narrower claim than the
@@ -99,6 +103,12 @@ use the applicable documentation-system or domain-specific skill.
    configuration, such as `hugo-quality-check`, use that asset instead of
    recreating its exceptions in the consumer. Use `github-actions-quality-check`
    to wire the repository-owned configuration into CI.
+
+## Optional handoff notes
+
+For a requested resumable handoff, use [handoff-notes.md](references/handoff-notes.md) to select the
+decisions and open questions the next reader needs. Keep the existing factual-ownership boundary
+and preserve the user's choice of destination and level of detail.
 
 ## Output checklist
 
