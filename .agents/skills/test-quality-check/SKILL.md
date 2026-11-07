@@ -2,10 +2,11 @@
 name: test-quality-check
 description: >-
   Design, review, and refactor automated tests for behavioral value, useful
-  classification, deterministic oracles, complete statement and branch
-  coverage, CI parity, and freedom from redundant or implementation-coupled
-  assertions. Use when adding or changing tests, coverage gates, test jobs, or
-  when auditing an existing suite for gaps, brittleness, or overengineering.
+  classification, deterministic oracles, statement and branch coverage
+  contracts, CI parity, and freedom from redundant or implementation-coupled
+  assertions. Use when deciding whether a fix needs lasting regression coverage,
+  adding or changing tests, coverage gates, or test jobs, or auditing a suite
+  for gaps, brittleness, or overengineering.
 ---
 
 # Test Quality Check
@@ -20,9 +21,10 @@ with `github-actions-quality-check` for workflow security and structure.
 ## Quality Standard
 
 - Test observable behavior through the narrowest stable production interface.
-- Require 100% statement and branch coverage for maintained first-party
-  executable code by default, using equivalent local and CI gates. Coverage is
-  a completeness floor, not evidence that assertions are meaningful.
+- Preserve explicit repository and applicable language/domain coverage
+  requirements, using equivalent local and CI gates. When establishing a new
+  policy, use 100% statement and branch coverage for maintained first-party
+  executable code as the default. Coverage does not prove meaningful assertions.
 - Cover meaningful success, failure, boundary, state, effect, and cleanup
   contracts. Add concurrency, compatibility, and recovery cases only when the
   product contract or risk justifies them.
@@ -38,6 +40,9 @@ with `github-actions-quality-check` for workflow security and structure.
    - Read requirements, production code, tests, coverage configuration, local
      commands, CI, and relevant defect history.
    - Identify public contracts and risks before counting test cases or lines.
+   - For a fix, use the [regression-test retention decision](references/coverage-and-suite-audit.md#regression-test-retention)
+     before adding a permanent test. Verification is required; a new test per
+     fix is not. Reuse or extend existing coverage when it proves the failure.
 2. Classify and place tests.
    - Read [classification-and-placement.md](references/classification-and-placement.md).
    - Name a test by the behavior and outcome it proves. Choose unit,
@@ -51,10 +56,13 @@ with `github-actions-quality-check` for workflow security and structure.
    - Use one behavioral reason per test. Multiple assertions are appropriate
      when together they establish that one outcome.
    - Parameterize genuinely equivalent cases; keep distinct behaviors separate.
-4. Enforce complete coverage without gaming it.
-   - Measure maintained first-party statements and branches at 100% locally and
-     in CI when the ecosystem supports them.
-   - Inspect every uncovered branch. Test reachable behavior; remove dead code;
+4. Enforce the coverage contract without gaming it.
+   - Apply the required thresholds and source scope locally and in CI when the
+     ecosystem supports them; report unsupported metrics explicitly.
+   - Keep a focused fix within scope. Do not raise thresholds or repair unrelated
+     suite gaps unless the task includes that work. Report any unmet required
+     gate without silently weakening it.
+   - Inspect uncovered branches in the affected scope. Test reachable behavior; remove dead code;
      or document a narrow, reviewed exclusion for generated, platform-impossible,
      or tool-instrumentation code.
    - Do not use broad omissions, defensive import guards, empty assertions, or
@@ -79,12 +87,15 @@ with `github-actions-quality-check` for workflow security and structure.
    - When feasible, demonstrate that a new regression test fails without the
      production fix and passes with it.
    - Report commands, statement and branch totals, behavioral gaps closed,
-     redundant tests removed, justified exclusions, and skipped checks.
+     redundant tests removed, justified exclusions, and skipped checks. For a
+     fix, briefly explain the retained regression evidence or why no permanent
+     test was added, including any remaining gap.
 
 ## Completion Checklist
 
 - Every retained test contributes distinct behavioral, risk, or contract evidence.
-- Maintained first-party executable code meets 100% statement and branch coverage.
+- Required coverage thresholds and scope are met, or concrete gaps and
+  unsupported metrics are reported without claiming a pass.
 - Local and CI gates use equivalent test selection and thresholds.
 - No deletion-only or source-string-presence test remains without a documented,
   observable contract.
