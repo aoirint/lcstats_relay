@@ -95,7 +95,7 @@ and download-artifact 8.0.2. Workflow checking uses pinact 5.0.0; its long CLI
 flags already use the required double-dash form. Shared Skills use the exact reviewed
 commit recorded in the APM lock and third-party notices.
 
-APM uses the repository-reviewed 0.34.0 bootstrap and its reviewed deployment
+APM uses the repository-reviewed 0.35.0 bootstrap and its reviewed deployment
 ledger. Complete a new or rebuilt ledger before frozen verification as described
 in [AGENTS.md](../../AGENTS.md); ordinary restores remain frozen. Python remains on the
 3.14 line used by the native packaging contract. A Python 3.15 migration and

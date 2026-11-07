@@ -2,8 +2,9 @@
 
 ## Overview
 
-Design and maintain focused behavioral tests with complete statement and branch
-coverage while removing redundant, brittle, and implementation-coupled tests.
+Design and maintain focused behavioral tests, preserve required coverage, and
+choose useful lasting regression evidence while removing redundant, brittle,
+and implementation-coupled tests.
 
 ## Install
 

@@ -1,4 +1,4 @@
 interface:
   display_name: "Test Quality Check"
-  short_description: "Design focused tests with complete coverage."
-  default_prompt: "Use $test-quality-check to review these tests for behavioral value, coverage completeness, and overengineering."
+  short_description: "Choose focused tests and lasting regression evidence."
+  default_prompt: "Use $test-quality-check to decide which regression tests this change needs and review the suite for behavioral value, coverage requirements, and overengineering."
