@@ -38,7 +38,7 @@ placeholder `0.0.0` and is not the desktop release authority.
 such as `## 0.1.0-alpha.1 - 2026-10-24`. Publication selects that section as the
 release body. Keep `Unreleased` for subsequent work.
 
-## Reviewed build inputs
+## Build inputs
 
 [`packaging/windows-toolchain.json`](../../packaging/windows-toolchain.json)
 pins artifact URLs and SHA-256 digests for Flutter 3.44.8, Flet's 1.0.4 template,
@@ -51,7 +51,7 @@ It verifies the source commit and preloads checksum-pinned official ARM64 Dart,
 engine and font archives into Flutter's standard cache before executing the
 SDK. The upstream runtime/bootstrap code remains unchanged. Their
 releases satisfy the seven-day cooldown. The official template receives
-the reviewed Dart lock; runtime/bootstrap code is unchanged.
+the Dart lock; runtime/bootstrap code is unchanged.
 
 The source/CI builder uses Python 3.14.9 and uv 0.13.5. Runtime wheels are
 exported from `uv.lock` and downloaded with hash enforcement using the repaired
@@ -62,8 +62,8 @@ The [Python security release](https://www.python.org/downloads/release/python-31
 addresses bundled pip's trust store; builder and embedded identities are
 recorded separately rather than claiming they share a patch version.
 
-The Dart graph in `packaging/pubspec.lock` contains 135 reviewed hosted
-packages. Enforce its hashes before build execution and reject hosted graph
+The Dart graph in `packaging/pubspec.lock` pins hosted packages. Enforce its
+hashes before build execution and reject hosted graph
 changes after Flet registers its official SecureStorage extension. Updating
 these pins requires a fresh provenance, compatibility and cooldown review.
 
@@ -78,8 +78,8 @@ C++ workload and ATL installed. For the unreleased `VERSION` value `0.0.0`:
 
 Use the actual root version and its numeric build version for other candidates.
 The script uses a workspace build directory when `RUNNER_TEMP` is unset. Its
-first run downloads the reviewed SDK and runtime artifacts. It does not request
-publication.
+first run downloads the checksum-pinned SDK and runtime artifacts. It does not
+request publication.
 
 ## Verification and publication
 
