@@ -1,13 +1,14 @@
 # UI state and lifecycle
 
-## Current ownership
+## State ownership
 
 `MonitorController` owns the active manager, persisted non-secret settings and
-the current GAS token loaded from an OS credential store. `MonitorView` owns the Flet controls. It renders three full-window
-views inside one root container: monitor, general settings, and GAS
-authentication.
+the active GAS token loaded from an OS credential store.
 
-Logging adds no view or configuration fields; the existing storage setting
+`MonitorView` owns the Flet controls. It renders three full-window views inside
+one root container: monitor, general settings, and GAS authentication.
+
+Logging adds no view or configuration fields; the storage setting
 controls archive/queue data only. See the [logging decision](relay-output.md#operational-diagnostics).
 
 The manager owns receiver and retry tasks. `RelayStateStore` emits copied
@@ -22,11 +23,11 @@ through the Flet-free `GasTokenStore` port. This avoids another third-party
 Python keyring library or a custom Win32 implementation. Memory-only storage
 does not meet the restart requirement; plaintext settings are excluded.
 
-The reviewed Windows backend, `flutter_secure_storage_windows` 4.1.0, calls
+The Windows backend, `flutter_secure_storage_windows` 4.1.0, calls
 `CredReadW`, `CredWriteW`, and `CredDeleteW`, with machine-persistent credentials
 for the current user. Windows backward-compatibility migration is disabled.
 See the [official Flet source](https://github.com/flet-dev/flet/tree/v1.0.4/sdk/python/packages/flet-secure-storage)
-and [reviewed Windows backend](https://pub.dev/packages/flutter_secure_storage_windows/versions/4.1.0).
+and [Windows backend](https://pub.dev/packages/flutter_secure_storage_windows/versions/4.1.0).
 
 On Linux the same official service delegates to libsecret and Secret Service.
 GNOME Keyring is the verified provider; a graphical session with an unlocked

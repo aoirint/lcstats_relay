@@ -67,7 +67,7 @@ The seven-day default remains active for every other dependency.
   managed Python builds. Normal eligibility begins 2026-10-29.
 - [Python 3.14.9](https://www.python.org/downloads/release/python-3149/):
   the 2026-10-21 security release replaces the affected bundled pip CA store.
-  Its managed build is delivered by the reviewed uv release; the source-run
+  Its managed build is delivered by uv 0.13.5; the source-run
   and CI Python patch is pinned in `.python-version`.
 - `urllib3>=2.8.0` addresses
   [chunked streaming](https://github.com/advisories/GHSA-vxq7-64xx-v4gw),
@@ -83,7 +83,7 @@ These changes cover the locked source environment and CI builder. A new native
 Flet bundle has not been built or inspected, so its embedded interpreter and
 trust store are not yet verified by this change.
 
-## Reviewed dependency snapshot (2026-10-24)
+## Dependency snapshot (2026-10-24)
 
 The source environment uses Flet 1.0.4 as a matching Python/CLI/web/desktop set,
 with mypy 2.4.0 and Ruff 0.17.1. The lock includes all compatible transitive
@@ -92,11 +92,11 @@ was removed; its patched floor is now 1.2.3.
 
 Actions use immutable release commits: setup-uv 10.3.0, upload-artifact 7.0.2,
 and download-artifact 8.0.2. Workflow checking uses pinact 5.0.0; its long CLI
-flags already use the required double-dash form. Shared Skills use the exact reviewed
-commit recorded in the APM lock and third-party notices.
+flags already use the required double-dash form. Shared Skills are pinned by
+commit in the APM manifest.
 
-APM uses the repository-reviewed 0.35.0 bootstrap and its reviewed deployment
-ledger. Complete a new or rebuilt ledger before frozen verification as described
-in [AGENTS.md](../../AGENTS.md); ordinary restores remain frozen. Python remains on the
+Use APM CLI 0.35.0. Complete and review a new or rebuilt deployment ledger
+before frozen verification as described in [AGENTS.md](../../AGENTS.md); ordinary
+restores remain frozen. Python remains on the
 3.14 line used by the native packaging contract. A Python 3.15 migration and
 native Flet 1.0.4 artifact verification remain separate validation work.
