@@ -6,6 +6,11 @@ This is the canonical development and release history. Versions follow
 
 ## Unreleased
 
+### Notes
+
+- New Linux amd64 and arm64 builds require Ubuntu 24.04. Ubuntu 22.04 is no
+  longer supported.
+
 ## 0.2.0 - 2026-10-24
 
 ### Added
