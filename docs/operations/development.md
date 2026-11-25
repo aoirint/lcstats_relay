@@ -59,9 +59,8 @@ The maintainer authorized exact cooldown exceptions for verified security fixes.
 The seven-day default remains active for every other dependency.
 
 - [certifi GHSA-6q48-6c7w-9gw2](https://github.com/advisories/GHSA-6q48-6c7w-9gw2):
-  pin `certifi==2026.10.19` to remove the compromised emSign trust anchor.
-  Its artifacts were uploaded on 2026-10-20; remove only its cooldown waiver
-  after 2026-10-27T02:24:16Z. Keep the patched version floor when unpinning.
+  the 2026-10-24 update pinned `certifi==2026.10.19` to remove the compromised
+  emSign trust anchor. The temporary cooldown exception has since been removed.
 - [uv 0.13.5](https://github.com/astral-sh/uv/releases/tag/0.13.5):
   published 2026-10-22, removes compromised CA trust and includes repaired
   managed Python builds. Normal eligibility begins 2026-10-29.
