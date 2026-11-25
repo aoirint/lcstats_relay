@@ -161,7 +161,7 @@ assert (bundle/'data/flutter_assets/NOTICES.Z').is_file()
 PY
 
 # The keyring and display live for all three independent executable launches.
-xvfb-run --auto-servernum dbus-run-session -- bash \
+dbus-run-session -- bash \
   .github/actions/build-desktop/verify-linux.sh "$PWD/build/linux" "$task_version" "$task_profile"
 task_name="lcstats-relay-v$task_version-linux-$task_arch"
 uv run --locked python scripts/package_desktop.py --build-directory build/linux \

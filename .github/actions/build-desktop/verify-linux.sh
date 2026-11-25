@@ -11,7 +11,23 @@ chmod 700 "$task_probe/run"
 export XDG_RUNTIME_DIR="$task_probe/run"
 export XDG_CACHE_HOME="$task_probe/cache" XDG_STATE_HOME="$task_probe/state"
 export FLET_APP_CONSOLE="$task_probe/console.log" PYTHONDONTWRITEBYTECODE=1
-export GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1
+# Exercise native Wayland without an X11 or XWayland fallback.
+unset DISPLAY WAYLAND_SOCKET
+export GDK_BACKEND=wayland LIBGL_ALWAYS_SOFTWARE=1
+export WAYLAND_DISPLAY=wayland-lcstats
+weston --backend=headless --renderer=gl --no-config --idle-time=0 \
+  --socket="$WAYLAND_DISPLAY" > "$task_probe/weston.log" 2>&1 &
+weston_pid=$!
+trap 'kill "$weston_pid" 2>/dev/null || true; wait "$weston_pid" 2>/dev/null || true' EXIT
+for ((attempt=0; attempt<100; attempt++)); do
+  [[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]] && break
+  kill -0 "$weston_pid" 2>/dev/null || break
+  sleep 0.1
+done
+if ! [[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]] || ! kill -0 "$weston_pid" 2>/dev/null; then
+  cat "$task_probe/weston.log" >&2
+  exit 1
+fi
 export LCSTATS_RELAY_STARTUP_CHECK="$task_probe/startup.json"
 LCSTATS_RELAY_PROBE_VALUE="$(uv run --locked python -c 'import secrets; print(secrets.token_hex(24))')"
 export LCSTATS_RELAY_PROBE_VALUE

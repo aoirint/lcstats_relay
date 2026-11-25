@@ -83,9 +83,9 @@ runs:
         [[ "$TARGET" == "linux-$arch" ]]
         sudo apt-get update
         sudo apt-get install --yes --no-install-recommends \
-          clang cmake ninja-build libgtk-3-dev liblzma-dev libstdc++-12-dev \
-          libsecret-1-dev libjsoncpp-dev xvfb xauth dbus-x11 gnome-keyring \
-          libgl1-mesa-dri libglx-mesa0
+          clang cmake ninja-build libgtk-3-dev liblzma-dev libstdc++-13-dev \
+          libsecret-1-dev libjsoncpp-dev weston dbus-daemon gnome-keyring \
+          libegl-mesa0 libgl1-mesa-dri
         bash .github/actions/build-desktop/build-linux.sh \
           "$PROJECT_VERSION" "$BUILD_VERSION" "$BUILD_NUMBER" "$OUTPUT_DIRECTORY"
         name="lcstats-relay-v${PROJECT_VERSION}-$TARGET.tar.gz"

@@ -4,9 +4,9 @@
 
 The verified build profiles are **windows-amd64** (portable ZIP),
 **linux-amd64** and **linux-arm64** (tar.gz, preserving executable modes and
-links). The Linux baseline is Ubuntu 22.04 with an X11 desktop and GNOME Keyring
-providing Secret Service; amd64 also requires an x86-64-v2 CPU. Native builds use
-the corresponding oldest supported GA runner, including `ubuntu-22.04-arm`.
+links). Linux builds target Ubuntu 24.04 Desktop; amd64 also requires an
+x86-64-v2 CPU. Native builds use the corresponding oldest supported GA runner,
+including `ubuntu-24.04-arm`.
 Published 0.1.0 releases remain Windows-only; these profiles apply to candidates
 and subsequent releases.
 
@@ -94,9 +94,10 @@ request publication.
    rendered first page and records actual Python/Flet/TLS versions.
 3. Three separate launches save an inert credential for a reserved-domain key,
    read it after restart and delete it, then confirm its absence. Temporary
-   settings and logs are isolated from production data. Linux uses Xvfb and a
-   separate D-Bus session with a temporary, unlocked GNOME Keyring. No live GAS request
-   is made.
+   settings and logs are isolated from production data. On Linux, CI runs the
+   binary natively on headless Wayland with Weston and no X11 fallback. It uses
+   a separate D-Bus session with a temporary, unlocked GNOME Keyring. No live
+   GAS request is made.
 4. Retain Python package licenses, Flutter notices and versioned Dart source
    references. Exclude unused Tk, debug/test artifacts and caches; reject media
    runtimes outside this profile.
@@ -140,7 +141,7 @@ or moving its tag.
 ## Linux runtime prerequisites
 
 The Linux archive bundles Python and the application, not the desktop session.
-On the supported Ubuntu baseline, install `libgtk-3-0`, `libsecret-1-0`,
+On the supported Ubuntu baseline, install `libgtk-3-0t64`, `libsecret-1-0`,
 `libjsoncpp25`, `libstdc++6` and `gnome-keyring`. Run the app in a graphical user
 session with its Secret Service unlocked. The app reports a credential-store
 failure when that service is unavailable; it does not save plaintext tokens.
