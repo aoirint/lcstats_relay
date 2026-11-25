@@ -5,7 +5,7 @@
   "embedded_python": "3.14.8",
   "python_build": "20261016",
   "compiler_build": "20261001",
-  "certifi": "2026.10.19",
+  "certifi": "2026.10.23",
   "inputs": [
     {
       "name": "template",

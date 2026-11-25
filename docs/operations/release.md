@@ -57,7 +57,7 @@ The source/CI builder uses Python 3.14.9 and uv 0.13.5. Runtime wheels are
 exported from `uv.lock` and downloaded with hash enforcement using the repaired
 builder pip. Flet's packaging interpreter installs only those local wheels,
 under exact constraints, with indexes and pip version checks disabled. The
-embedded runtime contains no pip/ensurepip and carries certifi 2026.10.19.
+embedded runtime contains no pip/ensurepip and carries the certifi version from the Python lock.
 The [Python security release](https://www.python.org/downloads/release/python-3149/)
 addresses bundled pip's trust store; builder and embedded identities are
 recorded separately rather than claiming they share a patch version.
